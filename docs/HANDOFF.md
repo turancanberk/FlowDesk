@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 09 birleştirildi) |
-| Son commit | `5d22d7a — docs: sayaç çakışması düzeltmesi kaydedildi` (Faz 08) |
+| Son commit | `49a2645 — Merge branch 'feat/dashboard'` (Faz 09) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
