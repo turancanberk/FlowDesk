@@ -119,7 +119,10 @@ function ControlsSections() {
             <Specimen label="Seçim">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="ds-select">Öncelik</Label>
-                <Select defaultValue="Medium">
+                <Select
+                  items={{ Low: "Düşük", Medium: "Orta", High: "Yüksek", Urgent: "Acil" }}
+                  defaultValue="Medium"
+                >
                   <SelectTrigger id="ds-select" className="w-full">
                     <SelectValue />
                   </SelectTrigger>

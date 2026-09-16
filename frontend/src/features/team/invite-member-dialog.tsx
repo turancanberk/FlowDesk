@@ -148,6 +148,9 @@ export function InviteMemberDialog({
                 <FieldLabel required>Rol</FieldLabel>
                 <FieldControl>
                   <Select
+                    items={Object.fromEntries(
+                      offeredRoles.map((role) => [role, membershipRoleLabels[role].label]),
+                    )}
                     defaultValue="Agent"
                     onValueChange={(value) => {
                       setValue("role", value as MembershipRole);
