@@ -20,24 +20,42 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Viewer, WorkspaceAction.Update, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageMembers, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.Delete, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.ViewTickets, true)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageTickets, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.CommentOnTickets, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteTickets, false)]
     // Agent: works with the data, does not administer the workspace.
     [InlineData(MembershipRole.Agent, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.ViewMembers, true)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.Update, false)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.ManageMembers, false)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.Delete, false)]
+    [InlineData(MembershipRole.Agent, WorkspaceAction.ViewTickets, true)]
+    [InlineData(MembershipRole.Agent, WorkspaceAction.ManageTickets, true)]
+    [InlineData(MembershipRole.Agent, WorkspaceAction.CommentOnTickets, true)]
+    // Deleting a ticket destroys a thread outright, so it stays with the
+    // people who administer the workspace.
+    [InlineData(MembershipRole.Agent, WorkspaceAction.DeleteTickets, false)]
     // Admin: administers the workspace but cannot delete it.
     [InlineData(MembershipRole.Admin, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.ViewMembers, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.Update, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.ManageMembers, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.Delete, false)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.ViewTickets, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.ManageTickets, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.CommentOnTickets, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteTickets, true)]
     // Owner: everything.
     [InlineData(MembershipRole.Owner, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.ViewMembers, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.Update, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.ManageMembers, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.Delete, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.ViewTickets, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.ManageTickets, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.CommentOnTickets, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteTickets, true)]
     public void The_matrix_matches_the_documented_rules(
         MembershipRole role,
         WorkspaceAction action,
