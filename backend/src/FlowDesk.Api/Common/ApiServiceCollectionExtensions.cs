@@ -39,6 +39,7 @@ using FlowDesk.Application.Tasks.DeleteTask;
 using FlowDesk.Application.Tasks.GetTask;
 using FlowDesk.Application.Tasks.ListTasks;
 using FlowDesk.Application.Tasks.UpdateTask;
+using FlowDesk.Application.Dashboard.GetDashboard;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -101,6 +102,8 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<DeleteTaskHandler>();
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<ListTasksHandler>();
+
+        services.AddScoped<GetDashboardHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 

@@ -41,6 +41,7 @@ app.MapTeamEndpoints();
 app.MapCustomerEndpoints();
 app.MapTicketEndpoints();
 app.MapTaskEndpoints();
+app.MapDashboardEndpoints();
 
 await app.RunAsync();
 
