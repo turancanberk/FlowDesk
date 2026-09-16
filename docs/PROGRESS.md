@@ -18,7 +18,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 06 — Müşteriler
 - [x] Faz 07 — Talepler
 - [x] Faz 08 — Görevler
-- [ ] Faz 09 — Dashboard
+- [x] Faz 09 — Dashboard
 - [ ] Faz 10 — RabbitMQ ve Worker
 - [ ] Faz 11 — Outbox
 - [ ] Faz 12 — E-posta ve Bildirimler
@@ -36,13 +36,44 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 09 — Dashboard**
+**Faz 10 — RabbitMQ ve Worker**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 09 — Dashboard · Tamamlandı
+
+Tek uç nokta, tek use case: `GET /api/workspaces/{slug}/dashboard` (ADR-0031).
+
+- Altı rakam: müşteri, açık talep, atanmamış talep, geciken görev, bu hafta
+  biten görev, ekip üyesi.
+- Talep durum dağılımı, enum sırasında — sayıya göre sıralamak çubukları her
+  yenilemede yerinden oynatırdı.
+- Son hareket eden beş talep ve en yakın beş görev.
+- Bütün rakamlar **tek bir ana** karşı okunuyor; saat sorgu başına okunsaydı bir
+  görev sayıda gecikmiş, yanındaki listede gecikmemiş görünebilirdi.
+- "Açık talep" bitmemiş demek: `Open + InProgress + Waiting`. Yalnızca `Open`
+  sayılsaydı ekran kuyruk dolarken sakin görünürdü.
+- Üye sayımı sayfadaki tek elle kapsanan sorgu; `Membership` bilinçli olarak
+  global query filter dışında (ADR-0024) ve eksik bir koşul başka bir kuruluşun
+  mevcudunu raporlardı. İzolasyon testi bunu ayrıca doğruluyor.
+- **Önbellek yok.** Redis Faz 15'te ve ancak gerçek bir ölçümden sonra.
+- **Grafik kütüphanesi yok.** Dağılım CSS ile çizilen yığılmış bir çubuk;
+  `aria-hidden` ve yanındaki lejant aynı bilgiyi metin olarak veriyor.
+- Etkinlik akışı bu fazda **yok**. `ActivityEvent` Faz 14'e ait; uydurma bir
+  akış göstermek yerine son hareket eden talepler ve yaklaşan görevler
+  gösteriliyor — ikisi de gerçek veri.
+
+Arayüz: altı rakam ayrı kartlar yerine tek şeritte, ince çizgilerle bölünmüş.
+Kartlar sayıları birbirinden uzaklaştırıp bir bakışı taramaya çevirirdi; bu
+rakamlar birlikte, çalışma alanı hakkında tek bir cümle olarak okunuyor.
+
+Testler: 386/386 (201 birim + 185 entegrasyon).
+
+---
 
 ### Faz 08 — Görevler · Tamamlandı
 
@@ -593,6 +624,17 @@ Faz 08 sonunda:
 | `npm --prefix frontend run lint / typecheck / build` | Başarılı |
 | Çalışan API'ye karşı 14 adımlık görev akışı | Tamamı geçti — gecikme hesabı, tamamlanma tarihinin temizlenmesi, null'un alanı temizlemesi, sıralama, izolasyon `404`, rol matrisi |
 | `/app/{slug}/tasks` | HTTP 200, doğru başlık, uygulama hatası yok |
+
+Faz 09 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 386/386 başarılı (201 birim + 185 entegrasyon) |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| Çalışan API'ye karşı 11 adımlık dashboard akışı | Tamamı geçti — açık talep tanımı, atanmamış sayımı, geciken/bu hafta ayrımı, enum sıralı dağılım, izolasyon `404`, izleyici erişimi |
+| `/app/{slug}/dashboard` | HTTP 200, doğru başlık, uygulama hatası yok |
+| Migration | **Yok** — bu faz yalnızca okuma yapıyor |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
