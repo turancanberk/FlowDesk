@@ -76,6 +76,56 @@ public sealed class TicketNumberingTests
     }
 
     /// <summary>
+    /// The very first tickets in a workspace race on creating the counter row
+    /// itself, not just on reading it.
+    /// </summary>
+    /// <remarks>
+    /// Regression test. FOR UPDATE can only lock a row that exists, so before
+    /// the counter is seeded there is nothing to serialise on: two simultaneous
+    /// first creations both found no counter, both inserted one, and the second
+    /// failed on the primary key with a 500.
+    ///
+    /// Separate from the ten-way test below because it is a different failure
+    /// with a different cause, and because a cold workspace is the only place
+    /// it can happen — which also makes it the case a test suite is most likely
+    /// to pass over.
+    /// </remarks>
+    [Fact]
+    public async Task The_first_simultaneous_creations_do_not_collide_on_the_counter()
+    {
+        await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
+
+        // Repeated, because whether two requests genuinely overlap is a matter
+        // of timing; one attempt can pass on a bug that is still there.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
+
+            var responses = await Task.WhenAll(
+                TicketTestClient.CreateAsync(
+                    workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation, "İlk"),
+                TicketTestClient.CreateAsync(
+                    workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation, "İkinci"));
+
+            var numbers = new List<int>();
+
+            foreach (var response in responses)
+            {
+                Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+                var ticket = await TicketTestClient.ReadDetailAsync(response, Cancellation);
+                numbers.Add(ticket.Number);
+
+                response.Dispose();
+            }
+
+            Assert.Equal(
+                [TicketNumber.FirstNumber, TicketNumber.FirstNumber + 1],
+                numbers.Order());
+        }
+    }
+
+    /// <summary>
     /// Ten simultaneous creations produce ten distinct, gapless numbers.
     /// </summary>
     /// <remarks>

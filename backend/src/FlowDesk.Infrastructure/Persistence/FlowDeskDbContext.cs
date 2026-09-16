@@ -109,18 +109,39 @@ public sealed class FlowDeskDbContext
     ///
     /// The counter row is created on first use rather than when the workspace
     /// is created, so a workspace that never raises a ticket costs nothing.
+    /// Creating it is a separate statement for a reason given below.
     /// </remarks>
     public async Task<int> TakeNextTicketNumberAsync(Guid tenantId, CancellationToken cancellationToken)
     {
+        /*
+          Ensures the counter row exists before anything tries to lock it.
+
+          FOR UPDATE can only lock a row that is already there. Without this
+          step, the first two tickets ever raised in a workspace would both find
+          no counter, both insert one, and the second would fail on the primary
+          key — a 500 on the very first concurrent use, and exactly the case the
+          lock was meant to cover.
+
+          ON CONFLICT DO NOTHING makes the creation itself the serialisation
+          point: whoever gets there second waits for the first to commit and
+          then finds the row waiting for them.
+
+          The starting state still comes from the domain, so where numbering
+          begins is defined in one place.
+        */
+        var seed = TenantCounter.StartFor(tenantId);
+
+        await Database.ExecuteSqlAsync(
+            $"""
+             INSERT INTO "TenantCounters" ("TenantId", "NextTicketNumber")
+             VALUES ({seed.TenantId}, {seed.NextTicketNumber})
+             ON CONFLICT ("TenantId") DO NOTHING
+             """,
+            cancellationToken);
+
         var counter = await TenantCounters
             .FromSql($"SELECT * FROM \"TenantCounters\" WHERE \"TenantId\" = {tenantId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (counter is null)
-        {
-            counter = TenantCounter.StartFor(tenantId);
-            TenantCounters.Add(counter);
-        }
+            .FirstAsync(cancellationToken);
 
         var number = counter.TakeNextTicketNumber();
 
