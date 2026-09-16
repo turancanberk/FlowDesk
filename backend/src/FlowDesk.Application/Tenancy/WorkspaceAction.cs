@@ -24,6 +24,10 @@ public enum WorkspaceAction
     ViewCustomers,
     ManageCustomers,
     ArchiveCustomers,
+    ViewTickets,
+    ManageTickets,
+    DeleteTickets,
+    CommentOnTickets,
 }
 
 /// <summary>
@@ -55,6 +59,13 @@ public static class WorkspacePermissions
         // theirs; taking a record out of circulation is an administrative act.
         [WorkspaceAction.ManageCustomers] = MembershipRole.Agent,
         [WorkspaceAction.ArchiveCustomers] = MembershipRole.Admin,
+        [WorkspaceAction.ViewTickets] = MembershipRole.Viewer,
+        // Handling requests is the agent's core job: creating, editing,
+        // assigning, changing status and commenting.
+        [WorkspaceAction.ManageTickets] = MembershipRole.Agent,
+        [WorkspaceAction.CommentOnTickets] = MembershipRole.Agent,
+        // Deleting destroys a customer conversation, so it stays with admins.
+        [WorkspaceAction.DeleteTickets] = MembershipRole.Admin,
         [WorkspaceAction.Update] = MembershipRole.Admin,
         [WorkspaceAction.ManageMembers] = MembershipRole.Admin,
         [WorkspaceAction.InviteMembers] = MembershipRole.Admin,
