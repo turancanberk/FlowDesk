@@ -13,17 +13,19 @@ import { WorkspaceShell } from "./workspace-shell";
 export function WorkspaceDashboard({ workspaceSlug }: { workspaceSlug: string }) {
   return (
     <WorkspaceShell workspaceSlug={workspaceSlug} activeSection="dashboard">
-      <div className="px-6 py-6">
-        <PageHeader
-          title="Dashboard"
-          description="Çalışma alanınızın güncel durumu burada özetlenecek."
-        />
+      {() => (
+        <div className="px-6 py-6">
+          <PageHeader
+            title="Dashboard"
+            description="Çalışma alanınızın güncel durumu burada özetlenecek."
+          />
 
-        <p className="text-muted-foreground mt-6 text-sm">
-          Müşteri, talep ve görev modülleri eklendikçe bu ekran gerçek operasyonel göstergelerle
-          dolacak.
-        </p>
-      </div>
+          <p className="text-muted-foreground mt-6 text-sm">
+            Müşteri, talep ve görev modülleri eklendikçe bu ekran gerçek operasyonel göstergelerle
+            dolacak.
+          </p>
+        </div>
+      )}
     </WorkspaceShell>
   );
 }

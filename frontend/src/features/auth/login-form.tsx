@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,11 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldControl, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api/api-error";
+import { toSafeRedirect } from "./safe-redirect";
 import { useLogin } from "./auth-queries";
 import { loginSchema, type LoginFormValues } from "./auth-schemas";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Where to go after signing in; only same-origin paths are honoured.
+  const redirectTo = toSafeRedirect(searchParams.get("next"));
   const loginMutation = useLogin();
 
   const {
@@ -40,7 +45,7 @@ export function LoginForm() {
   const submit = handleSubmit((values) => {
     loginMutation.mutate(values, {
       onSuccess: () => {
-        router.replace("/");
+        router.replace(redirectTo);
       },
     });
   });
