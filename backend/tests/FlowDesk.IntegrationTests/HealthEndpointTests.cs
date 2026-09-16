@@ -20,7 +20,7 @@ public sealed class HealthEndpointTests
     public async Task Liveness_returns_ok_when_the_process_is_running()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateApiClient();
 
         using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
 
@@ -31,7 +31,7 @@ public sealed class HealthEndpointTests
     public async Task Readiness_returns_ok_when_the_database_is_reachable()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateApiClient();
 
         using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
 
@@ -42,7 +42,7 @@ public sealed class HealthEndpointTests
     public async Task Readiness_names_the_database_check_and_its_status()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateApiClient();
 
         using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
@@ -67,7 +67,7 @@ public sealed class HealthEndpointTests
             "Host=127.0.0.1;Port=1;Database=flowdesk;Username=flowdesk;Password=irrelevant;Timeout=2";
 
         await using var factory = new FlowDeskApiFactory(unreachableDatabase);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateApiClient();
 
         using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
 
@@ -85,7 +85,7 @@ public sealed class HealthEndpointTests
             "Host=127.0.0.1;Port=1;Database=flowdesk;Username=flowdesk;Password=irrelevant;Timeout=2";
 
         await using var factory = new FlowDeskApiFactory(unreachableDatabase);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateApiClient();
 
         using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
 

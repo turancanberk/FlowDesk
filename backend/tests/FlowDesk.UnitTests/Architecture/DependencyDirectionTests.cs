@@ -21,12 +21,22 @@ public sealed class DependencyDirectionTests
 
     /// <summary>
     /// Package name fragments that mark a dependency as an infrastructure
-    /// concern. Domain and Application must stay clear of all of them.
+    /// concern. Application must stay clear of all of them.
     /// </summary>
+    /// <remarks>
+    /// EF Core itself is not on this list, and that is deliberate (ADR-0021).
+    /// The application layer works against <c>IFlowDeskDbContext</c>, which
+    /// returns <c>DbSet&lt;T&gt;</c>, so it needs the EF Core types. The line
+    /// that is held instead is the database <em>provider</em>: Npgsql belongs
+    /// to infrastructure, and a query that only runs on PostgreSQL has no
+    /// business being written in a use case.
+    ///
+    /// Domain is stricter still and takes no packages at all.
+    /// </remarks>
     private static readonly string[] InfrastructurePackageMarkers =
     [
-        "EntityFrameworkCore",
         "Npgsql",
+        "EntityFrameworkCore.Design",
         "StackExchange.Redis",
         "RabbitMQ",
         "Azure.Storage",
@@ -34,6 +44,7 @@ public sealed class DependencyDirectionTests
         "MimeKit",
         "Serilog",
         "OpenTelemetry",
+        "Microsoft.AspNetCore",
     ];
 
     [Fact]
@@ -71,6 +82,23 @@ public sealed class DependencyDirectionTests
             .ToArray();
 
         Assert.Empty(violations);
+    }
+
+    /// <summary>
+    /// Guards the exception carved out in ADR-0021: the application layer may
+    /// use EF Core, but never a database provider. Without this the carve-out
+    /// would widen silently the first time someone needed a provider-specific
+    /// helper in a use case.
+    /// </summary>
+    [Fact]
+    public void Application_uses_EntityFrameworkCore_but_no_database_provider()
+    {
+        var application = SolutionLayout.ReadProject(Application);
+
+        Assert.Contains("Microsoft.EntityFrameworkCore", application.PackageReferences);
+        Assert.DoesNotContain(
+            application.PackageReferences,
+            package => package.Contains("Npgsql", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
