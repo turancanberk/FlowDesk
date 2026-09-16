@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure, Application'ın tanımladığı sözleşmeleri somut
+    teknolojilerle uygular. Bağımlılık yönü buradan içeri doğrudur.
+
+    Bu proje ASP.NET Core shared framework'üne bağımlı DEĞİLDİR. Yalnızca
+    ihtiyaç duyduğu Extensions soyutlamalarını alır; böylece web katmanı
+    endişeleri altyapıya sızmaz (ADR-0001).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\FlowDesk.Application\FlowDesk.Application.csproj" />
+    <ProjectReference Include="..\FlowDesk.Domain\FlowDesk.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+  </ItemGroup>
+
+</Project>

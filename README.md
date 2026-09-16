@@ -120,7 +120,7 @@ cp .env.example .env
 # .env içindeki örnek parolaları kendi yerel değerlerinizle değiştirin
 
 # 2. Altyapıyı başlat
-docker compose -f infra/docker-compose.yml up -d
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 
 # 3. Veritabanını oluştur
 dotnet ef database update \
@@ -161,8 +161,8 @@ değiştirilebilir.
 
 ```bash
 # Backend
-dotnet build backend/FlowDesk.sln
-dotnet test  backend/FlowDesk.sln
+dotnet build backend/FlowDesk.slnx
+dotnet test  backend/FlowDesk.slnx
 
 # Frontend
 npm --prefix frontend run lint

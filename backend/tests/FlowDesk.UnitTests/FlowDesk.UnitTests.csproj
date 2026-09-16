@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Domain kuralları, izin matrisi ve mimari bağımlılık yönü testleri.
+    Altyapı gerektirmeyen, hızlı çalışan testler burada tutulur.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlowDesk.Domain\FlowDesk.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FlowDesk.Application\FlowDesk.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

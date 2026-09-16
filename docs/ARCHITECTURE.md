@@ -57,11 +57,11 @@ seviyeli ayrıntıya değil; her ikisi de soyutlamaya bağımlıdır.
 ## Proje düzeni
 
 ```
+global.json                      # .NET SDK sürümü + dotnet test çalıştırıcısı
 backend/
-  global.json                    # .NET SDK sürüm sabitleme
   Directory.Build.props          # tüm projeler için ortak derleme ayarları
   Directory.Packages.props       # merkezî paket sürüm yönetimi
-  FlowDesk.sln
+  FlowDesk.slnx
   src/
     FlowDesk.Domain/             # varlıklar, değer nesneleri, domain kuralları
     FlowDesk.Application/        # use case'ler, sözleşmeler, izinler

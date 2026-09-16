@@ -1,0 +1,53 @@
+<Project>
+
+  <!--
+    Merkezî paket sürüm yönetimi (ADR-0016).
+    Sürümler yalnızca burada tanımlanır; .csproj dosyalarında Version verilmez.
+    Tüm sürümler resmî NuGet registry'sinden doğrulanmış stable sürümlerdir.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="ASP.NET Core">
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup Label="Barındırma">
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup Label="Veri erişimi">
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+
+  <!--
+    Infrastructure katmanı ASP.NET Core shared framework'üne bağımlı değildir.
+    Yalnızca ihtiyaç duyduğu soyutlama paketleri alınır; böylece web katmanı
+    endişeleri altyapıya sızmaz (ADR-0001).
+  -->
+  <ItemGroup Label="Extensions soyutlamaları">
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.12" />
+  </ItemGroup>
+
+  <!--
+    xUnit v3 Microsoft.Testing.Platform üzerine kuruludur ve test projesini
+    kendi çalıştırıcısıyla çalıştırılabilir olarak derler. Bu yüzden VSTest
+    tarafı paketlere (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio,
+    coverlet.collector) ihtiyaç yoktur. Çalıştırıcı seçimi kökteki
+    global.json içindedir.
+  -->
+  <ItemGroup Label="Test">
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+  </ItemGroup>
+
+</Project>

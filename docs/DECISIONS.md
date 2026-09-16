@@ -23,6 +23,9 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0014 | Outbox Pattern ve at-least-once idempotency | Kabul edildi |
 | ADR-0015 | Redis yalnızca dashboard önbelleği için | Kabul edildi |
 | ADR-0016 | Merkezî paket sürüm yönetimi ve sürüm doğrulama | Kabul edildi |
+| ADR-0017 | ESLint 9 hattı (10 değil) | Kabul edildi |
+| ADR-0018 | xUnit v3 ve Microsoft.Testing.Platform | Kabul edildi |
+| ADR-0019 | Çözüm dosyası biçimi olarak .slnx | Kabul edildi |
 
 ---
 
@@ -363,3 +366,73 @@ kullanılmayacak (kullanımdan kalkmış otomatik doğrulama paketi); bunun yeri
 çekirdek `FluentValidation` paketi minimal API endpoint filtresi ile açıkça
 bağlanacak. Base UI için stabil paket adı `@base-ui/react`'tır;
 `@base-ui-components/react` eski/RC isimlendirmedir ve kullanılmaz.
+
+
+---
+
+## ADR-0017 — ESLint 9 hattı (10 değil)
+
+**Bağlam.** ESLint 10.10.0 güncel major sürüm. Ancak `eslint-config-next@16.3.5`
+üç eklenti getiriyor: `eslint-plugin-import`, `eslint-plugin-jsx-a11y` ve
+`eslint-plugin-react`. Üçünün de peer aralığı ESLint 9 ve öncesiyle sınırlı.
+ESLint 10 ile kurulum yapıldığında npm bu peer'ları eziyor, ikinci bir ESLint
+kopyası yükleniyor ve lint zinciri öngörülemez hale geliyor.
+
+**Karar.** ESLint **9.39.5** sabitlenecek — Next.js lint zincirinin desteklediği
+en yeni sürüm.
+
+**Gerekçe.** ADR-0016'daki ilkeyle aynı: peer uyumsuzluğu bilerek kabul
+edilmez. ESLint sürümünü zorlamak, tip farkındalıklı lint kurallarının sessizce
+çalışmamasına yol açardı; oysa bu kurallar (`no-unsafe-*`,
+`no-floating-promises`) projenin tip güvenliği kapısının bir parçası.
+
+**Sonuçlar.** npm, ESLint 9.39.5 için "artık desteklenmiyor" uyarısı gösterir;
+bu bir yaşam döngüsü bildirimidir, bilinen bir güvenlik açığı değildir
+(`npm audit` temiz). Karar, Next.js lint zinciri ESLint 10'u desteklediğinde
+yeniden değerlendirilecek.
+
+---
+
+## ADR-0018 — xUnit v3 ve Microsoft.Testing.Platform
+
+**Bağlam.** .NET 10 SDK'nın `dotnet new xunit` şablonu hâlâ xUnit v2 üretiyor.
+xUnit v3 güncel major sürüm ve Microsoft.Testing.Platform (MTP) üzerine kurulu.
+.NET 10 SDK'da VSTest hedefi MTP tabanlı test projeleri için artık
+desteklenmiyor ve açık bir hata veriyor.
+
+**Karar.** xUnit **v3** kullanılacak. Çalıştırıcı seçimi kökteki `global.json`
+içinde yapılır:
+
+```json
+{ "test": { "runner": "Microsoft.Testing.Platform" } }
+```
+
+**Gerekçe.** v3 aktif geliştirilen sürüm; şablonun v2 üretmesi yalnızca şablonun
+güncellenmemiş olmasından kaynaklanıyor. MTP'ye geçmek, .NET 10'un desteklediği
+yoldur.
+
+**Sonuçlar.** VSTest tarafındaki paketlere gerek kalmaz:
+`Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` ve `coverlet.collector`
+kaldırıldı. Test projeleri çalıştırılabilir (`OutputType=Exe`) olarak derlenir.
+Kod kapsamı gerekirse MTP eklentisiyle Faz 20'de eklenecek.
+
+`global.json` depo kökündedir, `backend/` altında değil: `dotnet test` çalıştırıcı
+yapılandırmasını çalışma dizininden yukarı doğru arar, bu yüzden depo kökünden
+verilen komutların onu bulması gerekir.
+
+---
+
+## ADR-0019 — Çözüm dosyası biçimi olarak .slnx
+
+**Bağlam.** .NET 10 SDK'da `dotnet new sln` artık klasik `.sln` yerine XML
+tabanlı `.slnx` üretiyor.
+
+**Karar.** `backend/FlowDesk.slnx` kullanılacak.
+
+**Gerekçe.** `.slnx` .NET 10'un varsayılanı; okunabilir, birleştirme
+çakışmalarına klasik `.sln` biçiminden çok daha az açık ve `dotnet`
+komutlarının tamamı tarafından destekleniyor. SDK varsayılanına karşı gitmek
+için bir sebep yok.
+
+**Sonuçlar.** `.slnx` desteği Visual Studio 2022 17.13 ve sonrasını gerektirir.
+CI, depoda sabitlenen .NET 10 SDK'sını kullandığı için etkilenmez.

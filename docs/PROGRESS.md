@@ -10,7 +10,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 ## Fazlar
 
 - [x] Faz 00 — Bootstrap
-- [ ] Faz 01 — Temel
+- [x] Faz 01 — Temel
 - [ ] Faz 02 — Tasarım Sistemi
 - [ ] Faz 03 — Kimlik Doğrulama
 - [ ] Faz 04 — Çok Kiracılılık
@@ -36,13 +36,64 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 01 — Temel**
+**Faz 02 — Tasarım Sistemi**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 01 — Temel · Tamamlandı
+
+Backend:
+
+- .NET 10 solution (`backend/FlowDesk.slnx`) ve yedi proje oluşturuldu.
+- `Directory.Build.props`: nullable reference types, `TreatWarningsAsErrors`,
+  .NET analyzer'ları (`AnalysisMode=Recommended`), NuGet açık denetimi.
+- `Directory.Packages.props`: merkezî paket sürüm yönetimi (ADR-0016).
+- Bağımlılık yönü proje referanslarıyla kuruldu ve 12 mimari testle bağlandı.
+- `Infrastructure` ASP.NET Core shared framework'üne bağlanmadı; yalnızca
+  ihtiyaç duyduğu Extensions soyutlamalarını alıyor.
+- `PostgresOptions` başlangıçta doğrulanıyor (`ValidateOnStart`); eksik bağlantı
+  dizesi ilk istekte değil, açılışta hata veriyor.
+- `PostgresHealthCheck` yazıldı. Üçüncü taraf paket alınmadı: tek bakımlı paket
+  eski framework hattını hedefliyor ve kontrol zaten birkaç satır.
+- `/health/live` ve `/health/ready` ayrıldı. Liveness hiçbir bağımlılığı
+  kontrol etmiyor; bağımlılık hatası yeniden başlatma döngüsü üretmemeli.
+- `Worker` gerçek bir host kabuğu olarak bırakıldı; sahte bir arka plan
+  döngüsü eklenmedi.
+
+Frontend:
+
+- Next.js 16.3.5 + React 19.2.8 + Tailwind 4.3.3 kuruldu, sürümler sabitlendi.
+- TypeScript 6.0.3 katı kip: `noUncheckedIndexedAccess`, `noImplicitOverride`,
+  `noImplicitReturns`, `verbatimModuleSyntax`.
+- ESLint 9.39.5 flat config; `no-explicit-any` ve `no-unsafe-*` kuralları hata
+  seviyesinde, tip farkındalıklı lint açık.
+- Prettier + `prettier-plugin-tailwindcss`.
+- Şablon içeriği kaldırıldı; IBM Plex Sans/Mono ve `lang="tr"` kuruldu.
+  Türkçe karakterler için `latin-ext` alt kümesi eklendi.
+
+Altyapı:
+
+- `infra/docker-compose.yml` yalnızca PostgreSQL 17 içeriyor (ADR-0008).
+  Sağlık kontrolü, adlandırılmış hacim ve tr_TR harmanlaması yapılandırıldı.
+
+Testler:
+
+- 12 mimari testi: bağımlılık yönü, katman sızıntısı, altyapı paketi kontrolü.
+- 5 entegrasyon testi: Testcontainers ile gerçek PostgreSQL üzerinde sağlık
+  uç noktaları. Hem olumlu hem olumsuz durum test ediliyor — veritabanı
+  erişilemezken readiness 503, liveness 200 dönüyor.
+
+Bu faz sırasında çözülen iki gerçek hata:
+
+1. xUnit v3, .NET 10 SDK'da VSTest hedefiyle çalışmıyor. Çalıştırıcı seçimi
+   kökteki `global.json` içine taşındı (ADR-0018).
+2. `.env` içindeki bağlantı dizesi tırnaksızdı; noktalı virgül shell tarafından
+   komut ayracı sayılıp dize `Host=localhost` olarak kırpılıyor ve API yanlış
+   veritabanına bağlanıyordu. Değer tırnak içine alındı.
 
 ### Faz 00 — Bootstrap · Tamamlandı
 
@@ -89,11 +140,20 @@ uygulama, özelleştirilebilir iş akışları.
 
 ## Doğrulama durumu
 
-| Kontrol | Durum |
+Faz 01 sonunda gerçekten çalıştırılan komutlar:
+
+| Komut | Sonuç |
 |---|---|
-| `dotnet --version` | 10.0.401 |
-| `dotnet ef --version` | 10.0.8 |
-| Backend derleme | Henüz proje yok (Faz 01) |
-| Backend testler | Henüz test yok (Faz 01) |
-| Frontend lint / typecheck / build | Henüz proje yok (Faz 01) |
-| Docker Compose | Henüz dosya yok (Faz 01) |
+| `dotnet restore backend/FlowDesk.slnx` | Başarılı |
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 17/17 başarılı |
+| `npm --prefix frontend run lint` | Başarılı |
+| `npm --prefix frontend run typecheck` | Başarılı |
+| `npm --prefix frontend run format:check` | Başarılı |
+| `npm --prefix frontend run build` | Başarılı |
+| `docker compose ... config` | Geçerli |
+| `docker compose ... up -d` | `flowdesk-postgres` healthy |
+| `GET /health/live` | HTTP 200 |
+| `GET /health/ready` | HTTP 200, `postgres = Healthy` |
+| `dotnet list package --vulnerable --include-transitive` | Açık yok |
+| `npm --prefix frontend audit` | 0 açık |

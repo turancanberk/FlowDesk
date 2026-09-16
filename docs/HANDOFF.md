@@ -17,24 +17,23 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `chore/bootstrap` |
-| Son commit | Faz 00 commit'i sonrası güncellenecek |
-| Working tree | Faz 00 commit'i ile temizlenecek |
-| Remote | `origin` → GitHub `FlowDesk` (public) |
-| Remote ile senkron | Faz 00 push'u sonrası |
+| Aktif dal | `feat/foundation` |
+| Son commit | Faz 01 commit'i ile güncellenecek |
+| Working tree | Faz 01 commit'i ile temizlenecek |
+| Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
 ## Tamamlanan Fazlar
 
 - Faz 00 — Bootstrap
+- Faz 01 — Temel
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 01 — Temel** (henüz başlanmadı)
+**Faz 02 — Tasarım Sistemi** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 01 kapsamında henüz iş yapılmadı. Ön koşul olan .NET 10.0.401 SDK
-kurulumu Faz 00 sırasında tamamlandı ve doğrulandı.
+Faz 02 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -42,56 +41,78 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 01'in tamamı:
+Faz 02'nin tamamı:
 
-- `backend/global.json`, `Directory.Build.props`, `Directory.Packages.props`
-- `FlowDesk.sln` ve yedi proje (Domain, Application, Infrastructure, Api,
-  Worker, UnitTests, IntegrationTests)
-- Nullable reference types, analyzer'lar, uyarı politikası
-- Next.js uygulaması, TypeScript strict, Tailwind, ESLint
-- `infra/docker-compose.yml` — yalnızca PostgreSQL
-- `/health/live` ve `/health/ready` uç noktaları
-- Bağımlılık yönünü doğrulayan mimari test
+- `docs/DESIGN_SYSTEM.md` içindeki token'ların CSS değişkeni olarak
+  tanımlanması ve Tailwind temasına bağlanması
+- Genel UI bileşenleri (`src/components/ui/`): buton, girdi, textarea, select,
+  checkbox, rozet, uyarı, toast, tablo, sekme, açılır menü, diyalog, tooltip,
+  sayfalama
+- Ürün bileşenleri (`src/components/product/`): sayfa başlığı, boş durum,
+  durum rozeti
+- `/design-system` vitrin sayfası, tüm içerik Türkçe
+- Erişilebilirlik: klavye gezintisi, görünür odak, etiketli girdiler
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/foundation` dalını aç. `backend/global.json` dosyasını .NET 10.0.401'e
-sabitleyerek oluştur, ardından `dotnet new sln` ile `FlowDesk.sln` ve yedi
-projeyi oluştur. Proje referanslarını ADR-0001'deki bağımlılık yönüne göre
-bağla: `Api`/`Worker` → `Application` → `Domain`, `Infrastructure` →
-`Application`/`Domain`. `dotnet build` ile doğrula.
+`feat/design-system` dalını aç. Önce `frontend/src/app/globals.css` içinde
+`docs/DESIGN_SYSTEM.md` bölüm 3'teki nötr, petrol ve anlamsal renk ölçeklerini
+CSS değişkeni olarak tanımla ve `@theme inline` ile Tailwind'e bağla. Ardından
+tipografi ölçeğini, yarıçap ve yükseklik token'larını ekle. Bileşen yazmaya
+buton ile başla; varyantları `primary`, `secondary`, `ghost`, `danger` ve
+boyutları 28/32/36 px olacak.
 
-Paket sürümlerini eklerken resmî registry'den doğrula (ADR-0016); plandaki veya
-dokümandaki sürüm numaralarını körlemesine kullanma.
+shadcn/ui bileşenleri kaynak olarak eklenip yerelde sahiplenilecek. Base UI
+paketinin stabil adı `@base-ui/react`'tır; `@base-ui-components/react` eski
+RC isimlendirmedir ve kullanılmaz. Paket sürümlerini kurulum anında resmî
+registry'den doğrula (ADR-0016).
+
+Görsel anti-pattern listesi `docs/DESIGN_SYSTEM.md` bölüm 2'dedir ve
+bağlayıcıdır.
 
 ## Son Doğrulama Durumu
 
-Gerçekten çalıştırılan komutlar:
+Faz 01 sonunda gerçekten çalıştırıldı:
 
 | Komut | Sonuç |
 |---|---|
-| `dotnet --version` | `10.0.401` |
-| `dotnet --list-sdks` | 8.0.421, 9.0.314, 10.0.401 |
-| `dotnet --list-runtimes` | `Microsoft.NETCore.App 10.0.12`, `Microsoft.AspNetCore.App 10.0.12` |
-| `dotnet ef --version` | `10.0.8` |
-| `gh auth status` | `turancanberk` olarak giriş yapılmış, `repo` + `workflow` kapsamları var |
-
-Backend, frontend ve Docker doğrulamaları Faz 01'de ilk kez çalıştırılacak.
+| `dotnet restore backend/FlowDesk.slnx` | Başarılı |
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 17/17 başarılı (12 mimari + 5 entegrasyon) |
+| `npm --prefix frontend run lint` | Başarılı |
+| `npm --prefix frontend run typecheck` | Başarılı |
+| `npm --prefix frontend run format:check` | Başarılı |
+| `npm --prefix frontend run build` | Başarılı |
+| `docker compose --env-file .env -f infra/docker-compose.yml up -d` | `flowdesk-postgres` healthy |
+| `GET http://localhost:5080/health/live` | HTTP 200 |
+| `GET http://localhost:5080/health/ready` | HTTP 200, `postgres = Healthy` |
+| `dotnet list ... package --vulnerable --include-transitive` | Açık yok |
+| `npm --prefix frontend audit` | 0 açık |
 
 ## Mevcut Hatalar / Blokerler
 
 Bilinen blocker yok.
 
-Çözülmüş ortam sorunu (tekrarlarsa): macOS 26 / Apple Silicon üzerinde
-`dotnet-install.sh` mevcut bir `~/.dotnet` kurulumunun üzerine yazdığında host
-ikilisi `SIGKILL (Code Signature Invalid)` alır. Crash raporunda sonlanma
-nedeni `CODESIGNING / Taskgated Invalid Signature` görünür. `codesign -v`
-imzayı geçerli bulur; sorun çekirdeğin o inode için tuttuğu bayat
-değerlendirmedir. Çözüm:
+Çözülmüş, tekrarlayabilecek ortam sorunları:
 
-```bash
-cd ~/.dotnet && cp dotnet dotnet.new && mv -f dotnet.new dotnet && chmod +x dotnet
-```
+1. **macOS 26 / Apple Silicon, .NET kurulumu.** `dotnet-install.sh` mevcut bir
+   `~/.dotnet` kurulumunun üzerine yazdığında host ikilisi
+   `SIGKILL (Code Signature Invalid)` alır. Crash raporunda sonlanma nedeni
+   `CODESIGNING / Taskgated Invalid Signature` görünür; `codesign -v` imzayı
+   geçerli bulur. Sorun çekirdeğin o inode için tuttuğu bayat değerlendirmedir.
+   Çözüm:
+   ```bash
+   cd ~/.dotnet && cp dotnet dotnet.new && mv -f dotnet.new dotnet && chmod +x dotnet
+   ```
+
+2. **`.env` içinde tırnaksız bağlantı dizesi.** Noktalı virgül shell tarafından
+   komut ayracı sayılır; `set -a; . ./.env` ile okunduğunda dize
+   `Host=localhost` olarak kırpılır ve API yanlış veritabanına bağlanır.
+   `.env.example` içindeki değer tırnaklıdır; bu tırnaklar kaldırılmamalıdır.
+
+3. **Docker Compose ve `.env` konumu.** Compose, `.env` dosyasını compose
+   dosyasının dizinine göre arar. Depo kökündeki `.env` için komutlarda
+   `--env-file .env` verilmelidir.
 
 ## Önemli Mimari Kararlar
 
@@ -109,46 +130,60 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   (ADR-0008)
 - Kimlikli veri çekme istemci tarafında; Server Component'lar access token'a
   erişemez (ADR-0009)
-- .NET 10 LTS (ADR-0010), TypeScript 6 hattı (ADR-0011)
+- .NET 10 LTS (ADR-0010), TypeScript 6 hattı (ADR-0011), ESLint 9 hattı
+  (ADR-0017)
 - Soft delete yalnızca `Customer` (ADR-0012)
 - İyimser eşzamanlılık yalnızca `Ticket` (ADR-0013)
 - Outbox + at-least-once idempotency (ADR-0014)
 - Redis yalnızca dashboard önbelleği (ADR-0015)
 - Merkezî paket yönetimi, kurulum anında sürüm doğrulama (ADR-0016)
+- xUnit v3 + Microsoft.Testing.Platform; çalıştırıcı kökteki `global.json`
+  içinde (ADR-0018)
+- Çözüm dosyası `.slnx` (ADR-0019)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
 
-Faz 00'da oluşturulanlar: `.gitignore`, `.editorconfig`, `.env.example`,
-`CLAUDE.md`, `README.md` ve `docs/` altındaki tüm dokümanlar.
+Faz 01'de eklenenler:
+
+- `global.json` — SDK sürümü ve `dotnet test` çalıştırıcısı (depo kökünde)
+- `backend/Directory.Build.props`, `backend/Directory.Packages.props`
+- `backend/FlowDesk.slnx` ve yedi proje
+- `backend/src/FlowDesk.Infrastructure/Persistence/PostgresOptions.cs`
+- `backend/src/FlowDesk.Infrastructure/HealthChecks/PostgresHealthCheck.cs`
+- `backend/src/FlowDesk.Infrastructure/InfrastructureServiceCollectionExtensions.cs`
+- `backend/src/FlowDesk.Api/Program.cs`, `Endpoints/HealthEndpoints.cs`
+- `backend/tests/FlowDesk.UnitTests/Architecture/` — bağımlılık yönü testleri
+- `backend/tests/FlowDesk.IntegrationTests/` — Testcontainers desteği ve
+  sağlık uç noktası testleri
+- `infra/docker-compose.yml`
+- `frontend/` — Next.js uygulaması, ESLint, Prettier, tsconfig
 
 ## Database Durumu
 
 | Alan | Durum |
 |---|---|
 | Son migration | Yok |
-| Migration uygulandı mı | Hayır — henüz DbContext yok |
+| Migration uygulandı mı | Hayır — henüz `DbContext` yok (Faz 03'te Identity ile gelir) |
 | Seed | Yok (Faz 21) |
+
+PostgreSQL 17.10 konteyneri çalışıyor ve `flowdesk` veritabanı boş.
 
 ## Infrastructure Durumu
 
-Kademeli altyapı planı gereği (ADR-0008) henüz hiçbir servis Compose'a
-eklenmedi.
-
 | Servis | Durum |
 |---|---|
-| PostgreSQL | Faz 01'de eklenecek |
+| PostgreSQL | **Aktif** — `flowdesk-postgres`, host portu 5433 |
 | RabbitMQ | Henüz projeye eklenmedi (Faz 10) |
 | Mailpit | Henüz projeye eklenmedi (Faz 12) |
 | Azurite | Henüz projeye eklenmedi (Faz 13) |
 | Redis | Henüz projeye eklenmedi (Faz 15) |
 | Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |
 
-Not: Bu makinede host portları `5432`, `6379` ve `5000` başka süreçlerce
-kullanılıyor. Port haritası `docs/ARCHITECTURE.md` içindedir; PostgreSQL 5433,
-Redis 6380, API 5080 kullanır.
+Bu makinede host portları `5432`, `6379` ve `5000` başka süreçlerce kullanılıyor.
+Tam port haritası `docs/ARCHITECTURE.md` içindedir.
 
 ## Harici İşlemler
 
@@ -164,8 +199,14 @@ Kullanıcıdan beklenen harici işlem yok.
 4. `docs/DECISIONS.md` içinde ilgili ADR'leri oku.
 5. `git status` çalıştır.
 6. `git log --oneline -10` ile son commit'leri incele.
-7. Bu dosyadaki "Son Doğrulama Durumu" bölümündeki komutları gerektiğinde
-   yeniden çalıştır ve sonuçların hâlâ geçerli olduğunu doğrula.
+7. Ortamı hazırla ve doğrula:
+   ```bash
+   cp .env.example .env          # yoksa
+   docker compose --env-file .env -f infra/docker-compose.yml up -d
+   dotnet test backend/FlowDesk.slnx
+   npm --prefix frontend ci
+   npm --prefix frontend run lint && npm --prefix frontend run typecheck
+   ```
 8. "Bir Sonraki Yapılacak İş" bölümünden devam et.
 9. Önceki tamamlanmış işi sebepsiz yere yeniden yazma.
 

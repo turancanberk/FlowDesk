@@ -1,0 +1,58 @@
+<Project>
+
+  <!--
+    Tüm FlowDesk projeleri için ortak derleme ayarları.
+    Proje bazlı özel ayarlar ilgili .csproj dosyasında yapılır.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Null güvenliği: uyarılar bastırılmaz, kök neden çözülür. -->
+    <Nullable>enable</Nullable>
+
+    <!-- Derleyici ve analiz uyarıları hata sayılır. Kalite kapısı budur. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>7</WarningLevel>
+
+    <!--
+      .NET analyzer'ları açık. AnalysisMode olarak "Recommended" seçildi;
+      "All" bu ölçekte büyük miktarda düşük değerli gürültü üretir.
+      Kural şiddetleri .editorconfig içinde ayarlanır.
+    -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+
+    <!-- XML doküman üretilmiyor; eksik doküman uyarısı gürültüsü oluşmasın. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- Yeniden üretilebilir derleme ve deterministik çıktı. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Merkezî paket sürüm yönetimi (ADR-0016). -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+
+    <!-- NuGet denetimi: bilinen açıklar derleme sırasında görünür olsun. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Test projeleri paketlenmez ve test altyapısını ortak alır. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- xUnit v3 test projeleri çalıştırılabilir olarak derlenir. -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+</Project>
