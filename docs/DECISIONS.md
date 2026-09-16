@@ -31,6 +31,8 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0022 | Kullanıcı hesabı Identity'ye ait, Domain'de User yok | Kabul edildi |
 | ADR-0023 | API'de enum'lar ada göre serileştirilir | Kabul edildi |
 | ADR-0024 | Global query filter mekanizması ve Membership istisnası | Kabul edildi |
+| ADR-0025 | Türkçe arama için katlanmış SearchIndex sütunu | Kabul edildi |
+| ADR-0026 | TanStack Table v8 hattı (v9 değil) | Kabul edildi |
 
 ---
 
@@ -616,3 +618,66 @@ Mekanizmanın doğru kurulduğu `TenantQueryFilterTests` ile model seviyesinde
 doğrulanır; böylece garanti henüz var olmayan varlıklar için de geçerlidir.
 İlk gerçek tüketicisi Faz 06'daki `Customer` olacak ve davranışsal test de
 orada yazılacak.
+
+
+---
+
+## ADR-0025 — Türkçe arama için katlanmış SearchIndex sütunu
+
+**Bağlam.** Müşteri araması ilk uygulamada `LOWER(sütun) LIKE LOWER(terim)`
+biçimindeydi. Testler gerçek bir hatayı yakaladı: "YAZILIM" araması "Kuzey
+Yazılım" kaydını bulamıyordu.
+
+Türkçede iki ayrı i harfi var — noktalı (i/İ) ve noktasız (ı/I) — ve hiçbir
+küçültme stratejisi kullanıcının beklediği sonucu vermiyor:
+
+- Invariant küçültme "YAZILIM"ı noktalı i ile "yazilim" yapıyor, saklanan
+  "Yazılım" ise noktasız ı ile "yazılım" oluyor. İkisi hiç eşleşmiyor.
+- Kültüre duyarlı küçültme hangi çiftin bozulduğunu değiştiriyor ve sonucu
+  sunucunun yereline bağlıyor.
+- SQL `LOWER()` veritabanı harmanlamasına bağlı ve aynı sorunu yaşıyor.
+
+**Karar.** `TurkishText.Fold` her iki tarafı da ASCII'ye katlıyor. `Customer`
+üzerinde `SearchIndex` sütunu ad, şirket ve e-postanın katlanmış hâlini tutuyor;
+arama bu sütunla tek bir karşılaştırma yapıyor.
+
+**Gerekçe.** Katlama soruyu ortadan kaldırıyor: "yazilim", "YAZILIM" ve
+"Yazılım" hepsi "yazilim" oluyor. Yan faydası, Türkçe karakter bulunmayan bir
+klavyeden yazan kişinin de kaydı bulabilmesi — gerçek bir kullanım senaryosu.
+
+Sütun olarak saklanması iki sebeple: katlama SQL'de doğru yapılamıyor, ve
+saklanan bir sütun indekslenebilirken satır başına hesaplanan bir ifade
+indekslenemez.
+
+**Sonuçlar.** `SearchIndex` kullanıcıya hiç gösterilmiyor; yalnızca katlanmış
+bir arama terimiyle karşılaştırılmak için var. Aynı katlama `WorkspaceSlug`
+tarafından da kullanılıyor, böylece Türkçe harf haritası tek yerde duruyor.
+Arama gerçek veride yavaşlarsa cevap ifade veya trigram indeksi olacak,
+sağlayıcıya özgü bir operatör değil.
+
+---
+
+## ADR-0026 — TanStack Table v8 hattı (v9 değil)
+
+**Bağlam.** npm'de `@tanstack/react-table` `latest` etiketi v9'u gösteriyor.
+v9, özellik tabanlı yeni bir API getiriyor: `useReactTable` yerine `useTable`,
+`getCoreRowModel` yerine `createCoreRowModel`, ve özelliklerin açıkça
+birleştirilmesi.
+
+**Karar.** v8 (8.21.3) kullanılacak.
+
+**Gerekçe.** v9 paketi kullanım belgesi içermiyor; API'yi tip tanımlarından
+çıkarmak gerekiyordu. Veri tabloları ürünün kimliği ve üç modülde daha
+kullanılacak; en çok kullanılan bileşenin, çıkarımla öğrenilen bir API üzerine
+kurulması kabul edilebilir değil.
+
+v8 olgun, desteklenen ve shadcn DataTable dâhil tüm referans uygulamaların
+dayandığı sürüm.
+
+**Sonuçlar.** En yeni major sürüm kullanılmıyor. v9 belgelenip yaygınlaştığında
+karar yeniden değerlendirilecek.
+
+React derleyicisi `useReactTable`'ın döndürdüğü fonksiyonları güvenle
+memoize edemiyor; TanStack'in belgelediği `"use no memo"` direktifi yalnızca
+tabloyu render eden bileşende kullanılıyor, dosyanın kalanı derleyici
+optimizasyonunu koruyor.

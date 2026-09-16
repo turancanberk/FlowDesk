@@ -146,6 +146,7 @@ dağınık `if (role == ...)` kontrolleri yazılmaz.
 | Müşteri görüntüle | ✓ | ✓ | ✓ | ✓ |
 | Müşteri oluştur / düzenle | ✓ | ✓ | ✓ | — |
 | Müşteri arşivle | ✓ | ✓ | — | — |
+| Müşteriyi arşivden çıkar | ✓ | ✓ | — | — |
 | Talep görüntüle | ✓ | ✓ | ✓ | ✓ |
 | Talep oluştur / düzenle | ✓ | ✓ | ✓ | — |
 | Talep ata | ✓ | ✓ | ✓ | — |
