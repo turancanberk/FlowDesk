@@ -96,7 +96,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 376/376 başarılı (201 birim + 175 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 377/377 başarılı (201 birim + 176 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -158,16 +158,14 @@ Bilinen blocker yok.
    Tarayıcıda arka arkaya doğrulama yaparken bu limit dolar ve kayıt `429`
    döner. Limiter bellek içidir; API'yi yeniden başlatmak sayaçları sıfırlar.
 
-6. **Tam çözüm koşusunda tek seferlik test düşüşü (Faz 08).** Bir
-   `dotnet test backend/FlowDesk.slnx` koşusunda 376 testten 1'i başarısız
-   oldu. Hangi test olduğu **yakalanamadı**, çünkü çıktı `tail -6` ile
-   kırpılmıştı. Ardından beş tam koşu ve her iki derlemenin ayrı ayrı koşusu
-   temiz geçti. Tekrarlanırsa çıktının tamamını saklayın:
+6. **Kararsız test çıktısını saklama alışkanlığı.** Faz 08'de tam çözüm
+   koşusunda ara sıra tek bir test düşüyordu ve ilk seferinde çıktı `tail` ile
+   kırpıldığı için hangi test olduğu kaybedildi. İkinci düşüşte çıktı
+   saklanınca sebep hemen görüldü ve düzeltildi (aşağıda). Kararsız bir düşüş
+   görürseniz koşuyu çıktıyı saklayarak tekrarlayın:
    ```bash
    dotnet test backend/FlowDesk.slnx 2>&1 | tee /tmp/flowdesk-test.log
    ```
-   En olası aday, eşzamanlı talep numarası testinin iki derleme aynı anda
-   koşarken yük altında kalması; doğrulanmadı.
 
 7. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
    için `waitUntil: "networkidle"` hiç sonuçlanmayabilir. Elle doğrulama

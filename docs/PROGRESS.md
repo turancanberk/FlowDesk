@@ -89,7 +89,23 @@ Frontend:
   sabitleniyor.
 - Görev listesi müşteri detay sekmesiyle paylaşılıyor.
 
-Testler: 376/376 (201 birim + 175 entegrasyon).
+Testler: 377/377 (201 birim + 176 entegrasyon).
+
+Bu faz sırasında yakalanan gerçek hata, aslında Faz 07'ye aitti:
+
+**Bir çalışma alanındaki ilk eşzamanlı taleplerde sayaç çakışması.** Tam çözüm
+koşusunda ara sıra tek bir test düşüyordu. İlk seferinde çıktı kırpıldığı için
+hangi test olduğu kaybedildi; ikinci düşüşte çıktı saklanınca sebep görüldü.
+
+`FOR UPDATE` yalnızca var olan bir satırı kilitleyebiliyor. Sayaç ilk kullanımda
+oluşturulduğu için, bir çalışma alanında açılan ilk iki talep eşzamanlı
+geldiğinde ikisi de sayaç bulamıyor, ikisi de ekliyor ve ikincisi birincil
+anahtar ihlaliyle `500` dönüyordu — tam olarak kilidin kapsaması gereken durum,
+kilidin henüz tutunacak bir şey bulamadığı an.
+
+`ON CONFLICT DO NOTHING` ile satırın varlığı garantilendi. Regresyon testi
+düzeltme olmadan başarısız oluyor ve beş kez tekrarlıyor, çünkü iki isteğin
+gerçekten örtüşüp örtüşmediği zamanlama meselesi.
 
 ---
 
@@ -572,7 +588,7 @@ Faz 08 sonunda:
 | Komut / kontrol | Sonuç |
 |---|---|
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 376/376 başarılı (201 birim + 175 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 377/377 başarılı (201 birim + 176 entegrasyon), altı ardışık tam koşu temiz |
 | `dotnet ef migrations add AddTasks` + `database update` | Uygulandı |
 | `npm --prefix frontend run lint / typecheck / build` | Başarılı |
 | Çalışan API'ye karşı 14 adımlık görev akışı | Tamamı geçti — gecikme hesabı, tamamlanma tarihinin temizlenmesi, null'un alanı temizlemesi, sıralama, izolasyon `404`, rol matrisi |
