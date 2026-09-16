@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 08 birleştirildi) |
+| Aktif dal | `main` (Faz 09 birleştirildi) |
 | Son commit | `5d22d7a — docs: sayaç çakışması düzeltmesi kaydedildi` (Faz 08) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -33,14 +33,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 06 — Müşteriler
 - Faz 07 — Talepler
 - Faz 08 — Görevler
+- Faz 09 — Dashboard
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 09 — Dashboard** (henüz başlanmadı)
+**Faz 10 — RabbitMQ ve Worker** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 09 kapsamında henüz iş yapılmadı.
+Faz 10 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -48,45 +49,41 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 09'un tamamı:
+Faz 10'un tamamı:
 
-- Operasyonel toplamlar: müşteri sayısı, açık talep sayısı, yaklaşan ve geciken
-  görevler, üye sayısı, talep durum dağılımı, son etkinlik
-- `GET /api/workspaces/{slug}/dashboard` uç noktası
-- Dashboard arayüzü; yalnızca değer katan yerde grafik
+- RabbitMQ **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
+- `IMessagePublisher` soyutlaması Application katmanında
+- `FlowDesk.Worker` barındırma altyapısı ve tüketici kayıt mekanizması
+- Bağlantı dayanıklılığı: yeniden bağlanma, kanal yönetimi, kapanış
 
-Bu fazda **önbellek yok**; Redis Faz 15'te geliyor (ADR-0008, ADR-0015).
-Etkinlik akışı Faz 14'e ait, dolayısıyla "son etkinlik" bölümü bu fazda gerçek
-`ActivityEvent` verisi yerine mevcut kayıtlardan türetilecek ya da Faz 14'e
-bırakılacak — hangisi seçilirse `PROGRESS.md`'ye yazılacak.
+Outbox **Faz 11'e** ait; bu fazda mesaj yayınlama doğrudan yapılacak ve
+transaction ile atomikliği Faz 11 sağlayacak.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/dashboard` dalını aç. `FlowDesk.Application/Dashboard/GetDashboard/`
-altında tek bir use case yaz ve `GET /api/workspaces/{slug}/dashboard` uç
-noktasına bağla.
+`feat/messaging` dalını aç. Önce `infra/docker-compose.yml`'a RabbitMQ'yu ekle
+(yönetim arayüzüyle birlikte, host portları 5672 / 15672) ve `.env.example`'a
+karşılık gelen değişkenleri yaz — **gerçek parola değil**, örnek değer.
 
-Toplamlar `docs/PRODUCT.md` "Dashboard içeriği" bölümünde tanımlı. Hepsi tek
-istekte dönecek; her kutu için ayrı uç nokta açmak sayfayı altı istekle
-yükletirdi.
+Ardından `FlowDesk.Application/Abstractions/IMessagePublisher.cs` sözleşmesini
+yaz ve `FlowDesk.Infrastructure/Messaging/` altında RabbitMQ uygulamasını ver.
 
 Dikkat edilecekler:
 
-- **Önbellek yok.** Redis Faz 15'te geliyor (ADR-0008). Bu fazda sorgular
-  doğrudan çalışacak; önbellek gerçek bir ölçümle gerekçelendirilecek.
-- **Sayımlar tek sorguya toplanabilir.** Beş ayrı `CountAsync` beş gidiş dönüş
-  demektir. Talep durum dağılımı zaten `GroupBy` istiyor; müşteri, üye ve görev
-  sayıları da benzer şekilde toplanabilir. Ölçmeden karmaşıklaştırma.
-- **Kiracı kapsamı.** Dashboard yalnızca `WorkspaceAction.View` gerektirir ve
-  global query filter zaten kapsamı veriyor; ancak `Memberships` filtreye dâhil
-  **değil** (ADR-0024), dolayısıyla üye sayısı sorgusuna `TenantId` koşulu elle
-  yazılmalı. Bu, izolasyonun bu fazda gözden kaçmaya en açık noktası.
-- Geciken görev sayısı `Status != Done && DueAt < now` demektir; geç tamamlanan
-  iş geciken sayılmaz (ADR-0030, `ListTasksHandler` aynı koşulu kullanıyor).
-- Etkinlik akışı Faz 14'e ait. Bu fazda `ActivityEvent` tablosu yok; "son
-  etkinlik" bölümü ya mevcut kayıtların `UpdatedAt` alanlarından türetilecek ya
-  da Faz 14'e bırakılıp arayüzde yer tutucu gösterilecek. Hangisi seçilirse
-  gerekçesiyle `PROGRESS.md`'ye yazılacak.
+- **Kademeli altyapı kuralı (ADR-0008).** RabbitMQ bu fazda ekleniyor çünkü ilk
+  gerçek asenkron iş akışı burada. Mailpit, Azurite, Redis, Prometheus ve
+  Grafana **eklenmeyecek**; her biri kendi fazını bekliyor.
+- **Bağlantı dayanıklılığı gerçek olmalı.** RabbitMQ.Client 7.x tamamen async
+  bir API'ye geçti; 6.x için yazılmış örnekler derlenmez. Yeniden bağlanma ve
+  kanal ömrü açıkça yönetilmeli, `try/catch` ile yutulmamalı.
+- **Sağlık kontrolü.** `/health/ready` şu an yalnızca PostgreSQL'i biliyor.
+  RabbitMQ zorunlu bir bağımlılık hâline geldiğinde buraya eklenmeli; API
+  RabbitMQ olmadan da ayakta kalabiliyorsa `live` ile `ready` ayrımı
+  korunmalı.
+- **Entegrasyon testleri.** `Testcontainers.RabbitMq` paketi var; sürümü
+  kurulum anında doğrula (ADR-0016). Mevcut `PostgresContainerFixture` deseni
+  izlenebilir.
+- Worker projesi zaten solution'da ve boş; barındırma altyapısı oraya gidecek.
 
 ## Son Doğrulama Durumu
 
@@ -96,7 +93,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 377/377 başarılı (201 birim + 176 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 386/386 başarılı (201 birim + 185 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -119,6 +116,8 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `AddTickets` migration SQL'i (Faz 07) | `xmin` sistem sütunu `CREATE TABLE` çıktısında yok — doğru |
 | Uçtan uca görev akışı (Faz 08) | Çalışan API'ye karşı 14 adımın tamamı geçti — gecikme hesabı, tamamlanma tarihinin temizlenmesi, null'un alanı temizlemesi, sıralama, izolasyon `404`, rol matrisi |
 | `/app/{slug}/tasks` render (Faz 08) | HTTP 200, doğru başlık, uygulama hatası yok |
+| Uçtan uca dashboard akışı (Faz 09) | Çalışan API'ye karşı 11 adımın tamamı geçti — açık talep tanımı, atanmamış sayımı, geciken/bu hafta ayrımı, enum sıralı dağılım, izolasyon `404`, izleyici erişimi |
+| `/app/{slug}/dashboard` render (Faz 09) | HTTP 200, doğru başlık, uygulama hatası yok |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -219,11 +218,24 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   önler; tel üzerindeki biçim değişmez (ADR-0029)
 - Görevde durum makinesi ve iyimser eşzamanlılık **yoktur**; `PATCH` tüm
   alanları değiştirir ve `null` "yok" demektir (ADR-0030)
+- Dashboard tek yanıt, önbelleksiz ve grafik kütüphanesiz; "açık talep"
+  bitmemiş demektir ve üye sayımı elle kapsanır (ADR-0031)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 09'da eklenenler:
+
+- `backend/src/FlowDesk.Application/Dashboard/` — `DashboardModels`,
+  `GetDashboardHandler`
+- `backend/src/FlowDesk.Api/Endpoints/DashboardEndpoints.cs`,
+  `Contracts/DashboardContracts.cs`
+- `backend/tests/.../Dashboard/DashboardTests.cs`
+- `frontend/src/features/dashboard/` — ekran, veri katmanı, dağılım çubuğu
+- `frontend/src/features/workspaces/workspace-dashboard.tsx` — yer tutucu
+  kaldırıldı, gerçek ekrana bağlandı
 
 Faz 08'de eklenenler:
 
@@ -335,7 +347,7 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddTasks` |
+| Son migration | `AddTasks` (Faz 09 migration üretmedi; yalnızca okuma yapıyor) |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
 | Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks` |
 | Seed | Yok (Faz 21) |

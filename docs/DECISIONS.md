@@ -800,3 +800,48 @@ yoktur ve bayat bir tarih onu bu alanı gösteren her listede bitmiş gösterird
 `null` "yok" demek. Bu, kısmi gövdenin JSON'da çözemediği "alan yok mu, değeri
 mi null" belirsizliğini ortadan kaldırıyor ve görevin düzenleme formu zaten bu
 alanların hepsini tutuyor.
+
+---
+
+## ADR-0031 — Dashboard tek yanıt, önbelleksiz, grafiksiz
+
+**Bağlam.** Dashboard altı ayrı rakam, bir dağılım ve iki kısa liste gösteriyor.
+Üç ayrı karar gerekiyordu: kaç uç nokta, önbellek var mı, grafik kütüphanesi
+var mı.
+
+**Karar.**
+
+1. **Tek uç nokta:** `GET /api/workspaces/{slug}/dashboard` her şeyi döndürüyor.
+2. **Önbellek yok.** Redis Faz 15'te ve ancak gerçek bir ölçümden sonra.
+3. **Grafik kütüphanesi yok.** Talep dağılımı CSS ile çizilen yığılmış bir çubuk.
+
+**Gerekçe.**
+
+Kutu başına uç nokta, sayfanın ilk saniyesini kendini yeniden dizerek
+geçirmesine yol açardı ve her istek aynı üyelik doğrulamasını tekrarlardı.
+Ayrıca tüm rakamların **tek bir ana** karşı okunması ancak tek istekte mümkün:
+saat sorgu başına okunsaydı bir görev sayıda gecikmiş, yanındaki listede
+gecikmemiş görünebilirdi.
+
+Önbellek, elde olmayan bir hız sorununu çözmek için bayatlık sorunu eklemek
+olurdu. Sorgular indeksli sayımlardan ibaret. Ölçüm geldiğinde ADR-0015
+zaten anahtar şemasını ve geçersiz kılma davranışını tanımlıyor.
+
+Toplamı bilinen beş kategori bir orandır ve oran tek çubukta okunur. Bunun için
+bir grafik kütüphanesi eklemek yüzlerce kilobayt, ikinci bir render modeli ve
+kendi erişilebilirlik yüzeyini getirirdi — tarayıcının zaten çizdiği bir resim
+için. Çubuk `aria-hidden`; yanındaki lejant aynı bilgiyi metin olarak veriyor,
+dolayısıyla hiçbir şey rengi görmeye bağlı değil.
+
+**Sonuçlar.** "Açık talep" **bitmemiş** anlamına geliyor: `Open`, `InProgress`
+ve `Waiting` toplamı. Yalnızca `Open` sayılsaydı kuyruk dolarken ekran sakin
+görünürdü.
+
+Üye sayımı sayfadaki tek elle kapsanan sorgu, çünkü `Membership` bilinçli
+olarak global query filter dışında (ADR-0024). İzolasyon testi bu rakamı ayrıca
+doğruluyor.
+
+Dashboard'daki rakamlar ilgili listeye bağlanıyor ama **filtrelenmiş** listeye
+değil: liste filtrelerini bileşen durumunda tutuyor, dolayısıyla sorgu dizesi
+filtresiz bir sayfaya düşer ve bağlantının verdiği sözü sessizce bozardı.
+Filtreleri URL'den okumak yapılmaya değer, ama listeye ait bir iş.
