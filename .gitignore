@@ -1,0 +1,83 @@
+# ----------------------------------------------------------------------------
+# FlowDesk — .gitignore
+# Bu depo public'tir. Gerçek gizli bilgi hiçbir koşulda commit edilmez.
+# ----------------------------------------------------------------------------
+
+# Ortam değişkenleri ve gizli bilgiler
+.env
+.env.*
+!.env.example
+*.env
+secrets.json
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Anahtar ve sertifika materyali
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+
+# .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*.userosscache
+*.sln.docstates
+*.received.*
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+.vs/
+BenchmarkDotNet.Artifacts/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# Test çıktıları
+/e2e/test-results/
+/e2e/playwright-report/
+/e2e/blob-report/
+/e2e/.cache/
+playwright/.cache/
+
+# Loglar
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editör
+.idea/
+*.swp
+*.swo
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+
+# Docker yerel veri hacimleri (varsa)
+infra/.data/

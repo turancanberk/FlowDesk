@@ -1,0 +1,104 @@
+# FlowDesk — EditorConfig
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+# ----------------------------------------------------------------------------
+# C# kod stili ve analiz kuralları
+# ----------------------------------------------------------------------------
+[*.cs]
+# using yönergeleri
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# Dosya kapsamlı namespace (daha az girinti, daha okunur dosyalar)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Modern C# ifadeleri
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_braces = true:warning
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_throw_expression = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+
+# this. kullanma
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+# Null güvenliği ve değişmezlik
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:silent
+dotnet_style_readonly_field = true:warning
+csharp_prefer_static_local_function = true:suggestion
+
+# İsimlendirme: arayüzler I ile başlar
+dotnet_naming_rule.interfaces_start_with_i.severity = warning
+dotnet_naming_rule.interfaces_start_with_i.symbols = interface_symbol
+dotnet_naming_rule.interfaces_start_with_i.style = prefix_i_style
+dotnet_naming_symbols.interface_symbol.applicable_kinds = interface
+dotnet_naming_style.prefix_i_style.required_prefix = I
+dotnet_naming_style.prefix_i_style.capitalization = pascal_case
+
+# İsimlendirme: private alanlar _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_field_symbol
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_style
+dotnet_naming_symbols.private_field_symbol.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbol.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_style.required_prefix = _
+dotnet_naming_style.underscore_camel_style.capitalization = camel_case
+
+# İsimlendirme: genel üyeler PascalCase
+dotnet_naming_rule.public_members_pascal.severity = warning
+dotnet_naming_rule.public_members_pascal.symbols = public_member_symbol
+dotnet_naming_rule.public_members_pascal.style = pascal_style
+dotnet_naming_symbols.public_member_symbol.applicable_kinds = property,method,event,class,struct,enum,delegate
+dotnet_naming_symbols.public_member_symbol.applicable_accessibilities = public,internal,protected
+dotnet_naming_style.pascal_style.capitalization = pascal_case
+
+# ----------------------------------------------------------------------------
+# Derleyici / analiz uyarı seviyeleri
+# ----------------------------------------------------------------------------
+# CA2007 (ConfigureAwait) ASP.NET Core'da gereksiz gürültü üretir.
+dotnet_diagnostic.CA2007.severity = none
+# CA1848 (LoggerMessage kaynak üreteci) bu ölçekte düşük değerli gürültü.
+dotnet_diagnostic.CA1848.severity = none
+# CA1062 (public argüman null kontrolü) nullable reference types ile karşılanıyor.
+dotnet_diagnostic.CA1062.severity = none
+# Kültüre duyarlı string karşılaştırmaları açık olmalı.
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+# Async metotlar Async son ekiyle bitmeli.
+dotnet_diagnostic.VSTHRD200.severity = none
+
+# Test projelerinde bazı kurallar gereksiz.
+[backend/tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
