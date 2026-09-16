@@ -314,7 +314,7 @@ Faz 19'da uygulanacaklar: `Content-Security-Policy`,
 Her güvenlik incelemesinde çalıştırılır:
 
 ```bash
-dotnet list backend/FlowDesk.sln package --vulnerable --include-transitive
+dotnet list backend/FlowDesk.slnx package --vulnerable --include-transitive
 npm --prefix frontend audit
 ```
 

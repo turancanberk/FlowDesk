@@ -92,8 +92,8 @@ implement edilmez.
 Faz sonunda gerçekten çalıştırılır (sonuç tahmin edilmez):
 
 ```bash
-dotnet build backend/FlowDesk.sln
-dotnet test  backend/FlowDesk.sln
+dotnet build backend/FlowDesk.slnx
+dotnet test  backend/FlowDesk.slnx
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
