@@ -102,3 +102,9 @@ dotnet_diagnostic.VSTHRD200.severity = none
 # Test projelerinde bazı kurallar gereksiz.
 [backend/tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
+
+# EF Core migration'ları araç tarafından üretilir; stil kurallarıyla
+# şekillendirilemezler. generated_code, analyzer'lara dosyanın üretilmiş
+# olduğunu bildiren standart mekanizmadır.
+[**/Migrations/*.cs]
+generated_code = true

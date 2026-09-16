@@ -4,6 +4,14 @@ using FlowDesk.Application.Authentication.LoginUser;
 using FlowDesk.Application.Authentication.LogoutSession;
 using FlowDesk.Application.Authentication.RefreshSession;
 using FlowDesk.Application.Authentication.RegisterUser;
+using FlowDesk.Api.Tenancy;
+using FlowDesk.Application.Abstractions;
+using FlowDesk.Application.Tenancy.CreateWorkspace;
+using FlowDesk.Application.Tenancy.DeleteWorkspace;
+using FlowDesk.Application.Tenancy.GetWorkspace;
+using FlowDesk.Application.Tenancy.ListWorkspaces;
+using FlowDesk.Application.Tenancy.UpdateWorkspace;
+using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using FlowDesk.Infrastructure.Authentication;
@@ -28,6 +36,12 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<LogoutSessionHandler>();
         services.AddScoped<GetCurrentUserHandler>();
 
+        services.AddScoped<CreateWorkspaceHandler>();
+        services.AddScoped<ListWorkspacesHandler>();
+        services.AddScoped<GetWorkspaceHandler>();
+        services.AddScoped<UpdateWorkspaceHandler>();
+        services.AddScoped<DeleteWorkspaceHandler>();
+
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 
         return services;
@@ -39,6 +53,30 @@ public static class ApiServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+
+        /*
+          Enums travel as their names, not their numeric values.
+
+          The default is the number, which makes a contract that depends on
+          declaration order: inserting a role or a ticket status in the middle
+          of an enum would silently change what every stored and in-flight value
+          means. Names also keep the wire format readable and match what
+          docs/API_CONVENTIONS.md promises clients.
+        */
+        services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
+
+        /*
+          One TenantContext instance per request, exposed under two service
+          types. The resolution filter needs the concrete type to write to it;
+          everything downstream sees the read-only interface, so no use case can
+          change which workspace it is operating in halfway through a request.
+        */
+        services.AddScoped<TenantContext>();
+        services.AddScoped<ITenantContext>(provider => provider.GetRequiredService<TenantContext>());
 
         services.Configure<CookieOptionsSettings>(configuration.GetSection(CookieOptionsSettings.SectionName));
         services.Configure<CorsSettings>(configuration.GetSection(CorsSettings.SectionName));
