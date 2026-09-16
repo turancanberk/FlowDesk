@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 08 birleştirildi) |
-| Son commit | `d96f2d5 — Merge branch 'feat/tickets'` (Faz 07) |
+| Son commit | `5d22d7a — docs: sayaç çakışması düzeltmesi kaydedildi` (Faz 08) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
