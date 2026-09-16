@@ -1,9 +1,15 @@
+using FlowDesk.Application.Abstractions;
+using FlowDesk.Application.Authentication;
+using FlowDesk.Infrastructure.Authentication;
 using FlowDesk.Infrastructure.HealthChecks;
+using FlowDesk.Infrastructure.Identity;
 using FlowDesk.Infrastructure.Persistence;
+using FlowDesk.Infrastructure.Time;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 
@@ -29,7 +35,11 @@ public static class InfrastructureServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        services.AddSingleton<IClock, SystemClock>();
+
         services.AddFlowDeskPersistence(configuration);
+        services.AddFlowDeskIdentity();
+        services.AddFlowDeskAuthentication(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
 
         return services;
@@ -55,10 +65,86 @@ public static class InfrastructureServiceCollectionExtensions
             var options = provider.GetRequiredService<IOptions<PostgresOptions>>().Value;
 
             var builder = new NpgsqlDataSourceBuilder(options.ConnectionString);
-            builder.UseLoggerFactory(provider.GetRequiredService<ILoggerFactory>());
+            builder.UseLoggerFactory(provider.GetRequiredService<
+                Microsoft.Extensions.Logging.ILoggerFactory>());
 
             return builder.Build();
         });
+
+        services.AddDbContext<FlowDeskDbContext>((provider, optionsBuilder) =>
+        {
+            optionsBuilder.UseNpgsql(
+                provider.GetRequiredService<NpgsqlDataSource>(),
+                npgsql => npgsql.MigrationsAssembly(typeof(FlowDeskDbContext).Assembly.FullName));
+        });
+
+        // The application layer depends on the contract, never on the concrete
+        // context (ADR-0021). Resolving through the registered context keeps a
+        // single instance per request, so both views share one change tracker.
+        services.AddScoped<IFlowDeskDbContext>(provider =>
+            provider.GetRequiredService<FlowDeskDbContext>());
+
+        return services;
+    }
+
+    private static IServiceCollection AddFlowDeskIdentity(this IServiceCollection services)
+    {
+        services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+
+                /*
+                  Length is the requirement that actually resists guessing.
+                  Character-class rules mostly push people towards predictable
+                  substitutions, so the minimum is raised instead and the
+                  classes are left optional (NIST SP 800-63B).
+                */
+                options.Password.RequiredLength = 10;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+
+                options.Lockout.MaxFailedAccessAttempts = 10;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            })
+            .AddEntityFrameworkStores<FlowDeskDbContext>();
+
+        // Identity's default token providers are not registered: they exist for
+        // e-mail confirmation and password reset, neither of which is in scope
+        // yet. Invitation tokens use ISecureTokenGenerator instead (Faz 05).
+
+        services.AddScoped<IUserAccountStore, UserAccountStore>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddFlowDeskAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<AuthenticationOptions>()
+            .Bind(configuration.GetSection(AuthenticationOptions.SectionName))
+            .ValidateDataAnnotations()
+            // A missing or too-short signing key must stop the process, not
+            // produce forgeable tokens.
+            .ValidateOnStart();
+
+        services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+        services.AddSingleton<ISecureTokenGenerator, Sha256SecureTokenGenerator>();
+
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
+
+            return new AuthenticationSettings(
+                TimeSpan.FromMinutes(options.AccessTokenLifetimeMinutes),
+                TimeSpan.FromDays(options.RefreshTokenLifetimeDays));
+        });
+
+        services.AddScoped<SessionIssuer>();
 
         return services;
     }

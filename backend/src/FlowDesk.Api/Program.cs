@@ -1,9 +1,14 @@
+using FlowDesk.Api.Common;
 using FlowDesk.Api.Endpoints;
 using FlowDesk.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddFlowDeskInfrastructure(builder.Configuration);
+builder.Services.AddFlowDeskApplication();
+builder.Services.AddFlowDeskApiServices(builder.Configuration);
+
+builder.Services.AddRateLimiter(RateLimitingPolicies.Configure);
 builder.Services.AddOpenApi();
 
 // ProblemDetails is registered from the start so that every error leaving the
@@ -13,6 +18,8 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+app.EnsureSecureCookiePolicyInProduction();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -21,7 +28,14 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
+app.UseCors(ApiServiceCollectionExtensions.CorsPolicyName);
+app.UseRateLimiter();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapHealthEndpoints();
+app.MapAuthEndpoints();
 
 await app.RunAsync();
 

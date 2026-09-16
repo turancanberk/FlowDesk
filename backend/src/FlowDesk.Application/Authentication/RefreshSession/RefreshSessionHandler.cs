@@ -1,0 +1,120 @@
+using FlowDesk.Application.Abstractions;
+using FlowDesk.Application.Common;
+using FlowDesk.Domain.Authentication;
+using Microsoft.EntityFrameworkCore;
+
+namespace FlowDesk.Application.Authentication.RefreshSession;
+
+/// <summary>
+/// Exchanges a refresh token for a new token pair, and detects replay.
+/// </summary>
+/// <remarks>
+/// Refresh tokens are single use. Presenting one that has already been
+/// exchanged means the value exists in two places: the legitimate client still
+/// holds it, or an attacker copied it. There is no way to tell which from the
+/// request, so the safe reading is that the family is compromised — every token
+/// in it is revoked and both parties are forced to sign in again.
+///
+/// This is the whole point of grouping tokens into families. Without it, a
+/// stolen token could be rotated indefinitely alongside the real session and
+/// nothing would ever look wrong.
+/// </remarks>
+public sealed class RefreshSessionHandler
+{
+    private readonly IFlowDeskDbContext _dbContext;
+    private readonly IUserAccountStore _accountStore;
+    private readonly ISecureTokenGenerator _tokenGenerator;
+    private readonly SessionIssuer _sessionIssuer;
+    private readonly IClock _clock;
+
+    public RefreshSessionHandler(
+        IFlowDeskDbContext dbContext,
+        IUserAccountStore accountStore,
+        ISecureTokenGenerator tokenGenerator,
+        SessionIssuer sessionIssuer,
+        IClock clock)
+    {
+        _dbContext = dbContext;
+        _accountStore = accountStore;
+        _tokenGenerator = tokenGenerator;
+        _sessionIssuer = sessionIssuer;
+        _clock = clock;
+    }
+
+    public async Task<Result<AuthenticatedSession>> HandleAsync(
+        RefreshSessionCommand command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (string.IsNullOrWhiteSpace(command.RefreshTokenValue))
+        {
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionNotFound);
+        }
+
+        // The lookup is by hash, so a database dump does not yield usable tokens.
+        var presentedHash = _tokenGenerator.Hash(command.RefreshTokenValue);
+
+        var storedToken = await _dbContext.RefreshTokens
+            .FirstOrDefaultAsync(token => token.TokenHash == presentedHash, cancellationToken);
+
+        if (storedToken is null)
+        {
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionNotFound);
+        }
+
+        var now = _clock.UtcNow;
+
+        if (storedToken.UsedAt is not null)
+        {
+            await RevokeFamilyAsync(storedToken.FamilyId, now, cancellationToken);
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionRevoked);
+        }
+
+        if (storedToken.RevokedAt is not null)
+        {
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionRevoked);
+        }
+
+        if (storedToken.IsExpired(now))
+        {
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionExpired);
+        }
+
+        var account = await _accountStore.FindByIdAsync(storedToken.UserId, cancellationToken);
+
+        if (account is null)
+        {
+            // The account disappeared while the session was alive. Take the
+            // session down with it rather than leaving a usable family behind.
+            await RevokeFamilyAsync(storedToken.FamilyId, now, cancellationToken);
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.AccountNotFound);
+        }
+
+        storedToken.MarkUsed(now);
+        var session = _sessionIssuer.ContinueSession(account, storedToken.FamilyId);
+
+        // One save: the old token is spent and the new one exists together, or
+        // neither change lands.
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(session);
+    }
+
+    private async Task RevokeFamilyAsync(
+        Guid familyId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var familyTokens = await _dbContext.RefreshTokens
+            .Where(token => token.FamilyId == familyId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in familyTokens)
+        {
+            token.Revoke(now);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+}

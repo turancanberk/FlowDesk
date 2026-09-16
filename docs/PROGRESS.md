@@ -12,7 +12,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 00 — Bootstrap
 - [x] Faz 01 — Temel
 - [x] Faz 02 — Tasarım Sistemi
-- [ ] Faz 03 — Kimlik Doğrulama
+- [x] Faz 03 — Kimlik Doğrulama
 - [ ] Faz 04 — Çok Kiracılılık
 - [ ] Faz 05 — Ekip ve Davetler
 - [ ] Faz 06 — Müşteriler
@@ -36,13 +36,71 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 03 — Kimlik Doğrulama**
+**Faz 04 — Çok Kiracılılık**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 03 — Kimlik Doğrulama · Tamamlandı
+
+Domain:
+
+- `RefreshToken` kendi durum kurallarını koruyor: tek kullanımlık, süresi
+  dolmuş veya iptal edilmiş token takas edilemez. Tek kullanım kuralı replay
+  tespitinin dayanağı.
+- Token'lar `FamilyId` altında gruplanıyor; bir oturum boyunca her rotasyon
+  aynı aileyi sürdürüyor.
+
+Application:
+
+- `Result` deseni: beklenen hatalar döndürülüyor, fırlatılmıyor.
+- Use case'ler: `RegisterUser`, `LoginUser`, `RefreshSession`,
+  `LogoutSession`, `GetCurrentUser`.
+- `SessionIssuer` token çiftini tek yerde üretiyor; kayıt, giriş ve yenileme
+  aynı ömürleri paylaşıyor.
+- Sözleşmeler: `IClock`, `IFlowDeskDbContext`, `IUserAccountStore`,
+  `IAccessTokenIssuer`, `ISecureTokenGenerator`.
+
+Infrastructure:
+
+- ASP.NET Core Identity, rol tabloları olmadan (`IdentityUserContext`).
+- Parola politikası uzunluk esaslı (10 karakter), karakter sınıfı zorunluluğu
+  yok (NIST SP 800-63B).
+- JWT üretimi ve doğrulama parametreleri aynı ayarlardan türüyor.
+  `ClockSkew` sıfır.
+- Refresh token SHA-256 ile hash'lenip saklanıyor.
+- İlk migration: 5 tablo (Identity kullanıcı tabloları + `RefreshTokens`).
+
+API:
+
+- `/api/auth/register`, `/login`, `/refresh`, `/logout`, `GET /api/me`.
+- Refresh çerezi: `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/auth`.
+- Üretimde `SecurePolicy` gevşetilirse uygulama başlamıyor.
+- Rate limiting: login 10/dk, register 5/10dk, refresh 30/dk.
+- Doğrulama hataları 422, ProblemDetails biçiminde, alan bazında.
+
+Frontend:
+
+- Access token modül kapsamlı bir değişkende; `localStorage` ve
+  `sessionStorage` kullanılmıyor.
+- Tek uçuşlu (single-flight) yenileme: aynı anda birden fazla sorgu süresi
+  dolmuş token görürse tek bir yenileme yapılıyor. Aksi halde ikinci istek
+  replay gibi görünür ve sunucu haklı olarak tüm aileyi iptal ederdi.
+- TanStack Query ile oturum durumu; çıkışta önbellek tamamen temizleniyor.
+- Giriş ve kayıt ekranları, istemci tarafı rota koruması.
+
+Bu faz sırasında çözülen üç gerçek hata:
+
+1. `ValidationFilter<RegisterRequest>` ile `IValidator<RegisterUserCommand>`
+   eşleşmiyordu; kayıt uç noktası 500 dönüyordu. İstek gövdeleri doğrudan
+   Application komutlarına bağlanarak ikizleme kaldırıldı.
+2. Doğrulama hataları 400 dönüyordu; `docs/API_CONVENTIONS.md` 422 diyor. Kod
+   dokümana uyduruldu.
+3. `AddJwtBearer` içinde `BuildServiceProvider` çağrısı ikinci bir konteyner
+   yaratıyordu; yapılandırma options pipeline'ına taşındı.
 
 ### Faz 02 — Tasarım Sistemi · Tamamlandı
 
@@ -205,3 +263,15 @@ Faz 02 sonunda:
 | `npm --prefix frontend run format:check` | Başarılı |
 | `npm --prefix frontend run build` | Başarılı — `/design-system` statik üretildi |
 | Görsel inceleme | Tipografi, renk, tablo, kenar çubuğu ve buton bölümleri ekran görüntüsüyle doğrulandı |
+
+Faz 03 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 51/51 başarılı |
+| `dotnet ef database update` | Boş veritabanına uygulandı, 5 tablo |
+| `npm --prefix frontend run lint / typecheck / format:check / build` | Başarılı |
+| Tarayıcıda uçtan uca akış | Kayıt → yenileme → çıkış → hatalı giriş → giriş tamam |
+| `localStorage` / `sessionStorage` | Boş (ADR-0006 doğrulandı) |
+| Çerezler | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |

@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/design-system` |
+| Aktif dal | `feat/authentication` |
 | Son commit | Faz 01 commit'i ile güncellenecek |
 | Working tree | Faz 01 commit'i ile temizlenecek |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -27,14 +27,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 00 — Bootstrap
 - Faz 01 — Temel
 - Faz 02 — Tasarım Sistemi
+- Faz 03 — Kimlik Doğrulama
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 03 — Kimlik Doğrulama** (henüz başlanmadı)
+**Faz 04 — Çok Kiracılılık** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 03 kapsamında henüz iş yapılmadı.
+Faz 04 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -42,35 +43,35 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 03'ün tamamı:
+Faz 04'ün tamamı:
 
-- ASP.NET Core Identity ve `FlowDeskDbContext` (ilk migration burada oluşur)
-- `RefreshToken` varlığı: `FamilyId`, `TokenHash`, `UsedAt`, `RevokedAt`
-- `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /api/me`
-- Access token üretimi (kısa ömürlü JWT) ve refresh token rotasyonu
-- Replay tespiti: kullanılmış bir token tekrar sunulursa ailenin tamamı iptal
-- Çerez politikası, CORS ve CSRF savunma katmanları
-- Rate limiting: login, register, refresh
-- Frontend: bellekte auth store, `Authorization: Bearer` ekleyen HTTP
-  istemcisi, sessiz yenileme, tek uçuşlu (single-flight) refresh,
-  giriş/kayıt ekranları, korumalı rota guard'ı
-- Entegrasyon testleri: rotasyon, replay, iptal, logout, rate limit
+- `Tenant` ve `Membership` domain varlıkları; `WorkspaceSlug` üretimi ve
+  benzersizliği
+- `POST /api/workspaces` (oluşturan Owner olur), `GET /api/workspaces`,
+  `GET/PATCH/DELETE /api/workspaces/{workspaceSlug}`
+- `TenantContext` çözümleme: rotadaki slug'dan tenant'a, her istekte üyelik
+  doğrulaması
+- EF Core global query filter (ikinci savunma hattı)
+- Frontend: çalışma alanı seçici, `/app/{workspaceSlug}/...` rotaları
+- **Kiracı izolasyonu güvenlik testleri** — bu fazın geçme şartı
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/authentication` dalını aç. Backend'de `FlowDesk.Infrastructure` içinde
-`FlowDeskDbContext` oluştur ve ASP.NET Core Identity'yi bağla
-(`Microsoft.AspNetCore.Identity.EntityFrameworkCore`). `AspNetRoles`
-**uygulama rolleri için kullanılmaz**; roller Faz 04'te `Membership` üzerinde
-olacak (ADR-0003). Ardından `RefreshToken` varlığını
-`docs/DATABASE.md` içindeki şemaya göre ekle, ilk migration'ı üret ve boş
-veritabanına uygula.
+`feat/multi-tenancy` dalını aç. `FlowDesk.Domain/Tenancy/` altında `Tenant` ve
+`Membership` varlıklarını `docs/DATABASE.md` şemasına göre yaz. `Membership`
+üzerinde `(UserId, TenantId)` benzersiz olacak ve rol burada duracak; `User`
+üzerinde kalıcı `TenantId` **olmayacak** (ADR-0003).
 
-Kimlik doğrulama modelinin tamamı `docs/SECURITY.md` bölüm 1'de tanımlı ve
-bağlayıcıdır: access token yalnızca bellekte, refresh token `HttpOnly` çerezde
-ve veritabanında yalnızca SHA-256 hash'i olarak saklanır.
+Ardından `IFlowDeskDbContext`'e `Tenants` ve `Memberships` ekle, EF
+yapılandırmalarını ve migration'ı üret.
 
-Paket sürümlerini kurulum anında resmî registry'den doğrula (ADR-0016).
+Önemli: kiracı izolasyonu üç savunma katmanıyla kurulacak ve sırası önemli —
+birincil hat her istekte üyelik doğrulaması, ikincisi global query filter,
+üçüncüsü yazma tarafı sahiplik kontrolü. Global query filter tek başına
+güvenlik sınırı sayılmaz; `IgnoreQueryFilters` ile atlanabilir. Ayrıntı
+`docs/SECURITY.md` bölüm 6.
+
+Yabancı kiracı kaynağı için `404` dönülecek, `403` değil (ADR-0007).
 
 ## Son Doğrulama Durumu
 
@@ -80,7 +81,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 17/17 başarılı (12 mimari + 5 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 51/51 başarılı (13 mimari + 12 domain + 26 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -92,6 +93,9 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `GET http://localhost:5080/health/ready` | HTTP 200, `postgres = Healthy` |
 | `dotnet list ... package --vulnerable --include-transitive` | Açık yok |
 | `npm --prefix frontend audit` | 0 açık |
+| Tarayıcıda uçtan uca akış (Faz 03) | Kayıt → yenileme → çıkış → hatalı giriş → giriş tamam |
+| `localStorage` / `sessionStorage` (Faz 03) | Boş — ADR-0006 doğrulandı |
+| Çerezler (Faz 03) | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -147,11 +151,31 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - shadcn/ui bileşenleri Base UI tabanlı olarak depoda sahiplenilir; shadcn'in
   semantik değişken sözleşmesi korunur, değerleri FlowDesk paletiyle
   doldurulur (ADR-0020)
+- Application EF Core kullanabilir ama veritabanı sağlayıcısını kullanamaz;
+  sınır `IFlowDeskDbContext` ve mimari testle korunur (ADR-0021)
+- Kullanıcı hesabı Identity'ye aittir, Domain'de `User` varlığı yoktur;
+  domain varlıkları kullanıcıya `Guid` ile referans verir (ADR-0022)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 03'te eklenenler:
+
+- `backend/src/FlowDesk.Domain/Authentication/RefreshToken.cs`
+- `backend/src/FlowDesk.Application/Common/` — `Result`, `ApplicationError`
+- `backend/src/FlowDesk.Application/Abstractions/` — beş sözleşme
+- `backend/src/FlowDesk.Application/Authentication/` — beş use case +
+  `SessionIssuer`
+- `backend/src/FlowDesk.Infrastructure/Identity/`, `Authentication/`,
+  `Persistence/` — `FlowDeskDbContext`, ilk migration
+- `backend/src/FlowDesk.Api/Endpoints/AuthEndpoints.cs`,
+  `Authentication/RefreshTokenCookie.cs`, `Common/` (Result eşlemesi,
+  doğrulama filtresi, rate limiting, çerez politikası koruması)
+- `frontend/src/lib/api/` — bellekte token deposu, HTTP istemcisi
+- `frontend/src/features/auth/` — API, sorgular, formlar, rota koruması
+- `frontend/src/app/(auth)/giris`, `(auth)/kayit`
 
 Faz 02'de eklenenler:
 
@@ -184,11 +208,15 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | Yok |
-| Migration uygulandı mı | Hayır — henüz `DbContext` yok (Faz 03'te Identity ile gelir) |
+| Son migration | `20260916134921_InitialIdentityAndRefreshTokens` |
+| Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
+| Tablolar | `AspNetUsers`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserTokens`, `RefreshTokens` |
 | Seed | Yok (Faz 21) |
 
-PostgreSQL 17.10 konteyneri çalışıyor ve `flowdesk` veritabanı boş.
+Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
+
+Entegrasyon testleri kendi Testcontainers örneğini kullanır ve migration'ları
+fixture içinde uygular; yerel veritabanına dokunmaz.
 
 ## Infrastructure Durumu
 

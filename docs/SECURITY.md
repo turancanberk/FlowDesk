@@ -22,10 +22,13 @@ ASP.NET Core Identity kullanılır. Parola hash'leme, kilitleme ve doğrulama
 
 ### Access token
 
+Doğrulanmış davranış: tarayıcıda `localStorage` ve `sessionStorage` boş kalır;
+kurulan tek çerez `HttpOnly` refresh çerezidir.
+
 | Özellik | Değer |
 |---|---|
 | Tür | JWT |
-| Ömür | Kısa (~10 dakika) |
+| Ömür | 10 dakika (`Auth:AccessTokenLifetimeMinutes`) |
 | Saklama yeri | **Yalnızca tarayıcı belleği** (modül kapsamlı auth store) |
 | Taşıma | `Authorization: Bearer <token>` başlığı |
 
@@ -259,7 +262,24 @@ ASP.NET Core rate limiting kullanılır. Kapsanan uç noktalar:
 | `POST /api/auth/refresh` | Token deneme ve kötüye kullanım |
 | Davet kabul | Token tahmin denemesi |
 
-Politika ayrıntıları Faz 19'da kesinleştirilir ve burada güncellenir.
+Uygulanan politikalar (sabit pencere, istemci IP adresine göre bölümlenmiş):
+
+| Uç nokta | Limit | Pencere |
+|---|---|---|
+| `POST /api/auth/login` | 10 istek | 1 dakika |
+| `POST /api/auth/register` | 5 istek | 10 dakika |
+| `POST /api/auth/refresh` | 30 istek | 1 dakika |
+
+IP adresi kaba bir anahtardır — paylaşılan bir ofis çıkışı tek istemci sayılır
+— ancak çağıran kimlik doğrulamadan önce elde olan tek tanımlayıcıdır ve bu uç
+noktaların korunması gereken an tam olarak o andır. Limitler normal insan
+kullanımının belirgin şekilde üzerinde; parolasını yeniden deneyen gerçek bir
+kullanıcı bunlara çarpmaz.
+
+Sıra tutulmaz (`QueueLimit = 0`): limiti aşan çağrıyı bekletmek, tam da
+savunulan yığılma anında bağlantıları meşgul ederdi.
+
+Politikalar Faz 19'da yeniden gözden geçirilecek.
 
 ---
 

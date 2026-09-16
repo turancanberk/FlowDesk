@@ -27,6 +27,8 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0018 | xUnit v3 ve Microsoft.Testing.Platform | Kabul edildi |
 | ADR-0019 | Çözüm dosyası biçimi olarak .slnx | Kabul edildi |
 | ADR-0020 | shadcn/ui kaynak bileşenleri + Base UI primitifleri | Kabul edildi |
+| ADR-0021 | IFlowDeskDbContext ile EF Core sınırı | Kabul edildi |
+| ADR-0022 | Kullanıcı hesabı Identity'ye ait, Domain'de User yok | Kabul edildi |
 
 ---
 
@@ -480,3 +482,79 @@ sözleşmenin yanında durur.
   `next-themes` bağımlılığı kaldırıldı.
 - shadcn paketi çalışma zamanı bağımlılığı değil, geliştirme aracıdır ve
   `devDependencies` altına alındı.
+
+
+---
+
+## ADR-0021 — IFlowDeskDbContext ile EF Core sınırı
+
+**Bağlam.** ADR-0004 gereği generic repository ve UnitOfWork sarmalayıcısı
+kullanılmıyor; EF Core doğrudan kullanılacak. Ancak ADR-0001 bağımlılık yönünü
+tek yönlü tutuyor: Application, Infrastructure'a bağımlı olamaz. `DbContext`
+bir altyapı tipi olduğu için use case'lerin ona doğrudan erişmesi bu kuralı
+kırardı.
+
+**Karar.** Application katmanında `IFlowDeskDbContext` arayüzü tanımlanacak.
+Arayüz `DbSet<T>` döndürür ve `SaveChangesAsync` sunar. `FlowDeskDbContext`
+bunu Infrastructure'da uygular.
+
+Application projesi `Microsoft.EntityFrameworkCore` paketine bağımlı olacak,
+ancak veritabanı **sağlayıcısına** (Npgsql) bağımlı olmayacak.
+
+**Gerekçe.** Üç seçenek vardı:
+
+1. Application'ın Infrastructure'a bağımlı olmasına izin vermek — katman
+   hikâyesini tamamen çökertirdi.
+2. Her varlık için odaklı repository yazmak — ADR-0004'ün kaçındığı dolaylılığı
+   varlık başına geri getirirdi.
+3. Tek bir context sözleşmesi.
+
+Üçüncüsü seçildi çünkü tek bir mimari sınır, varlık başına bir sarmalayıcıdan
+hem daha az hem de daha dürüst. `DbSet<T>` açıkta kaldığı için projeksiyon,
+`AsNoTracking` ve sorgu bileşimi kaybolmuyor — repository yaklaşımının en pahalı
+kaybı buydu.
+
+EF Core'un Application'da bulunması bilinçli bir taviz. EF Core pratikte
+değiştirilebilir bir bağımlılık değil; öyleymiş gibi davranmak sorgu ifade
+gücünü gerçek bir karşılık almadan harcamak olurdu. Tutulan sınır sağlayıcı
+sınırı: PostgreSQL'e özgü bir sorgunun use case içinde yazılmaması gerekir.
+
+**Sonuçlar.** Bu sınır mimari testle korunuyor:
+`Application_uses_EntityFrameworkCore_but_no_database_provider`. Test olmadan
+sınır, ilk sağlayıcıya özgü yardımcıya ihtiyaç duyulduğunda sessizce
+genişlerdi.
+
+---
+
+## ADR-0022 — Kullanıcı hesabı Identity'ye ait, Domain'de User yok
+
+**Bağlam.** ASP.NET Core Identity kullanılıyor ve `IdentityUser<TKey>` bir EF
+Core/altyapı tipi. Domain katmanı altyapıya bağımlı olamadığı için "Domain'de
+ayrı bir `User` varlığı olmalı mı?" sorusu doğuyor.
+
+**Karar.** `ApplicationUser : IdentityUser<Guid>` Infrastructure'da yaşayacak.
+Domain'de `User` varlığı **olmayacak**. Domain varlıkları kullanıcıya `Guid`
+ile referans verecek.
+
+**Gerekçe.** Identity zaten parola hash'i, normalleştirilmiş e-posta, güvenlik
+damgası ve kilitleme durumunu tutuyor. Paralel bir domain kullanıcısı bu
+durumu ikizler ve senkron tutulması gereken ikinci bir yer yaratırdı; bu tür
+ikizlemeler kaçınılmaz olarak birinde güncellenip diğerinde unutulur.
+
+Kullanıcı hesabı bir kimlik/kimlik doğrulama kaydıdır, bir iş varlığı değil.
+FlowDesk'in domain kuralları kullanıcının parolası hakkında hiçbir şey
+söylemiyor; söylediği şey üyelik, atama ve sahiplik ki bunların hepsi
+`UserId` ile ifade edilebiliyor.
+
+**Sonuçlar.**
+
+- `RefreshToken` gibi domain varlıkları `ApplicationUser`'a navigation property
+  taşımaz. Yabancı anahtar, EF yapılandırmasında Infrastructure tarafında
+  tanımlanır.
+- Identity rol tabloları oluşturulmaz. Rol, hesabın değil üyeliğin özelliğidir
+  (ADR-0003); bu yüzden `IdentityDbContext` yerine `IdentityUserContext`
+  kullanıldı ve `AspNetRoles`, `AspNetUserRoles`, `AspNetRoleClaims`
+  tablolarının kalıcı olarak boş durması engellendi.
+- Application katmanı Identity'yi doğrudan tanımaz; `IUserAccountStore`
+  sözleşmesi üzerinden çalışır ve bu sayede use case'ler veritabanı olmadan
+  test edilebilir.
