@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Gerçek ASP.NET Core uygulamasını WebApplicationFactory ile ayağa kaldıran
+    ve Testcontainers üzerinden gerçek PostgreSQL kullanan testler.
+    SQLite ile değiştirilmez; davranış farkı testi anlamsız kılar.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlowDesk.Api\FlowDesk.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
