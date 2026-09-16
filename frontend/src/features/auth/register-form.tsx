@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,11 +15,16 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api/api-error";
+import { toSafeRedirect } from "./safe-redirect";
 import { useRegister } from "./auth-queries";
 import { registerSchema, type RegisterFormValues } from "./auth-schemas";
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Where to go after signing in; only same-origin paths are honoured.
+  const redirectTo = toSafeRedirect(searchParams.get("next"));
   const registerMutation = useRegister();
 
   const {
@@ -39,7 +44,7 @@ export function RegisterForm() {
 
     registerMutation.mutate(values, {
       onSuccess: () => {
-        router.replace("/");
+        router.replace(redirectTo);
       },
       onError: (error) => {
         if (!(error instanceof ApiError)) {

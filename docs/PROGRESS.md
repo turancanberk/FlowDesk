@@ -14,7 +14,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 02 — Tasarım Sistemi
 - [x] Faz 03 — Kimlik Doğrulama
 - [x] Faz 04 — Çok Kiracılılık
-- [ ] Faz 05 — Ekip ve Davetler
+- [x] Faz 05 — Ekip ve Davetler
 - [ ] Faz 06 — Müşteriler
 - [ ] Faz 07 — Talepler
 - [ ] Faz 08 — Görevler
@@ -36,13 +36,69 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 05 — Ekip ve Davetler**
+**Faz 06 — Müşteriler**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 05 — Ekip ve Davetler · Tamamlandı
+
+Domain:
+
+- `Invitation`: hash'li token, süre dolumu (7 gün), tek kullanımlık kabul,
+  iptal. Kabul, davet edilen adrese bağlı — bu kural entity'de duruyor, çünkü
+  iletilmiş bir bağlantının onu alan kişi tarafından kullanılmasını engelleyen
+  kural bu.
+- Adres normalleştirmesi invariant küçültme ile; Türkçe kültür kuralı "I"
+  harfini noktasız "ı"ya eşleyip daveti kendi alıcısına kapatırdı.
+
+Application:
+
+- İzin matrisi üye ve davet eylemleriyle genişletildi.
+- Use case'ler: `ListMembers`, `ChangeMemberRole`, `RemoveMember`,
+  `InviteMember`, `ListInvitations`, `RevokeInvitation`, `AcceptInvitation`.
+- "Son sahip mi?" sorusu üç yerde geçiyor ve tek bir yerde soruluyor.
+- Ekip listesi Identity hesaplarını tek sorguda alıyor.
+
+Yetki kuralları:
+
+- Admin ekibi yönetir ama üstündekileri yönetemez ve sahiplik dağıtamaz.
+- Son sahip ne rolünü düşürebilir ne de ayrılabilir.
+- Ayrılmak başkasını çıkarmakla aynı eylem değil; her üye ayrılabilir.
+- Üyelik silindiğinde erişim aynı access token ile anında kesiliyor.
+
+API:
+
+- Kabul uç noktası çalışma alanı kapsamının dışında; kapsam token'dan geliyor.
+- Başarısız her kabul aynı hatayı döndürüyor.
+- Kabul uç noktası rate limiting kapsamında.
+
+Frontend:
+
+- Ekip ekranı: üye tablosu, rol değiştirme, üye çıkarma, bekleyen davetler.
+- Davet diyaloğu bağlantıyı bir kez gösteriyor ve e-posta gönderiminin henüz
+  devrede olmadığını açıkça söylüyor.
+- Davet kabul ekranı; giriş yapılmamışsa token korunarak giriş ekranına
+  yönlendiriliyor.
+- `toSafeRedirect`: `next` parametresi yalnızca aynı kökenli yolları kabul
+  ediyor. Açık yönlendirme, girişten hemen sonra parola sormak için ikna edici
+  bir yer sunardı.
+
+Testler: 183/183. Davet güvenliği (tek kullanım, adres bağı, süre dolumu,
+iptal, hash'li saklama, ayırt edilemez hatalar) ve rol yetkilendirme matrisi
+uçtan uca doğrulandı.
+
+Bu faz sırasında çözülen üç gerçek hata:
+
+1. `useSearchParams` statik prerender'da Suspense sınırı gerektiriyordu;
+   `/giris` derlemesi kırılıyordu.
+2. Render sırasında ref güncelleme (React kural ihlali) lint'e takıldı;
+   TanStack Query'nin kararlı `mutate` fonksiyonu doğrudan kullanıldı.
+3. Playwright doğrulamasında `networkidle` React Query ile hiç sonuçlanmıyordu;
+   bekleme stratejisi açık seçici beklemeye çevrildi.
 
 ### Faz 04 — Çok Kiracılılık · Tamamlandı
 

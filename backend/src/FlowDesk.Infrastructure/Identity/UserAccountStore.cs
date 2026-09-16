@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Application.Authentication;
 using FlowDesk.Application.Common;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlowDesk.Infrastructure.Identity;
 
@@ -97,6 +99,35 @@ public sealed class UserAccountStore : IUserAccountStore
         var user = await _userManager.FindByIdAsync(userId.ToString());
 
         return user is null ? null : ToAccount(user);
+    }
+
+    public async Task<UserAccount?> FindByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var user = await _userManager.FindByEmailAsync(email);
+
+        return user is null ? null : ToAccount(user);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, UserAccount>> FindByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        if (userIds.Count == 0)
+        {
+            return ReadOnlyDictionary<Guid, UserAccount>.Empty;
+        }
+
+        // One query for the whole team rather than one per member.
+        var users = await _userManager.Users
+            .AsNoTracking()
+            .Where(user => userIds.Contains(user.Id))
+            .ToListAsync(cancellationToken);
+
+        return users.ToDictionary(user => user.Id, ToAccount);
     }
 
     private static UserAccount ToAccount(ApplicationUser user) =>

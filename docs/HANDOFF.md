@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/multi-tenancy` |
+| Aktif dal | `feat/team-invitations` |
 | Son commit | Faz 01 commit'i ile güncellenecek |
 | Working tree | Faz 01 commit'i ile temizlenecek |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -29,16 +29,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 02 — Tasarım Sistemi
 - Faz 03 — Kimlik Doğrulama
 - Faz 04 — Çok Kiracılılık
+- Faz 05 — Ekip ve Davetler
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 05 — Ekip ve Davetler** (henüz başlanmadı)
+**Faz 06 — Müşteriler** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 05 kapsamında henüz iş yapılmadı. İzin matrisi altyapısı
-(`WorkspaceAction` + `WorkspacePermissions`) Faz 04'te kuruldu; bu fazda üye
-ve davet eylemleriyle genişletilecek.
+Faz 06 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -46,38 +45,37 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 05'in tamamı:
+Faz 06'nın tamamı:
 
-- `Invitation` domain varlığı: hash'li token, süre dolumu, tek kullanımlık
-  kabul
-- Üye listeleme, rol değiştirme, üyeyi çıkarma uç noktaları
-- Davet oluşturma, listeleme, iptal etme ve kabul etme
-- İzin matrisinin üye/davet eylemleriyle genişletilmesi
-- Frontend: Ekip ekranı, davet gönderme, davet kabul ekranı
-- Yetkilendirme testleri: her rol × her eylem
+- `Customer` domain varlığı; `ITenantOwned` uygulayacak ve global query
+  filter'a **otomatik** kaydolacak
+- Soft delete (arşivleme) — yalnızca `Customer` (ADR-0012)
+- CRUD use case'leri + arama, filtre, sıralama, sayfalama
+- İzin matrisine müşteri eylemleri
+- Frontend: TanStack Table tabanlı liste, detay sayfası, formlar
+- Yükleniyor / boş / sonuç yok / hata durumları
+- Kiracı izolasyon testleri ve query filter'ın **davranışsal** testi
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/team-invitations` dalını aç. `FlowDesk.Domain/Tenancy/Invitation.cs`
-dosyasını `docs/DATABASE.md` şemasına göre yaz. Davet token'ı **ham olarak
-saklanmaz**, yalnızca hash'i; üretim ve hash'leme için mevcut
-`ISecureTokenGenerator` kullanılacak (Faz 03'te yazıldı, refresh token için
-aynı sözleşme).
+`feat/customers` dalını aç. `FlowDesk.Domain/Customers/Customer.cs` dosyasını
+`docs/DATABASE.md` şemasına göre yaz ve `ITenantOwned` uygula — bu, varlığı
+global query filter'a otomatik kaydeder (ADR-0024); ayrıca bir şey yapmaya
+gerek yok ve `TenantQueryFilterTests` kaydın yapıldığını doğrular.
 
-Domain invariantları: süresi dolmuş davet kabul edilemez, kabul edilmiş davet
-ikinci kez kabul edilemez, davet yalnızca davet edilen e-posta adresiyle
-eşleşen hesap tarafından kabul edilebilir.
+`Customer` soft delete destekleyen **tek** varlık (ADR-0012): müşteri kayıtları
+geçmiş taleplerin ve görevlerin bağlamını taşıdığı için kalıcı silinmiyor,
+arşivleniyor. `ArchivedAt IS NULL` koşulu da query filter'a eklenecek.
 
-`WorkspaceAction` enum'una üye ve davet eylemleri eklenecek. Matris tek bir
-tabloda; `Every_defined_action_is_mapped` testi eksik eşlemeyi yakalar.
+Faz 06, query filter'ın ilk gerçek tüketicisi. Mekanizma model seviyesinde
+doğrulanmış durumda; bu fazda **davranışsal** testi de yazılacak: iki kiracının
+müşterileri aynı tabloda dururken her sorgu yalnızca kendi kiracısının
+satırlarını görmeli.
 
-Davet kabul uç noktası çalışma alanı kapsamının **dışında** olacak
-(`POST /api/invitations/accept`): kabul eden kişi henüz üye değildir ve
-`WorkspaceResolutionFilter` isteği reddederdi. Bu sapma
-`docs/API_CONVENTIONS.md` içinde belgeli.
-
-Bu fazda e-posta gönderimi yok; davet bağlantısı arayüzden alınır. Mailpit
-Faz 12'de geliyor.
+Sayfalama sözleşmesi `docs/API_CONVENTIONS.md` içinde tanımlı: `page`,
+`pageSize` (varsayılan 25, üst sınır 100), `search`, `sort`. Sıralama alanı
+benzersiz değilse `Id` ile tie-break yapılacak; aksi halde sayfalar arasında
+kayıt tekrarlanır veya atlanır.
 
 ## Son Doğrulama Durumu
 
@@ -87,7 +85,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 135/135 başarılı |
+| `dotnet test backend/FlowDesk.slnx` | 183/183 başarılı |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -103,6 +101,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `localStorage` / `sessionStorage` (Faz 03) | Boş — ADR-0006 doğrulandı |
 | Çerezler (Faz 03) | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |
 | Tarayıcıda çok kiracılı akış (Faz 04) | Yedi adımın tamamı geçti; izolasyon doğrulandı |
+| Tarayıcıda davet akışı (Faz 05) | Dokuz adımın tamamı geçti; yanlış hesap ve ikinci kullanım reddedildi |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -141,6 +140,10 @@ Bilinen blocker yok.
 5. **Rate limiting ve elle doğrulama.** Kayıt limiti IP başına 10 dakikada 5.
    Tarayıcıda arka arkaya doğrulama yaparken bu limit dolar ve kayıt `429`
    döner. Limiter bellek içidir; API'yi yeniden başlatmak sayaçları sıfırlar.
+
+6. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
+   için `waitUntil: "networkidle"` hiç sonuçlanmayabilir. Elle doğrulama
+   betiklerinde `domcontentloaded` + açık seçici beklemesi kullanın.
 
 ## Önemli Mimari Kararlar
 
@@ -184,6 +187,15 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 05'te eklenenler:
+
+- `backend/src/FlowDesk.Domain/Tenancy/Invitation.cs`
+- `backend/src/FlowDesk.Application/Team/` — yedi use case + `TeamErrors`
+- `backend/src/FlowDesk.Api/Endpoints/TeamEndpoints.cs`
+- `backend/tests/.../Team/` — davet güvenliği ve rol yetkilendirme testleri
+- `frontend/src/features/team/` — ekip ekranı, davet diyaloğu, kabul ekranı
+- `frontend/src/features/auth/safe-redirect.ts` — açık yönlendirme koruması
 
 Faz 04'te eklenenler:
 
@@ -245,9 +257,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `20260916141442_AddTenantsAndMemberships` |
+| Son migration | `AddInvitations` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).

@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLogout } from "@/features/auth/auth-queries";
 import { RequireSession } from "@/features/auth/require-session";
 import type { CurrentUser } from "@/features/auth/auth-types";
+import type { Workspace } from "./workspace-types";
 import { membershipRoleLabels } from "@/lib/domain-labels";
 import { useWorkspace, useWorkspaces } from "./workspace-queries";
 import { WorkspaceSwitcher } from "./workspace-switcher";
@@ -37,7 +38,13 @@ export function WorkspaceShell({
 }: {
   workspaceSlug: string;
   activeSection: WorkspaceSection;
-  children: React.ReactNode;
+  /*
+    A render function rather than plain nodes, so a page receives the resolved
+    workspace — including the caller's own role — without fetching it a second
+    time. The shell has already handled the loading and not-found states by the
+    time this runs.
+  */
+  children: (workspace: Workspace) => React.ReactNode;
 }) {
   return (
     <RequireSession>
@@ -66,7 +73,7 @@ function WorkspaceShellContent({
   workspaceSlug: string;
   activeSection: WorkspaceSection;
   user: CurrentUser;
-  children: React.ReactNode;
+  children: (workspace: Workspace) => React.ReactNode;
 }) {
   const workspaceQuery = useWorkspace(workspaceSlug);
   const workspacesQuery = useWorkspaces();
@@ -120,7 +127,7 @@ function WorkspaceShellContent({
         }
       />
 
-      <div className="bg-canvas flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="bg-canvas flex min-w-0 flex-1 flex-col">{children(workspace)}</div>
     </div>
   );
 }

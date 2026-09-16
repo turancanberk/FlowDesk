@@ -28,5 +28,7 @@ public interface IFlowDeskDbContext
     /// </summary>
     DbSet<Membership> Memberships { get; }
 
+    DbSet<Invitation> Invitations { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -34,6 +34,19 @@ public interface IUserAccountStore
         CancellationToken cancellationToken);
 
     Task<UserAccount?> FindByIdAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Looks up an account by address, without checking a password.</summary>
+    Task<UserAccount?> FindByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads several accounts at once.
+    /// </summary>
+    /// <remarks>
+    /// Exists so that listing a team is one query rather than one per member.
+    /// </remarks>
+    Task<IReadOnlyDictionary<Guid, UserAccount>> FindByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A user account as the application layer sees it.</summary>

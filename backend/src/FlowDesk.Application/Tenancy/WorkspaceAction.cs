@@ -18,6 +18,9 @@ public enum WorkspaceAction
     Delete,
     ViewMembers,
     ManageMembers,
+    ViewInvitations,
+    InviteMembers,
+    RevokeInvitations,
 }
 
 /// <summary>
@@ -37,8 +40,17 @@ public static class WorkspacePermissions
     {
         [WorkspaceAction.View] = MembershipRole.Viewer,
         [WorkspaceAction.ViewMembers] = MembershipRole.Viewer,
+        /*
+          Pending invitations are visible to anyone in the workspace. They are
+          not sensitive on their own — the address was supplied by a teammate —
+          and hiding them would leave agents wondering why someone they expect
+          has not appeared yet.
+        */
+        [WorkspaceAction.ViewInvitations] = MembershipRole.Viewer,
         [WorkspaceAction.Update] = MembershipRole.Admin,
         [WorkspaceAction.ManageMembers] = MembershipRole.Admin,
+        [WorkspaceAction.InviteMembers] = MembershipRole.Admin,
+        [WorkspaceAction.RevokeInvitations] = MembershipRole.Admin,
         [WorkspaceAction.Delete] = MembershipRole.Owner,
     };
 

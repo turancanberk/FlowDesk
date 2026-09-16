@@ -159,13 +159,27 @@ dağınık `if (role == ...)` kontrolleri yazılmaz.
 | Ek dosya indir | ✓ | ✓ | ✓ | ✓ |
 | Ek dosya sil | ✓ | ✓ | — | — |
 | Etkinlik geçmişini görüntüle | ✓ | ✓ | ✓ | ✓ |
+| Bekleyen davetleri görüntüle | ✓ | ✓ | ✓ | ✓ |
+| Daveti iptal et | ✓ | ✓ | — | — |
+| Çalışma alanından kendi ayrıl | ✓ | ✓ | ✓ | ✓ |
 
 Kurallar:
 
 - Bir Owner kendini son Owner olduğu workspace'ten çıkaramaz ve rolünü
-  düşüremez. Önce sahiplik devredilmelidir.
-- Admin, Owner'ın rolünü değiştiremez ve Owner'ı çıkaramaz.
+  düşüremez. Önce sahiplik devredilmelidir. Sahipsiz bir çalışma alanını kimse
+  yönetemezdi.
+- Admin, Owner'ın rolünü değiştiremez ve Owner'ı çıkaramaz. Admin ekibi
+  yönetir; üstündekileri yönetebilseydi Owner rolü anlamını kaybederdi.
+- Admin **sahiplik dağıtamaz**: ne bir üyeyi Owner yapabilir ne de birini Owner
+  olarak davet edebilir. Yapabilseydi bir suç ortağı üzerinden kendi yetkisini
+  yükseltebilirdi.
 - Viewer hiçbir yazma işlemi yapamaz.
+- Ayrılmak başkasını çıkarmakla aynı eylem değildir; her üye katıldığı çalışma
+  alanından ayrılabilir. Son sahip yine ayrılamaz.
+
+Üyelik silindiğinde erişim **anında** kesilir. Rol, access token'ın içinde
+taşınmaz; her istek üyeliği veritabanından okur. Aksi halde çıkarılan bir üye,
+elindeki token'ın ömrü boyunca erişmeye devam ederdi.
 
 ---
 
@@ -223,7 +237,16 @@ hiçbir koşulda silinmez, `Skip` edilmez veya assertion'ları zayıflatılmaz.
 - Davet **tek kullanımlıktır**; kabul edilmiş bir davet ikinci kez kabul
   edilemez.
 - Davetin kabulü, davet edilen e-posta adresiyle eşleşme koşuluna bağlıdır.
-- Davet kabul uç noktası rate limiting kapsamındadır.
+- Davet kabul uç noktası rate limiting kapsamındadır (10 dakikada 20 istek).
+- Başarısız her kabul **aynı** hatayı döndürür: bilinmeyen token, süresi
+  dolmuş, kullanılmış, iptal edilmiş ve başka adrese ait olma durumları
+  ayırt edilemez. Bir token'ın var olduğunu ama süresinin dolduğunu söylemek,
+  çağırana sahip olmadığı bilgiyi verir; geçerli bağlantıyı tutan kişi bu
+  hatayı zaten hiç görmez.
+- Adres karşılaştırması invariant küçültme ile yapılır. Türkçe kültür kuralı
+  "I" harfini noktasız "ı"ya eşler; büyük harfle yazılmış bir adres saklanan
+  adresle eşleşmeyi bırakır ve davet, tam da gönderildiği kişiyi sessizce geri
+  çevirirdi.
 
 ---
 
@@ -269,6 +292,7 @@ Uygulanan politikalar (sabit pencere, istemci IP adresine göre bölümlenmiş):
 | `POST /api/auth/login` | 10 istek | 1 dakika |
 | `POST /api/auth/register` | 5 istek | 10 dakika |
 | `POST /api/auth/refresh` | 30 istek | 1 dakika |
+| `POST /api/invitations/accept` | 20 istek | 10 dakika |
 
 IP adresi kaba bir anahtardır — paylaşılan bir ofis çıkışı tek istemci sayılır
 — ancak çağıran kimlik doğrulamadan önce elde olan tek tanımlayıcıdır ve bu uç
