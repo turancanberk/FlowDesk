@@ -3,6 +3,7 @@ using FlowDesk.Application.Abstractions;
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
+using FlowDesk.Domain.Tickets;
 using FlowDesk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,76 @@ public sealed class FlowDeskDbContext
     public DbSet<Invitation> Invitations => Set<Invitation>();
 
     public DbSet<Customer> Customers => Set<Customer>();
+
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+
+    public DbSet<TicketComment> TicketComments => Set<TicketComment>();
+
+    /// <summary>
+    /// Per-workspace ticket numbering. Not covered by the workspace query
+    /// filter because it is keyed by workspace already and is only ever read
+    /// with an explicit id and a row lock.
+    /// </summary>
+    public DbSet<TenantCounter> TenantCounters => Set<TenantCounter>();
+
+    /// <summary>
+    /// Runs <paramref name="work"/> inside a database transaction.
+    /// </summary>
+    /// <remarks>
+    /// Joins an ambient transaction rather than nesting a second one: a caller
+    /// that already opened a transaction expects its work to land with the
+    /// rest, not in a separate unit that could commit on its own.
+    /// </remarks>
+    public async Task<TResult> ExecuteInTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> work,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+
+        if (Database.CurrentTransaction is not null)
+        {
+            return await work(cancellationToken);
+        }
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+
+        var result = await work(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Locks the workspace's counter row and returns the next ticket number.
+    /// </summary>
+    /// <remarks>
+    /// The lock is what makes numbering safe under concurrency. Two requests
+    /// creating a ticket at the same moment queue here; the second reads the
+    /// value the first already advanced, so they cannot take the same number.
+    /// The lock is released when the surrounding transaction ends.
+    ///
+    /// The counter row is created on first use rather than when the workspace
+    /// is created, so a workspace that never raises a ticket costs nothing.
+    /// </remarks>
+    public async Task<int> TakeNextTicketNumberAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var counter = await TenantCounters
+            .FromSql($"SELECT * FROM \"TenantCounters\" WHERE \"TenantId\" = {tenantId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (counter is null)
+        {
+            counter = TenantCounter.StartFor(tenantId);
+            TenantCounters.Add(counter);
+        }
+
+        var number = counter.TakeNextTicketNumber();
+
+        await SaveChangesAsync(cancellationToken);
+
+        return number;
+    }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

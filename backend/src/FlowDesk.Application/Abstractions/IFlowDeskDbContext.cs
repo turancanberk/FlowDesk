@@ -1,6 +1,7 @@
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
+using FlowDesk.Domain.Tickets;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowDesk.Application.Abstractions;
@@ -37,6 +38,38 @@ public interface IFlowDeskDbContext
     /// archived customer is genuinely the subject.
     /// </summary>
     DbSet<Customer> Customers { get; }
+
+    DbSet<Ticket> Tickets { get; }
+
+    DbSet<TicketComment> TicketComments { get; }
+
+    /// <summary>Per-workspace ticket numbering counters.</summary>
+    DbSet<TenantCounter> TenantCounters { get; }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> inside a database transaction.
+    /// </summary>
+    /// <remarks>
+    /// Needed where two changes only make sense together — taking a ticket
+    /// number and inserting the ticket that uses it. The application layer says
+    /// it needs atomicity; how a transaction is opened is infrastructure's
+    /// business.
+    /// </remarks>
+    Task<TResult> ExecuteInTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> work,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Locks a workspace's counter row and returns the next ticket number.
+    /// </summary>
+    /// <remarks>
+    /// Row locking is a database capability with no portable LINQ expression,
+    /// so it is declared here and implemented by the provider. Must be called
+    /// inside <see cref="ExecuteInTransactionAsync"/>: the lock is held until
+    /// that transaction ends, and that is what stops two simultaneous
+    /// creations from taking the same number.
+    /// </remarks>
+    Task<int> TakeNextTicketNumberAsync(Guid tenantId, CancellationToken cancellationToken);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
