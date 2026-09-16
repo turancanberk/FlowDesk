@@ -29,6 +29,8 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0020 | shadcn/ui kaynak bileşenleri + Base UI primitifleri | Kabul edildi |
 | ADR-0021 | IFlowDeskDbContext ile EF Core sınırı | Kabul edildi |
 | ADR-0022 | Kullanıcı hesabı Identity'ye ait, Domain'de User yok | Kabul edildi |
+| ADR-0023 | API'de enum'lar ada göre serileştirilir | Kabul edildi |
+| ADR-0024 | Global query filter mekanizması ve Membership istisnası | Kabul edildi |
 
 ---
 
@@ -558,3 +560,59 @@ söylemiyor; söylediği şey üyelik, atama ve sahiplik ki bunların hepsi
 - Application katmanı Identity'yi doğrudan tanımaz; `IUserAccountStore`
   sözleşmesi üzerinden çalışır ve bu sayede use case'ler veritabanı olmadan
   test edilebilir.
+
+
+---
+
+## ADR-0023 — API'de enum'lar ada göre serileştirilir
+
+**Bağlam.** `System.Text.Json` varsayılan olarak enum'ları sayısal değeriyle
+serileştirir. Faz 04'te çalışma alanı rolü istemciye `3` olarak gitti ve arayüz
+`"Owner"` beklediği için çöktü.
+
+**Karar.** `ConfigureHttpJsonOptions` ile `JsonStringEnumConverter` eklendi;
+tüm enum'lar adlarıyla taşınır.
+
+**Gerekçe.** Sayısal değer, sözleşmeyi bildirim sırasına bağlar. Bir rolü veya
+talep durumunu enum'un ortasına eklemek, daha önce saklanmış ve yolda olan her
+değerin anlamını sessizce değiştirirdi. Ad kullanmak bu bağı koparır, tel
+biçimini okunur kılar ve `docs/API_CONVENTIONS.md`'nin istemcilere verdiği
+sözü karşılar.
+
+**Sonuçlar.** .NET test istemcisinin de aynı dönüştürücüyü kullanması gerekir;
+`FlowDeskJson.Options` bunun için paylaşılan ayar noktasıdır. Regresyonu
+`Roles_are_serialised_by_name` testi engelliyor — bu hata, bir istemci rolü
+yanlış okuyana kadar görünmez kalırdı.
+
+---
+
+## ADR-0024 — Global query filter mekanizması ve Membership istisnası
+
+**Bağlam.** Kiracıya ait her varlık, geçerli çalışma alanına göre süzülmeli.
+Bunu varlık başına elle yazmak, yeni bir varlık eklendiğinde filtrenin
+unutulmasına açıktır ve unutulan bir filtre çalışma alanları arası veri
+sızıntısıdır.
+
+**Karar.** `ITenantOwned` arayüzü bir işaretleyicidir. `OnModelCreating`,
+modeldeki bu arayüzü uygulayan her tipe filtreyi otomatik uygular. Bir varlık
+arayüzü uygulayarak kaydolur; ayrıca bir şey yapmaya gerek yoktur.
+
+`Membership` bu filtrenin **dışındadır**.
+
+**Gerekçe.** "Hangi çalışma alanlarına üyeyim?" sorusu tüm alanlara bakmak
+zorundadır. Üyelikleri geçerli çalışma alanına göre süzmek bu soruyu
+cevaplanamaz hâle getirirdi.
+
+Filtre tipli bir lambda ile kurulur, elle inşa edilmiş ifade ağacıyla değil:
+EF Core'un sorgu başına yeniden değerlendirdiği biçim tam olarak budur. Model
+bir kez derlenip önbelleğe alındığı için, bağlamı değil bir değeri yakalayan
+bir filtre ilk isteğin çalışma alanını sonraki tüm isteklere dondururdu.
+
+**Sonuçlar.** Filtre ikinci savunma hattıdır, sınır değildir:
+`IgnoreQueryFilters` onu atlar ve ham SQL hiç görmez. Birincil hat her istekte
+yapılan üyelik doğrulamasıdır (`docs/SECURITY.md`).
+
+Mekanizmanın doğru kurulduğu `TenantQueryFilterTests` ile model seviyesinde
+doğrulanır; böylece garanti henüz var olmayan varlıklar için de geçerlidir.
+İlk gerçek tüketicisi Faz 06'daki `Customer` olacak ve davranışsal test de
+orada yazılacak.
