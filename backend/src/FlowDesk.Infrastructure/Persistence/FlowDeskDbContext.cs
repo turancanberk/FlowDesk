@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Domain.Authentication;
+using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -52,6 +53,8 @@ public sealed class FlowDeskDbContext
 
     public DbSet<Invitation> Invitations => Set<Invitation>();
 
+    public DbSet<Customer> Customers => Set<Customer>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -90,6 +93,14 @@ public sealed class FlowDeskDbContext
                 continue;
             }
 
+            // Customer carries the archive condition as well, so it gets its
+            // own filter rather than the generic one.
+            if (clrType == typeof(Customer))
+            {
+                ConfigureCustomerFilter(builder);
+                continue;
+            }
+
             ConfigureTenantFilterMethod
                 .MakeGenericMethod(clrType)
                 .Invoke(this, [builder]);
@@ -122,4 +133,24 @@ public sealed class FlowDeskDbContext
             _tenantContext == null
             || !_tenantContext.IsResolved
             || entity.TenantId == _tenantContext.TenantId);
+
+    /// <summary>
+    /// Hides archived customers from every query that does not ask for them.
+    /// </summary>
+    /// <remarks>
+    /// Declared alongside the workspace filter rather than inside
+    /// <c>CustomerConfiguration</c>, because EF applies one filter per entity
+    /// and defining it in both places would silently replace the tenant scope —
+    /// turning a soft-delete convenience into a cross-workspace leak.
+    ///
+    /// Customer is the only entity that is archived rather than deleted
+    /// (ADR-0012), so this stays a named special case instead of a second
+    /// generic mechanism.
+    /// </remarks>
+    private void ConfigureCustomerFilter(ModelBuilder builder) =>
+        builder.Entity<Customer>().HasQueryFilter(customer =>
+            (_tenantContext == null
+                || !_tenantContext.IsResolved
+                || customer.TenantId == _tenantContext.TenantId)
+            && customer.ArchivedAt == null);
 }

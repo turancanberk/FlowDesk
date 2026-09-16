@@ -18,6 +18,12 @@ using FlowDesk.Application.Team.ListInvitations;
 using FlowDesk.Application.Team.ListMembers;
 using FlowDesk.Application.Team.RemoveMember;
 using FlowDesk.Application.Team.RevokeInvitation;
+using FlowDesk.Application.Customers.ArchiveCustomer;
+using FlowDesk.Application.Customers.CreateCustomer;
+using FlowDesk.Application.Customers.GetCustomer;
+using FlowDesk.Application.Customers.ListCustomers;
+using FlowDesk.Application.Customers.RestoreCustomer;
+using FlowDesk.Application.Customers.UpdateCustomer;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -56,6 +62,13 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ListInvitationsHandler>();
         services.AddScoped<RevokeInvitationHandler>();
         services.AddScoped<AcceptInvitationHandler>();
+
+        services.AddScoped<CreateCustomerHandler>();
+        services.AddScoped<UpdateCustomerHandler>();
+        services.AddScoped<ArchiveCustomerHandler>();
+        services.AddScoped<RestoreCustomerHandler>();
+        services.AddScoped<GetCustomerHandler>();
+        services.AddScoped<ListCustomersHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using FlowDesk.Domain.Common;
 
@@ -76,52 +75,20 @@ public sealed record WorkspaceSlug
     /// Derives a slug from a workspace name.
     /// </summary>
     /// <remarks>
-    /// Turkish letters are transliterated to their ASCII counterparts, so
+    /// Turkish letters are folded to ASCII by <see cref="TurkishText"/>, so
     /// "Kuzey Yazılım" becomes "kuzey-yazilim" rather than an escaped mess in
-    /// the address bar.
-    ///
-    /// The dotted and dotless i are handled explicitly. Invariant lowercasing
-    /// maps "I" to "i" and leaves "İ" alone, neither of which is what a Turkish
-    /// reader expects, and culture-sensitive lowercasing would make the result
-    /// depend on the server's locale.
+    /// the address bar. The same folding backs customer search, which keeps the
+    /// two consistent.
     /// </remarks>
     public static string SuggestFrom(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        var transliterated = new StringBuilder(name.Length);
-
-        foreach (var character in name)
-        {
-            transliterated.Append(character switch
-            {
-                'ı' or 'I' => "i",
-                'İ' or 'i' => "i",
-                'ş' or 'Ş' => "s",
-                'ğ' or 'Ğ' => "g",
-                'ü' or 'Ü' => "u",
-                'ö' or 'Ö' => "o",
-                'ç' or 'Ç' => "c",
-                _ => character.ToString(),
-            });
-        }
-
-        // Strips accents left on any other Latin letters, e.g. "é" to "e".
-        var decomposed = transliterated.ToString().Normalize(NormalizationForm.FormD);
-        var ascii = new StringBuilder(decomposed.Length);
-
-        foreach (var character in decomposed)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
-            {
-                ascii.Append(character);
-            }
-        }
-
-        var slug = new StringBuilder(ascii.Length);
+        var folded = TurkishText.Fold(name);
+        var slug = new StringBuilder(folded.Length);
         var previousWasHyphen = false;
 
-        foreach (var character in ascii.ToString().ToLowerInvariant())
+        foreach (var character in folded)
         {
             if (char.IsAsciiLetterLower(character) || char.IsAsciiDigit(character))
             {

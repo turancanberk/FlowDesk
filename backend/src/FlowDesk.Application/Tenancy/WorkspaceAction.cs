@@ -21,6 +21,9 @@ public enum WorkspaceAction
     ViewInvitations,
     InviteMembers,
     RevokeInvitations,
+    ViewCustomers,
+    ManageCustomers,
+    ArchiveCustomers,
 }
 
 /// <summary>
@@ -47,6 +50,11 @@ public static class WorkspacePermissions
           has not appeared yet.
         */
         [WorkspaceAction.ViewInvitations] = MembershipRole.Viewer,
+        [WorkspaceAction.ViewCustomers] = MembershipRole.Viewer,
+        // Agents do the day-to-day work, so creating and editing customers is
+        // theirs; taking a record out of circulation is an administrative act.
+        [WorkspaceAction.ManageCustomers] = MembershipRole.Agent,
+        [WorkspaceAction.ArchiveCustomers] = MembershipRole.Admin,
         [WorkspaceAction.Update] = MembershipRole.Admin,
         [WorkspaceAction.ManageMembers] = MembershipRole.Admin,
         [WorkspaceAction.InviteMembers] = MembershipRole.Admin,
