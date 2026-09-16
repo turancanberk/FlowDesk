@@ -15,6 +15,7 @@ import { formatDateTime } from "@/lib/format";
 import { ApiError } from "@/lib/api/api-error";
 import type { Workspace } from "@/features/workspaces/workspace-types";
 import { CustomerTicketsPanel } from "@/features/tickets/customer-tickets-panel";
+import { CustomerTasksPanel } from "@/features/tasks/customer-tasks-panel";
 import { CustomerFormDialog } from "./customer-form-dialog";
 import { useArchiveCustomer, useCustomer, useRestoreCustomer } from "./customer-queries";
 import type { CustomerDetail } from "./customer-types";
@@ -179,12 +180,13 @@ function CustomerDetailContent({
         </TabsContent>
 
         <TabsContent value="gorevler" className="pt-5">
-          <Surface>
-            <EmptyState
-              title="Görevler yakında"
-              description="Görev yönetimi eklendiğinde bu müşteriye bağlı görevler burada listelenecek."
+          <div className="flex flex-col gap-3">
+            <CustomerTasksPanel
+              workspace={workspace}
+              customerId={customer.id}
+              canManage={canManage}
             />
-          </Surface>
+          </div>
         </TabsContent>
       </Tabs>
 

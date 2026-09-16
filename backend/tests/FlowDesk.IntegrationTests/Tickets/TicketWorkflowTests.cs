@@ -27,7 +27,7 @@ public sealed class TicketWorkflowTests
     public async Task A_new_ticket_is_open_and_carries_the_names_a_list_needs()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation,
@@ -51,7 +51,7 @@ public sealed class TicketWorkflowTests
     public async Task Available_transitions_follow_the_tickets_current_status()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -72,7 +72,7 @@ public sealed class TicketWorkflowTests
     public async Task An_invalid_transition_is_refused_with_a_conflict()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -104,7 +104,7 @@ public sealed class TicketWorkflowTests
     public async Task Resolving_records_the_moment_the_work_was_done()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -128,7 +128,7 @@ public sealed class TicketWorkflowTests
     public async Task Assignment_names_a_member_and_null_takes_it_back()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var agent = await TeamTestClient.AddMemberAsync(
             factory, workspace.Client, workspace.Slug, MembershipRole.Agent, Cancellation,
@@ -161,7 +161,7 @@ public sealed class TicketWorkflowTests
     public async Task A_concurrent_edit_is_reported_instead_of_overwriting()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -196,7 +196,7 @@ public sealed class TicketWorkflowTests
     public async Task An_edit_with_the_current_version_succeeds()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -224,7 +224,7 @@ public sealed class TicketWorkflowTests
     public async Task Comments_are_returned_oldest_first_with_their_authors()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var agent = await TeamTestClient.AddMemberAsync(
             factory, workspace.Client, workspace.Slug, MembershipRole.Agent, Cancellation,
@@ -256,7 +256,7 @@ public sealed class TicketWorkflowTests
     public async Task An_empty_comment_is_rejected()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -275,7 +275,7 @@ public sealed class TicketWorkflowTests
     public async Task Deleting_a_ticket_removes_it_and_its_comments()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -307,7 +307,7 @@ public sealed class TicketWorkflowTests
     public async Task A_ticket_survives_its_customer_being_archived()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);

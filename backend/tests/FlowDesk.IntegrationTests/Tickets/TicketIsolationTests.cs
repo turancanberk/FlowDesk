@@ -30,11 +30,11 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var first = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var first = await TestWorkspace.CreateAsync(factory, Cancellation);
         await TicketTestClient.CreateAndReadAsync(
             first.Client, first.Slug, first.CustomerId, Cancellation, "Birinci alanın talebi");
 
-        using var second = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var second = await TestWorkspace.CreateAsync(factory, Cancellation);
         await TicketTestClient.CreateAndReadAsync(
             second.Client, second.Slug, second.CustomerId, Cancellation, "İkinci alanın talebi");
 
@@ -54,11 +54,11 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var owner = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var owner = await TestWorkspace.CreateAsync(factory, Cancellation);
         var ticket = await TicketTestClient.CreateAndReadAsync(
             owner.Client, owner.Slug, owner.CustomerId, Cancellation);
 
-        using var stranger = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var stranger = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         // Through the stranger's own workspace, using the other ticket's id.
         using var throughOwnWorkspace = await TicketTestClient.GetAsync(
@@ -80,11 +80,11 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var owner = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var owner = await TestWorkspace.CreateAsync(factory, Cancellation);
         var ticket = await TicketTestClient.CreateAndReadAsync(
             owner.Client, owner.Slug, owner.CustomerId, Cancellation);
 
-        using var stranger = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var stranger = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var status = await TicketTestClient.ChangeStatusAsync(
             stranger.Client, stranger.Slug, ticket.Id, TicketStatus.Closed,
@@ -125,8 +125,8 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var foreign = await TicketWorkspace.CreateAsync(factory, Cancellation);
-        using var mine = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var foreign = await TestWorkspace.CreateAsync(factory, Cancellation);
+        using var mine = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var response = await TicketTestClient.CreateAsync(
             mine.Client, mine.Slug, foreign.CustomerId, Cancellation);
@@ -146,8 +146,8 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var foreign = await TicketWorkspace.CreateAsync(factory, Cancellation);
-        using var mine = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var foreign = await TestWorkspace.CreateAsync(factory, Cancellation);
+        using var mine = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             mine.Client, mine.Slug, mine.CustomerId, Cancellation);
@@ -172,7 +172,7 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var mine = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var mine = await TestWorkspace.CreateAsync(factory, Cancellation);
         using var outsider = await AuthTestClient.SignInNewUserAsync(factory, Cancellation);
 
         using var onCreate = await TicketTestClient.CreateAsync(
@@ -201,7 +201,7 @@ public sealed class TicketIsolationTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var owner = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var owner = await TestWorkspace.CreateAsync(factory, Cancellation);
         var ticket = await TicketTestClient.CreateAndReadAsync(
             owner.Client, owner.Slug, owner.CustomerId, Cancellation);
 
@@ -209,7 +209,7 @@ public sealed class TicketIsolationTests
             owner.Client, owner.Slug, ticket.Id, "Müşteriyle görüşüldü.", Cancellation);
         Assert.Equal(HttpStatusCode.Created, added.StatusCode);
 
-        using var stranger = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var stranger = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var throughOwnWorkspace = await TicketTestClient.ListCommentsAsync(
             stranger.Client, stranger.Slug, ticket.Id, Cancellation);

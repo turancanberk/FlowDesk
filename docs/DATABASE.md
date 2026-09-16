@@ -151,8 +151,9 @@ oluşturma işlemlerinde numara çakışması oluşmaz.
 
 ### TaskItem (Faz 08)
 
-Sınıf adı `TaskItem`'dır; `Task` adı `System.Threading.Tasks.Task` ile
-çakıştığı için kullanılmaz. Kullanıcıya "Görev" olarak gösterilir.
+Sınıf adı `TaskItem`, durum enum'u `TaskItemStatus`'tır; `Task` ve `TaskStatus`
+adları `System.Threading.Tasks` ile çakışır (ADR-0029). Kullanıcıya "Görev"
+olarak gösterilir.
 
 | Sütun | Tip | Not |
 |---|---|---|
@@ -161,13 +162,13 @@ Sınıf adı `TaskItem`'dır; `Task` adı `System.Threading.Tasks.Task` ile
 | `Title` | text | |
 | `Description` | text? | |
 | `Status` | int | `Todo`/`InProgress`/`Done` |
-| `DueAt` | timestamptz? | |
+| `DueAt` | timestamptz? | İsteğe bağlı; zorunlu tarih uydurulmuş son tarih üretir |
 | `AssignedUserId` | uuid? | set null |
 | `CustomerId` | uuid? | İsteğe bağlı ilişki, set null |
 | `CreatedByUserId` | uuid | |
 | `CreatedAt` | timestamptz | |
 | `UpdatedAt` | timestamptz | |
-| `CompletedAt` | timestamptz? | |
+| `CompletedAt` | timestamptz? | Tamamlandığında yazılır, geri alındığında **temizlenir** (ADR-0030) |
 
 İndeksler: `(TenantId, Status)`, `(TenantId, DueAt)` — yaklaşan ve geciken
 görevler, `(TenantId, AssignedUserId)`.

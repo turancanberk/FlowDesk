@@ -25,7 +25,7 @@ public sealed class TicketNumberingTests
     public async Task Numbers_run_in_sequence_within_a_workspace()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var numbers = new List<int>();
 
@@ -60,8 +60,8 @@ public sealed class TicketNumberingTests
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
 
-        using var first = await TicketWorkspace.CreateAsync(factory, Cancellation);
-        using var second = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var first = await TestWorkspace.CreateAsync(factory, Cancellation);
+        using var second = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var firstTicket = await TicketTestClient.CreateAndReadAsync(
             first.Client, first.Slug, first.CustomerId, Cancellation);
@@ -89,7 +89,7 @@ public sealed class TicketNumberingTests
     public async Task Simultaneous_creations_never_share_a_number()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         const int simultaneousCreations = 10;
 

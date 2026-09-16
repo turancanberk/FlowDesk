@@ -88,7 +88,11 @@ Domain tanımlayıcıları İngilizce, kullanıcıya görünen etiketler Türkç
 | `High` | Yüksek |
 | `Urgent` | Acil |
 
-### Görev durumu (`TaskStatus`)
+### Görev durumu (`TaskItemStatus`)
+
+Sınıf adları `TaskItem` ve `TaskItemStatus`'tır; `Task` ve `TaskStatus`
+`System.Threading.Tasks` ile çakışır (ADR-0029). API'de değerler yine
+`Todo` / `InProgress` / `Done` olarak taşınır.
 
 | Kod | Görünen |
 |---|---|

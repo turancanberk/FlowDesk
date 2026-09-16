@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 07 birleştirildi) |
+| Aktif dal | `main` (Faz 08 birleştirildi) |
 | Son commit | `d96f2d5 — Merge branch 'feat/tickets'` (Faz 07) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -32,14 +32,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 05 — Ekip ve Davetler
 - Faz 06 — Müşteriler
 - Faz 07 — Talepler
+- Faz 08 — Görevler
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 08 — Görevler** (henüz başlanmadı)
+**Faz 09 — Dashboard** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 08 kapsamında henüz iş yapılmadı.
+Faz 09 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -47,46 +48,45 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 08'in tamamı:
+Faz 09'un tamamı:
 
-- `TaskItem` domain varlığı ve `TaskStatus` (Todo / InProgress / Done)
-- Son tarih (`DueDate`), atama, isteğe bağlı müşteri ilişkisi
-- CRUD use case'leri, filtre ve sayfalama
-- API uç noktaları ve migration
-- Liste arayüzü ve müşteri detayındaki "Görevler" sekmesinin doldurulması
+- Operasyonel toplamlar: müşteri sayısı, açık talep sayısı, yaklaşan ve geciken
+  görevler, üye sayısı, talep durum dağılımı, son etkinlik
+- `GET /api/workspaces/{slug}/dashboard` uç noktası
+- Dashboard arayüzü; yalnızca değer katan yerde grafik
 
-Kanban **yok**; kapsam dışı (`docs/ROADMAP.md`).
+Bu fazda **önbellek yok**; Redis Faz 15'te geliyor (ADR-0008, ADR-0015).
+Etkinlik akışı Faz 14'e ait, dolayısıyla "son etkinlik" bölümü bu fazda gerçek
+`ActivityEvent` verisi yerine mevcut kayıtlardan türetilecek ya da Faz 14'e
+bırakılacak — hangisi seçilirse `PROGRESS.md`'ye yazılacak.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/tasks` dalını aç. `FlowDesk.Domain/Tasks/TaskItem.cs` dosyasını
-`docs/DATABASE.md` şemasına göre yaz ve `ITenantOwned` uygula.
+`feat/dashboard` dalını aç. `FlowDesk.Application/Dashboard/GetDashboard/`
+altında tek bir use case yaz ve `GET /api/workspaces/{slug}/dashboard` uç
+noktasına bağla.
 
-Faz 07'den doğrudan devralınabilecek desenler:
-
-**Yazma tarafı sahiplik kontrolü.** `TicketGuards` müşterinin ve atanan kişinin
-çalışma alanına ait olduğunu her yazmadan önce doğruluyor. Görevin de isteğe
-bağlı bir müşteri ilişkisi ve bir atanan kişisi var; aynı kontrol gerekli.
-Query filter neyin *okunabileceğini* sınırlar, istek gövdesinde yabancı bir
-kimliğin gelmesini engellemez.
-
-**Liste kurgusu.** `ListTicketsHandler` filtreleme, sıralama ve sayfalamayı
-birlikte yapıyor ve sıralamayı her zaman benzersiz bir sütunla tie-break
-ediyor; aksi hâlde aynı saniyede oluşturulmuş iki satır sayfalar arasında iki
-kez görünebilir ya da hiç görünmeyebilir.
-
-**Paylaşılan tablo bileşeni.** `TicketTable` hem talep listesinde hem müşteri
-sekmesinde kullanılıyor; `showCustomer` ile müşteri sütunu düşürülüyor. Görev
-tablosu aynı yaklaşımı izleyebilir.
+Toplamlar `docs/PRODUCT.md` "Dashboard içeriği" bölümünde tanımlı. Hepsi tek
+istekte dönecek; her kutu için ayrı uç nokta açmak sayfayı altı istekle
+yükletirdi.
 
 Dikkat edilecekler:
 
-- Görevlerin numaralandırması **yok**; `TenantCounter` yalnızca talebe ait.
-- İyimser eşzamanlılık **yalnızca** `Ticket` için (ADR-0013). Göreve `xmin`
-  eklenmeyecek.
-- İzin matrisine görev eylemleri eklenecek; `Every_defined_action_is_mapped`
-  testi eksik eşlemeyi yakalar.
-- `TaskStatus` etiketleri `frontend/src/lib/domain-labels.ts` içinde zaten var.
+- **Önbellek yok.** Redis Faz 15'te geliyor (ADR-0008). Bu fazda sorgular
+  doğrudan çalışacak; önbellek gerçek bir ölçümle gerekçelendirilecek.
+- **Sayımlar tek sorguya toplanabilir.** Beş ayrı `CountAsync` beş gidiş dönüş
+  demektir. Talep durum dağılımı zaten `GroupBy` istiyor; müşteri, üye ve görev
+  sayıları da benzer şekilde toplanabilir. Ölçmeden karmaşıklaştırma.
+- **Kiracı kapsamı.** Dashboard yalnızca `WorkspaceAction.View` gerektirir ve
+  global query filter zaten kapsamı veriyor; ancak `Memberships` filtreye dâhil
+  **değil** (ADR-0024), dolayısıyla üye sayısı sorgusuna `TenantId` koşulu elle
+  yazılmalı. Bu, izolasyonun bu fazda gözden kaçmaya en açık noktası.
+- Geciken görev sayısı `Status != Done && DueAt < now` demektir; geç tamamlanan
+  iş geciken sayılmaz (ADR-0030, `ListTasksHandler` aynı koşulu kullanıyor).
+- Etkinlik akışı Faz 14'e ait. Bu fazda `ActivityEvent` tablosu yok; "son
+  etkinlik" bölümü ya mevcut kayıtların `UpdatedAt` alanlarından türetilecek ya
+  da Faz 14'e bırakılıp arayüzde yer tutucu gösterilecek. Hangisi seçilirse
+  gerekçesiyle `PROGRESS.md`'ye yazılacak.
 
 ## Son Doğrulama Durumu
 
@@ -96,7 +96,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 320/320 başarılı (169 birim + 151 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 376/376 başarılı (201 birim + 175 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -117,6 +117,8 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | Uçtan uca talep akışı (Faz 07) | Çalışan API'ye karşı 14 adımın tamamı geçti — numaralandırma, geçersiz geçiş `409`, eşzamanlılık `409`, izolasyon `404`, rol matrisi |
 | `/app/{slug}/tickets` ve `/tickets/{id}` render (Faz 07) | HTTP 200, doğru başlıklar, uygulama hatası yok |
 | `AddTickets` migration SQL'i (Faz 07) | `xmin` sistem sütunu `CREATE TABLE` çıktısında yok — doğru |
+| Uçtan uca görev akışı (Faz 08) | Çalışan API'ye karşı 14 adımın tamamı geçti — gecikme hesabı, tamamlanma tarihinin temizlenmesi, null'un alanı temizlemesi, sıralama, izolasyon `404`, rol matrisi |
+| `/app/{slug}/tasks` render (Faz 08) | HTTP 200, doğru başlık, uygulama hatası yok |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -156,7 +158,18 @@ Bilinen blocker yok.
    Tarayıcıda arka arkaya doğrulama yaparken bu limit dolar ve kayıt `429`
    döner. Limiter bellek içidir; API'yi yeniden başlatmak sayaçları sıfırlar.
 
-6. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
+6. **Tam çözüm koşusunda tek seferlik test düşüşü (Faz 08).** Bir
+   `dotnet test backend/FlowDesk.slnx` koşusunda 376 testten 1'i başarısız
+   oldu. Hangi test olduğu **yakalanamadı**, çünkü çıktı `tail -6` ile
+   kırpılmıştı. Ardından beş tam koşu ve her iki derlemenin ayrı ayrı koşusu
+   temiz geçti. Tekrarlanırsa çıktının tamamını saklayın:
+   ```bash
+   dotnet test backend/FlowDesk.slnx 2>&1 | tee /tmp/flowdesk-test.log
+   ```
+   En olası aday, eşzamanlı talep numarası testinin iki derleme aynı anda
+   koşarken yük altında kalması; doğrulanmadı.
+
+7. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
    için `waitUntil: "networkidle"` hiç sonuçlanmayabilir. Elle doğrulama
    betiklerinde `domcontentloaded` + açık seçici beklemesi kullanın.
 
@@ -204,11 +217,29 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   atama "atamayı kaldır" demektir ve JSON'da yokluk ile ayrılamaz (ADR-0027)
 - Satır sürümü yalnızca `PATCH /tickets/{id}` için zorunludur; durum zaten
   durum makinesiyle, atama üyelik kontrolüyle korunur (ADR-0028)
+- `TaskItem` / `TaskItemStatus` adları `System.Threading.Tasks` ile çakışmayı
+  önler; tel üzerindeki biçim değişmez (ADR-0029)
+- Görevde durum makinesi ve iyimser eşzamanlılık **yoktur**; `PATCH` tüm
+  alanları değiştirir ve `null` "yok" demektir (ADR-0030)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 08'de eklenenler:
+
+- `backend/src/FlowDesk.Domain/Tasks/` — `TaskItem`, `TaskItemStatus`
+- `backend/src/FlowDesk.Application/Tasks/` — altı use case, `TaskGuards`,
+  `TaskWorkflow`, `TaskQueries`, `TaskErrors`
+- `backend/src/FlowDesk.Infrastructure/Persistence/Configurations/TaskItemConfiguration.cs`
+- `backend/src/FlowDesk.Api/Endpoints/TaskEndpoints.cs`,
+  `Contracts/TaskContracts.cs`
+- `backend/tests/.../Tasks/` — birim ve entegrasyon testleri
+- `backend/tests/FlowDesk.IntegrationTests/Support/TestWorkspace.cs` —
+  `TicketWorkspace`'ten yeniden adlandırıldı; artık görev testleri de kullanıyor
+- `frontend/src/features/tasks/` — liste, satır bileşeni, form, müşteri sekmesi
+- `frontend/src/app/app/[workspaceSlug]/tasks/page.tsx`
 
 Faz 07'de eklenenler:
 
@@ -306,9 +337,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddTickets` |
+| Son migration | `AddTasks` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).

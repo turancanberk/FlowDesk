@@ -33,6 +33,12 @@ using FlowDesk.Application.Tickets.GetTicket;
 using FlowDesk.Application.Tickets.ListTicketComments;
 using FlowDesk.Application.Tickets.ListTickets;
 using FlowDesk.Application.Tickets.UpdateTicket;
+using FlowDesk.Application.Tasks.ChangeTaskStatus;
+using FlowDesk.Application.Tasks.CreateTask;
+using FlowDesk.Application.Tasks.DeleteTask;
+using FlowDesk.Application.Tasks.GetTask;
+using FlowDesk.Application.Tasks.ListTasks;
+using FlowDesk.Application.Tasks.UpdateTask;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -88,6 +94,13 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ListTicketsHandler>();
         services.AddScoped<AddTicketCommentHandler>();
         services.AddScoped<ListTicketCommentsHandler>();
+
+        services.AddScoped<CreateTaskHandler>();
+        services.AddScoped<UpdateTaskHandler>();
+        services.AddScoped<ChangeTaskStatusHandler>();
+        services.AddScoped<DeleteTaskHandler>();
+        services.AddScoped<GetTaskHandler>();
+        services.AddScoped<ListTasksHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 

@@ -71,6 +71,16 @@ export const ticketSortLabels: Record<
   NumberDescending: "Talep numarası",
 };
 
+export const taskSortLabels: Record<
+  "DueSoonest" | "RecentlyCreated" | "RecentlyUpdated" | "TitleAscending",
+  string
+> = {
+  DueSoonest: "Son tarihe göre",
+  RecentlyCreated: "Son eklenen",
+  RecentlyUpdated: "Son güncellenen",
+  TitleAscending: "Başlığa göre (A-Z)",
+};
+
 export const membershipRoleLabels: Record<MembershipRole, DomainLabel> = {
   Owner: { label: "Sahip", tone: "accent" },
   Admin: { label: "Yönetici", tone: "info" },

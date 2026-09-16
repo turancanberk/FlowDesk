@@ -29,7 +29,7 @@ public sealed class TicketAuthorizationTests
     public async Task A_viewer_can_read_but_not_change_a_ticket()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -77,7 +77,7 @@ public sealed class TicketAuthorizationTests
     public async Task An_agent_can_work_a_ticket_but_not_delete_it()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var agent = await TeamTestClient.AddMemberAsync(
             factory, workspace.Client, workspace.Slug, MembershipRole.Agent, Cancellation);
@@ -104,7 +104,7 @@ public sealed class TicketAuthorizationTests
     public async Task An_admin_can_delete_a_ticket()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);
@@ -122,7 +122,7 @@ public sealed class TicketAuthorizationTests
     public async Task An_anonymous_caller_reaches_nothing()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var ticket = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation);

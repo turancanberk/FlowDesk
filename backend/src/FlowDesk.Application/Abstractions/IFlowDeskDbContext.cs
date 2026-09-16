@@ -1,5 +1,6 @@
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
+using FlowDesk.Domain.Tasks;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Domain.Tickets;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,8 @@ public interface IFlowDeskDbContext
 
     /// <summary>Per-workspace ticket numbering counters.</summary>
     DbSet<TenantCounter> TenantCounters { get; }
+
+    DbSet<TaskItem> Tasks { get; }
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.

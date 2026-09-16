@@ -24,6 +24,9 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageTickets, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.CommentOnTickets, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteTickets, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.ViewTasks, true)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageTasks, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteTasks, false)]
     // Agent: works with the data, does not administer the workspace.
     [InlineData(MembershipRole.Agent, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.ViewMembers, true)]
@@ -36,6 +39,11 @@ public sealed class WorkspacePermissionsTests
     // Deleting a ticket destroys a thread outright, so it stays with the
     // people who administer the workspace.
     [InlineData(MembershipRole.Agent, WorkspaceAction.DeleteTickets, false)]
+    [InlineData(MembershipRole.Agent, WorkspaceAction.ViewTasks, true)]
+    [InlineData(MembershipRole.Agent, WorkspaceAction.ManageTasks, true)]
+    // Unlike a ticket, a task is internal housekeeping: nothing outside the
+    // team refers to it, so an agent may remove their own cancelled work.
+    [InlineData(MembershipRole.Agent, WorkspaceAction.DeleteTasks, true)]
     // Admin: administers the workspace but cannot delete it.
     [InlineData(MembershipRole.Admin, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.ViewMembers, true)]
@@ -46,6 +54,9 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Admin, WorkspaceAction.ManageTickets, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.CommentOnTickets, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteTickets, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.ViewTasks, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.ManageTasks, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteTasks, true)]
     // Owner: everything.
     [InlineData(MembershipRole.Owner, WorkspaceAction.View, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.ViewMembers, true)]
@@ -56,6 +67,9 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Owner, WorkspaceAction.ManageTickets, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.CommentOnTickets, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteTickets, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.ViewTasks, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.ManageTasks, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteTasks, true)]
     public void The_matrix_matches_the_documented_rules(
         MembershipRole role,
         WorkspaceAction action,

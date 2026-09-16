@@ -742,3 +742,61 @@ izlenen varlığı okuduğu sürümle güncelliyor. Yani okuma ile yazma arasın
 geçen süreye" genişletiyor. `TicketDetail` her yanıtta yeni sürümü döndürüyor,
 böylece açık bir form ikinci kez kaydederken kendi önceki kaydına çakışma
 bildirmiyor.
+
+---
+
+## ADR-0029 — `TaskItem` ve `TaskItemStatus` adlandırması
+
+**Bağlam.** Ürün kavramının adı "Görev", domain karşılığı `Task`. Ancak `Task`
+ve `TaskStatus` adlarının ikisi de `System.Threading.Tasks` altında var ve bu
+ad alanı örtük using'lerle her dosyaya geliyor.
+
+Çakışma gizlenmiyor, **belirsizlik** üretiyor: her iki ad da kapsamdayken
+derleyici hangisinin kastedildiğini bilemiyor ve derleme kırılıyor. Her async
+imzada tam nitelikli ad yazmak ya da her dosyada takma ad tanımlamak gerekirdi.
+
+**Karar.** Varlık `TaskItem`, durum `TaskItemStatus`. Kullanıcıya her ikisi de
+"Görev" olarak gösteriliyor.
+
+**Gerekçe.** `docs/DATABASE.md` `TaskItem` adını zaten aynı gerekçeyle
+belirlemişti; `TaskItemStatus` bunun doğal devamı. Alternatif olan takma adlar
+her yeni dosyada hatırlanmak zorunda olurdu ve unutulduğunda hata mesajı
+sorunun kendisini değil sonucunu gösterirdi.
+
+**Sonuçlar.** Tel üzerindeki biçim etkilenmiyor: enum'lar üye adlarıyla
+taşınıyor (ADR-0023), dolayısıyla frontend tarafında tip hâlâ `TaskStatus` ve
+değerler `Todo` / `InProgress` / `Done`. `docs/PRODUCT.md` ve
+`docs/DATABASE.md` bu adlandırmayı yansıtacak şekilde güncellendi.
+
+---
+
+## ADR-0030 — Görevde durum makinesi ve iyimser eşzamanlılık yok
+
+**Bağlam.** `Ticket` hem geçiş tablosuyla hem `xmin` eşzamanlılık belirteciyle
+korunuyor (ADR-0013). Aynı korumaların göreve de uygulanıp uygulanmayacağı
+açıktı.
+
+**Karar.** `TaskItem` üzerinde ne durum makinesi ne de eşzamanlılık belirteci
+var. Üç durumun her biri diğerini izleyebiliyor ve yazma işlemleri istemciden
+satır sürümü istemiyor.
+
+**Gerekçe.** Talep müşteriye bakan bir iş akışı; "kapalı"dan doğrudan
+"işlemde"ye atlamak geçmişi bulanıklaştırır ve bunu birden fazla kişi izler.
+Görev ise bir sahibi ve tarihi olan iç hatırlatma. Tamamlandı'dan geri almak
+bir düzeltmedir; reddetmek yalnızca insanlara görevi silip yenisini açmayı
+öğretir ve korunmak istenen geçmiş böylece tamamen kaybolur.
+
+Eşzamanlılık belirteci de aynı sebeple gereksiz: kayıp güncellemeyi olası kılan
+şey aynı kaydın birden fazla kişi tarafından eşzamanlı düzenlenmesi, bu da
+görevde olmuyor. Belirteç eklemek, gerçekleşmeyen bir çakışma için her formda
+sürüm taşımak demekti.
+
+**Sonuçlar.** `CompletedAt` talebin `ResolvedAt`'ının tersine geri alındığında
+temizleniyor. Talepte ilk çözüm tarihi korunuyor çünkü ilk denemenin süresi
+raporlanan bir sayı; görevde ise tamamlanmamış bir işin tamamlanma tarihi
+yoktur ve bayat bir tarih onu bu alanı gösteren her listede bitmiş gösterirdi.
+
+`PATCH /tasks/{id}` bütün düzenlenebilir alanları değiştiriyor, dolayısıyla
+`null` "yok" demek. Bu, kısmi gövdenin JSON'da çözemediği "alan yok mu, değeri
+mi null" belirsizliğini ortadan kaldırıyor ve görevin düzenleme formu zaten bu
+alanların hepsini tutuyor.

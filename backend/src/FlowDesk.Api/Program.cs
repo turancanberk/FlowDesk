@@ -40,6 +40,7 @@ app.MapWorkspaceEndpoints();
 app.MapTeamEndpoints();
 app.MapCustomerEndpoints();
 app.MapTicketEndpoints();
+app.MapTaskEndpoints();
 
 await app.RunAsync();
 
