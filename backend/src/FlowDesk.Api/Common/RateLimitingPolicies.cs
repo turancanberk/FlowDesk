@@ -25,6 +25,9 @@ public static class RateLimitingPolicies
     /// <summary>Refresh token guessing and abuse.</summary>
     public const string Refresh = "auth-refresh";
 
+    /// <summary>Invitation token guessing.</summary>
+    public const string InvitationAcceptance = "invitation-accept";
+
     public static void Configure(RateLimiterOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -57,6 +60,11 @@ public static class RateLimitingPolicies
         AddFixedWindow(options, Login, permitLimit: 10, window: TimeSpan.FromMinutes(1));
         AddFixedWindow(options, Registration, permitLimit: 5, window: TimeSpan.FromMinutes(10));
         AddFixedWindow(options, Refresh, permitLimit: 30, window: TimeSpan.FromMinutes(1));
+
+        // An invitation token is 256 bits of randomness, so guessing is not a
+        // realistic threat; the limit is there to stop the endpoint being used
+        // as a probe, not to protect the token.
+        AddFixedWindow(options, InvitationAcceptance, permitLimit: 20, window: TimeSpan.FromMinutes(10));
     }
 
     private static void AddFixedWindow(

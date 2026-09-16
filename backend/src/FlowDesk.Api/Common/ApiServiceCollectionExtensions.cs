@@ -11,6 +11,13 @@ using FlowDesk.Application.Tenancy.DeleteWorkspace;
 using FlowDesk.Application.Tenancy.GetWorkspace;
 using FlowDesk.Application.Tenancy.ListWorkspaces;
 using FlowDesk.Application.Tenancy.UpdateWorkspace;
+using FlowDesk.Application.Team.AcceptInvitation;
+using FlowDesk.Application.Team.ChangeMemberRole;
+using FlowDesk.Application.Team.InviteMember;
+using FlowDesk.Application.Team.ListInvitations;
+using FlowDesk.Application.Team.ListMembers;
+using FlowDesk.Application.Team.RemoveMember;
+using FlowDesk.Application.Team.RevokeInvitation;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,6 +48,14 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<GetWorkspaceHandler>();
         services.AddScoped<UpdateWorkspaceHandler>();
         services.AddScoped<DeleteWorkspaceHandler>();
+
+        services.AddScoped<ListMembersHandler>();
+        services.AddScoped<ChangeMemberRoleHandler>();
+        services.AddScoped<RemoveMemberHandler>();
+        services.AddScoped<InviteMemberHandler>();
+        services.AddScoped<ListInvitationsHandler>();
+        services.AddScoped<RevokeInvitationHandler>();
+        services.AddScoped<AcceptInvitationHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 
