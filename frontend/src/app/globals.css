@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/*
+  Faz 01 taban katmanı.
+  Tam tasarım sistemi token'ları Faz 02'de gelir (docs/DESIGN_SYSTEM.md).
+  Burada yalnızca tipografi ve okunabilir bir zemin kurulur.
+*/
+
+@theme inline {
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+:root {
+  --color-surface: #ffffff;
+  --color-app-background: #f7f8f9;
+  --color-text-primary: #1a1f26;
+  --color-text-secondary: #5c6675;
+  --color-border: #e4e6ea;
+  --color-accent: #1f7a80;
+}
+
+body {
+  background-color: var(--color-app-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Klavye odağı her zaman görünür kalır (docs/DESIGN_SYSTEM.md). */
+:focus-visible {
+  outline: 2px solid #45959a;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
