@@ -39,6 +39,7 @@ app.MapAuthEndpoints();
 app.MapWorkspaceEndpoints();
 app.MapTeamEndpoints();
 app.MapCustomerEndpoints();
+app.MapTicketEndpoints();
 
 await app.RunAsync();
 

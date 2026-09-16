@@ -3,7 +3,7 @@
 Bu dosya faz seviyesindeki ilerlemeyi takip eder. Her faz sonunda güncellenir.
 Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
-**Son güncelleme:** 2026-09-16
+**Son güncelleme:** 2026-09-17
 
 ---
 
@@ -16,7 +16,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 04 — Çok Kiracılılık
 - [x] Faz 05 — Ekip ve Davetler
 - [x] Faz 06 — Müşteriler
-- [ ] Faz 07 — Talepler
+- [x] Faz 07 — Talepler
 - [ ] Faz 08 — Görevler
 - [ ] Faz 09 — Dashboard
 - [ ] Faz 10 — RabbitMQ ve Worker
@@ -36,13 +36,85 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 07 — Talepler**
+**Faz 08 — Görevler**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 07 — Talepler · Tamamlandı
+
+Domain:
+
+- `Ticket` kendi durum geçişlerini koruyor. Geçiş tablosu ortada bağışlayıcı
+  (Açık, İşlemde ve Bekliyor arasında gerçek destek işi ileri geri hareket
+  eder), uçta katı: kapalı bir talep yalnızca Açık'a dönebilir, böylece yeniden
+  açma geçmişte görünür bir karar oluyor.
+- `ResolvedAt` ilk çözümde yazılıyor ve sonraki çözümlerde korunuyor; ilk
+  denemenin ne kadar sürdüğü silinmiyor.
+- `TicketNumber` (`TLP-1042`) kiracı başına sıralı. Küresel numaralandırma bir
+  kuruluşun kendi dizisindeki boşluklardan başkasının hacmini çıkarmasına izin
+  verirdi.
+- `TenantCounter`: veritabanı sequence'ı yerine satır. Sequence transactional
+  değil; geri alınan bir oluşturma yine de numara tüketip görünür bir boşluk
+  bırakırdı.
+- `TicketComment`: ayrı varlık, `ITenantOwned`.
+
+Infrastructure:
+
+- `xmin` sistem sütunu eşzamanlılık belirteci (ADR-0013). Npgsql bunu sistem
+  sütunu olarak tanıdığı için `CREATE TABLE` çıktısında yer almıyor; doğrulandı.
+- Müşteri yabancı anahtarı `Restrict`. Müşteri silinmiyor arşivleniyor
+  (ADR-0012) ve bunun sebebi zaten talep geçmişinin korunması; cascade tam da
+  arşivlemenin var oluş sebebini yok ederdi.
+- Yorum yabancı anahtarı `Cascade`: yorumun talebi olmadan anlamı yok.
+- `TakeNextTicketNumberAsync` sayaç satırını `FOR UPDATE` ile kilitliyor ve
+  talep eklemesiyle **aynı transaction** içinde çalışıyor.
+
+Application:
+
+- Dokuz use case: Create, Update, ChangeStatus, Assign, Delete, Get, List,
+  AddComment, ListComments.
+- `TicketGuards`: müşteri ve atanan kişi her yazmadan önce çalışma alanına ait
+  mi diye doğrulanıyor. Query filter neyin *okunabileceğini* sınırlar; istek
+  gövdesinde yabancı bir kimliğin gelmesini engellemez.
+- İzin matrisi dört eylemle genişledi: `ViewTickets` (İzleyici),
+  `ManageTickets` (Temsilci), `CommentOnTickets` (Temsilci),
+  `DeleteTickets` (Yönetici).
+- Arama numara gibi görünüyorsa numara olarak ele alınıyor: `1042`, `TLP-1042`
+  ve `tlp-1042` aynı talebi buluyor.
+
+API:
+
+- Durum ve atama kendi eylem rotalarında (ADR-0027). `PATCH` yalnızca alan
+  düzenlemesi yapıyor ve `version` istiyor (ADR-0028).
+
+Frontend:
+
+- Liste: debounce'lu arama, durum/öncelik/atama/sıralama filtreleri, sayfalama.
+  "Bana atananlar" ve "atanmamışlar" tek kontrolde toplandı; kullanıcı için aynı
+  karar.
+- Detay: durum seçicisi yalnızca sunucunun gönderdiği geçişleri sunuyor, atama
+  seçicisi üyelerden besleniyor, yorum akışı eskiden yeniye.
+- Talep tablosu müşteri detay sekmesiyle paylaşılıyor; orada müşteri sütunu
+  düşürülüyor.
+
+Testler: 320/320 (169 birim + 151 entegrasyon). On eşzamanlı oluşturma on
+farklı ve boşluksuz numara üretiyor; bu test sayaç tasarımının varlık sebebi ve
+gerçek PostgreSQL üzerinde koşuyor.
+
+Bu faz sırasında karşılaşılan iki gerçek durum:
+
+1. **React Compiler uyarısı.** `react-hook-form`'un `watch()` fonksiyonu her
+   render'da kimlik değiştirdiği için derleyici bileşenin tamamını optimizasyon
+   dışı bırakıyordu. Uyarı bastırılmadı; `useWatch` kancasına geçildi.
+2. **Boş dize sentinel.** Atanmamış seçeneği önce boş dize taşıyordu. Boş değer
+   bir select için "hiçbir şey seçilmedi" demek ve kontrol "Atanmamış" yerine
+   boş görünürdü; adlandırılmış sentinel'e geçildi.
+
+---
 
 ### Faz 06 — Müşteriler · Tamamlandı
 
@@ -433,3 +505,21 @@ Faz 03 sonunda:
 | Tarayıcıda uçtan uca akış | Kayıt → yenileme → çıkış → hatalı giriş → giriş tamam |
 | `localStorage` / `sessionStorage` | Boş (ADR-0006 doğrulandı) |
 | Çerezler | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |
+
+Faz 07 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 320/320 başarılı (169 birim + 151 entegrasyon) |
+| `dotnet ef migrations add AddTickets` + `database update` | Uygulandı; `xmin` sistem sütunu `CREATE TABLE` çıktısında yok |
+| `dotnet ef migrations add AddTicketAssigneeForeignKey` + `database update` | Uygulandı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| Çalışan API'ye karşı 14 adımlık talep akışı | Tamamı geçti — numaralandırma, geçersiz geçiş `409`, eşzamanlılık `409`, izolasyon `404`, rol matrisi, silme |
+| `/app/{slug}/tickets` ve `/app/{slug}/tickets/{id}` | HTTP 200, doğru başlık, uygulama hatası yok |
+
+**Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
+değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
+tarayıcı otomasyonu mevcut değildi ve Playwright Faz 17'ye ait. Arayüz tarafında
+lint, tip kontrolü, üretim derlemesi ve rota render'ı doğrulandı. Tıklama
+seviyesindeki akış Faz 17'de Playwright ile kalıcı hâle gelecek.

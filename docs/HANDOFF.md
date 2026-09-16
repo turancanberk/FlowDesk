@@ -17,9 +17,9 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/customers` |
-| Son commit | Faz 01 commit'i ile güncellenecek |
-| Working tree | Faz 01 commit'i ile temizlenecek |
+| Aktif dal | `main` (Faz 07 birleştirildi) |
+| Son commit | `74d7c1c — feat: talep arayüzü, liste, detay ve yorumlar` |
+| Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
 ## Tamamlanan Fazlar
@@ -31,14 +31,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 04 — Çok Kiracılılık
 - Faz 05 — Ekip ve Davetler
 - Faz 06 — Müşteriler
+- Faz 07 — Talepler
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 07 — Talepler** (henüz başlanmadı)
+**Faz 08 — Görevler** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 07 kapsamında henüz iş yapılmadı.
+Faz 08 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -46,38 +47,46 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 07'nin tamamı:
+Faz 08'in tamamı:
 
-- `Ticket` ve `TicketComment` domain varlıkları
-- Kiracı içinde sıralı talep numarası (`TLP-1042`)
-- Durum geçişleri: geçersiz geçişler domain seviyesinde reddedilecek
-- İyimser eşzamanlılık (`xmin`), çakışmada `409`
-- Atama, öncelik, müşteri ilişkisi, yorumlar
-- Filtre, arama, sayfalama, detay arayüzü
-- Müşteri detayındaki "Talepler" sekmesinin doldurulması
+- `TaskItem` domain varlığı ve `TaskStatus` (Todo / InProgress / Done)
+- Son tarih (`DueDate`), atama, isteğe bağlı müşteri ilişkisi
+- CRUD use case'leri, filtre ve sayfalama
+- API uç noktaları ve migration
+- Liste arayüzü ve müşteri detayındaki "Görevler" sekmesinin doldurulması
+
+Kanban **yok**; kapsam dışı (`docs/ROADMAP.md`).
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/tickets` dalını aç. `FlowDesk.Domain/Tickets/Ticket.cs` dosyasını
+`feat/tasks` dalını aç. `FlowDesk.Domain/Tasks/TaskItem.cs` dosyasını
 `docs/DATABASE.md` şemasına göre yaz ve `ITenantOwned` uygula.
 
-İki nokta özellikle dikkat ister:
+Faz 07'den doğrudan devralınabilecek desenler:
 
-**Talep numarası.** Kiracı başına sıralı olacak ve eşzamanlı oluşturmada
-çakışmamalı. `TenantCounters` tablosundaki satır aynı transaction içinde
-kilitlenip artırılacak (`docs/DATABASE.md`). `(TenantId, Number)` benzersiz
-indeksi son savunma hattı.
+**Yazma tarafı sahiplik kontrolü.** `TicketGuards` müşterinin ve atanan kişinin
+çalışma alanına ait olduğunu her yazmadan önce doğruluyor. Görevin de isteğe
+bağlı bir müşteri ilişkisi ve bir atanan kişisi var; aynı kontrol gerekli.
+Query filter neyin *okunabileceğini* sınırlar, istek gövdesinde yabancı bir
+kimliğin gelmesini engellemez.
 
-**Durum geçişleri.** `Ticket` kendi geçiş kurallarını koruyacak; geçersiz bir
-geçiş entity tarafından reddedilecek, yalnızca use case'te kontrol edilmeyecek.
-`RefreshToken` ve `Invitation` aynı deseni izliyor, onlara bakılabilir.
+**Liste kurgusu.** `ListTicketsHandler` filtreleme, sıralama ve sayfalamayı
+birlikte yapıyor ve sıralamayı her zaman benzersiz bir sütunla tie-break
+ediyor; aksi hâlde aynı saniyede oluşturulmuş iki satır sayfalar arasında iki
+kez görünebilir ya da hiç görünmeyebilir.
 
-İyimser eşzamanlılık yalnızca `Ticket` için (ADR-0013): PostgreSQL `xmin`
-sistem sütunu eşzamanlılık belirteci olarak yapılandırılacak, çakışmada `409`
-dönülecek.
+**Paylaşılan tablo bileşeni.** `TicketTable` hem talep listesinde hem müşteri
+sekmesinde kullanılıyor; `showCustomer` ile müşteri sütunu düşürülüyor. Görev
+tablosu aynı yaklaşımı izleyebilir.
 
-İzin matrisine talep eylemleri eklenecek; `Every_defined_action_is_mapped`
-testi eksik eşlemeyi yakalar.
+Dikkat edilecekler:
+
+- Görevlerin numaralandırması **yok**; `TenantCounter` yalnızca talebe ait.
+- İyimser eşzamanlılık **yalnızca** `Ticket` için (ADR-0013). Göreve `xmin`
+  eklenmeyecek.
+- İzin matrisine görev eylemleri eklenecek; `Every_defined_action_is_mapped`
+  testi eksik eşlemeyi yakalar.
+- `TaskStatus` etiketleri `frontend/src/lib/domain-labels.ts` içinde zaten var.
 
 ## Son Doğrulama Durumu
 
@@ -87,7 +96,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 241/241 başarılı |
+| `dotnet test backend/FlowDesk.slnx` | 320/320 başarılı (169 birim + 151 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -105,6 +114,9 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | Tarayıcıda çok kiracılı akış (Faz 04) | Yedi adımın tamamı geçti; izolasyon doğrulandı |
 | Tarayıcıda davet akışı (Faz 05) | Dokuz adımın tamamı geçti; yanlış hesap ve ikinci kullanım reddedildi |
 | Tarayıcıda müşteri akışı (Faz 06) | On adımın tamamı geçti; Türkçe arama ve arşivleme doğrulandı |
+| Uçtan uca talep akışı (Faz 07) | Çalışan API'ye karşı 14 adımın tamamı geçti — numaralandırma, geçersiz geçiş `409`, eşzamanlılık `409`, izolasyon `404`, rol matrisi |
+| `/app/{slug}/tickets` ve `/tickets/{id}` render (Faz 07) | HTTP 200, doğru başlıklar, uygulama hatası yok |
+| `AddTickets` migration SQL'i (Faz 07) | `xmin` sistem sütunu `CREATE TABLE` çıktısında yok — doğru |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -188,11 +200,31 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Türkçe arama katlanmış `SearchIndex` sütunu üzerinden yapılır; SQL `LOWER()`
   noktalı/noktasız i'yi doğru katlayamaz (ADR-0025)
 - TanStack Table **v8** kullanılır, v9 değil (ADR-0026)
+- Talepte durum ve atama, `PATCH` alanı değil kendi eylem rotalarıdır; `null`
+  atama "atamayı kaldır" demektir ve JSON'da yokluk ile ayrılamaz (ADR-0027)
+- Satır sürümü yalnızca `PATCH /tickets/{id}` için zorunludur; durum zaten
+  durum makinesiyle, atama üyelik kontrolüyle korunur (ADR-0028)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 07'de eklenenler:
+
+- `backend/src/FlowDesk.Domain/Tickets/` — `Ticket`, `TicketComment`,
+  `TicketStatus`, `TicketNumber`, `TenantCounter`
+- `backend/src/FlowDesk.Application/Tickets/` — dokuz use case,
+  `TicketGuards`, `TicketWorkflow`, `TicketQueries`, `TicketErrors`
+- `backend/src/FlowDesk.Infrastructure/Persistence/Configurations/` — üç
+  yapılandırma; `FlowDeskDbContext` içinde `TakeNextTicketNumberAsync`
+  (`FOR UPDATE`) ve `ExecuteInTransactionAsync`
+- `backend/src/FlowDesk.Api/Endpoints/TicketEndpoints.cs`,
+  `Contracts/TicketContracts.cs`
+- `backend/tests/.../Tickets/` — birim ve entegrasyon testleri
+- `frontend/src/features/tickets/` — liste, detay, tablo, form, yorumlar,
+  müşteri sekmesi paneli
+- `frontend/src/app/app/[workspaceSlug]/tickets/` — iki rota
 
 Faz 06'da eklenenler:
 
@@ -274,9 +306,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddCustomers` |
+| Son migration | `AddTickets` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).

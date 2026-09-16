@@ -681,3 +681,64 @@ React derleyicisi `useReactTable`'ın döndürdüğü fonksiyonları güvenle
 memoize edemiyor; TanStack'in belgelediği `"use no memo"` direktifi yalnızca
 tabloyu render eden bileşende kullanılıyor, dosyanın kalanı derleyici
 optimizasyonunu koruyor.
+
+---
+
+## ADR-0027 — Durum ve atama, PATCH alanı değil kendi eylem rotaları
+
+**Bağlam.** `docs/API_CONVENTIONS.md` kısmi güncelleme için `PATCH` kullanır ve
+talep rotaları arasında başlangıçta yalnızca `PATCH /tickets/{id}` vardı. Talep
+üzerinde iki işlem bu kalıba oturmuyor:
+
+- **Durum değişikliği** bir durum makinesi geçişi. Geçerliliği gönderilen değere
+  değil, talebin o anki durumuna bağlı. Kapalı bir talep "işlemde" yapılamaz,
+  ama aynı gövde açık bir talep için geçerli.
+- **Atama kaldırma** `null` demek. JSON'da alanın *yokluğu* ile `null` değeri
+  arasındaki fark, `System.Text.Json` ile bağlanan bir kayıtta güvenilir biçimde
+  okunamaz; her ikisi de `null` olarak gelir. Yani `PATCH` gövdesi "atamayı
+  değiştirme" ile "atamayı kaldır"ı ifade edemez.
+
+**Karar.** `POST /tickets/{id}/status` ve `POST /tickets/{id}/assignment` ayrı
+eylem rotaları olarak eklendi. `PATCH /tickets/{id}` geriye kalan alan
+düzenlemesini yapıyor: konu, açıklama, öncelik, müşteri.
+
+**Gerekçe.** Kural tablosundaki `POST` zaten "oluşturma **veya eylem**" olarak
+tanımlı; bu iki işlem tam olarak eylem. Ayrı rota aynı zamanda yetkilendirme ve
+hata kodlarını netleştiriyor: geçersiz geçiş `409` döndürüyor ve bu kod,
+gövdesi kusursuz ama o an mümkün olmayan bir isteği doğru anlatıyor.
+
+**Sonuçlar.** Sapma `docs/API_CONVENTIONS.md` içinde "Bilinçli sapmalar"
+başlığına gerekçesiyle yazıldı. Arayüz tarafında bu ayrım kendiliğinden işe
+yarıyor: detay ekranı durum ve atama için tek tıklık kontroller sunuyor,
+düzenleme formu ise ayrı bir diyalog.
+
+---
+
+## ADR-0028 — Sürüm kontrolü yalnızca talep düzenlemesinde zorunlu
+
+**Bağlam.** ADR-0013, `Ticket` üzerinde PostgreSQL `xmin` ile iyimser
+eşzamanlılık kurdu. Açık kalan soru, her yazma işleminin istemciden bir satır
+sürümü isteyip istemeyeceğiydi.
+
+**Karar.** `PATCH /tickets/{id}` `version` alanını **zorunlu** tutuyor. Durum
+değişikliği ve atama istemciden sürüm istemiyor.
+
+**Gerekçe.** Kayıp güncellemenin zararlı olduğu yer serbest metin. İki kişi aynı
+açıklamayı düzenlerse, ikincisinin kaydı birincinin yazdığını iz bırakmadan
+siler. Bunu ancak istemcinin okuduğu sürüm engelliyor.
+
+Durum ise zaten alan modelinin geçiş tablosuyla korunuyor. Bir meslektaş arada
+talebi taşımışsa istenen hareket ya hâlâ geçerli, ya zaten olmuş bir işlemin
+tekrarı, ya da reddediliyor. Üzerine yazılacak metin yok. Sürüm istemek burada
+yalnızca tek tıklık bir eylemi karşılıksız biçimde başarısız kılardı.
+
+Atamada son yazan kazanıyor ve bu doğru anlam: "bu talep artık Ayşe'nin" şimdiki
+zaman hakkında bir cümle, sahipliği en son söyleyen haklı. Açılır listede çakışma
+diyaloğu göstermek gürültü olurdu.
+
+**Sonuçlar.** Sunucu yine de her yazmada `xmin` belirtecini taşıyor, çünkü EF
+izlenen varlığı okuduğu sürümle güncelliyor. Yani okuma ile yazma arasındaki
+çakışma her koşulda yakalanıyor; istemciden gelen sürüm bunu "form açık dururken
+geçen süreye" genişletiyor. `TicketDetail` her yanıtta yeni sürümü döndürüyor,
+böylece açık bir form ikinci kez kaydederken kendi önceki kaydına çakışma
+bildirmiyor.

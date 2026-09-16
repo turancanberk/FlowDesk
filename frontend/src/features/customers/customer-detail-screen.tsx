@@ -14,6 +14,7 @@ import { CustomerStatusBadge, StatusBadge } from "@/components/product/status-ba
 import { formatDateTime } from "@/lib/format";
 import { ApiError } from "@/lib/api/api-error";
 import type { Workspace } from "@/features/workspaces/workspace-types";
+import { CustomerTicketsPanel } from "@/features/tickets/customer-tickets-panel";
 import { CustomerFormDialog } from "./customer-form-dialog";
 import { useArchiveCustomer, useCustomer, useRestoreCustomer } from "./customer-queries";
 import type { CustomerDetail } from "./customer-types";
@@ -168,17 +169,13 @@ function CustomerDetailContent({
         </TabsContent>
 
         <TabsContent value="talepler" className="pt-5">
-          {/*
-            Tickets arrive in Faz 07. The tab exists now because the customer
-            page is where they will live; showing a placeholder count or a fake
-            list would suggest data that does not exist.
-          */}
-          <Surface>
-            <EmptyState
-              title="Talepler yakında"
-              description="Talep yönetimi eklendiğinde bu müşteriye açılan talepler burada listelenecek."
+          <div className="flex flex-col gap-3">
+            <CustomerTicketsPanel
+              workspace={workspace}
+              customerId={customer.id}
+              canManage={canManage}
             />
-          </Surface>
+          </div>
         </TabsContent>
 
         <TabsContent value="gorevler" className="pt-5">

@@ -50,6 +50,8 @@ POST   /api/workspaces/{workspaceSlug}/tickets
 GET    /api/workspaces/{workspaceSlug}/tickets/{id}
 PATCH  /api/workspaces/{workspaceSlug}/tickets/{id}
 DELETE /api/workspaces/{workspaceSlug}/tickets/{id}
+POST   /api/workspaces/{workspaceSlug}/tickets/{id}/status
+POST   /api/workspaces/{workspaceSlug}/tickets/{id}/assignment
 POST   /api/workspaces/{workspaceSlug}/tickets/{id}/comments
 GET    /api/workspaces/{workspaceSlug}/tickets/{id}/comments
 POST   /api/workspaces/{workspaceSlug}/tickets/{id}/attachments
@@ -81,6 +83,14 @@ GET    /health/ready     # zorunlu bağımlılıklar hazır mı
 - **`DELETE /api/workspaces/{slug}/customers/{id}`** kalıcı silmez, arşivler
   (ADR-0012). Fiil `DELETE` olarak korunur çünkü istemci açısından anlam
   "bu kaydı listeden kaldır"dır.
+- **`POST /tickets/{id}/status`** ve **`POST /tickets/{id}/assignment`** alan
+  güncellemesi değil, eylemdir. Durum değişikliği bir durum makinesi geçişidir;
+  geçerliliği talebin o anki durumuna bağlıdır ve geçersiz geçiş `409` döner.
+  Atamada `null` "atamayı kaldır" anlamına gelir; `PATCH` gövdesinde alanın
+  *yokluğu* ile `null` değeri JSON'da güvenilir biçimde ayrılamayacağı için bu
+  anlam ancak kendi rotasında net ifade edilebilir. `PATCH /tickets/{id}` geriye
+  kalan alan düzenlemesini (konu, açıklama, öncelik, müşteri) yapar ve
+  `version` alanını zorunlu tutar.
 
 ## HTTP fiilleri
 
