@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Domain katmanı hiçbir projeye ve hiçbir altyapı paketine bağımlı değildir.
+    Bu kural FlowDesk.UnitTests içindeki mimari testlerle doğrulanır (ADR-0001).
+    Buraya PackageReference eklemeden önce o kararı gözden geçirin.
+  -->
+
+</Project>

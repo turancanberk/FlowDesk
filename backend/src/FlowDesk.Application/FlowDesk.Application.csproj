@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Application yalnızca Domain'e bağımlıdır. Altyapı ihtiyaçları burada
+    tanımlanan arayüzlerle ifade edilir; uygulamaları Infrastructure sağlar.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\FlowDesk.Domain\FlowDesk.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
