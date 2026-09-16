@@ -1,6 +1,7 @@
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Domain.Tickets;
+using FlowDesk.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -68,5 +69,20 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .WithMany()
             .HasForeignKey(ticket => ticket.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        /*
+          SetNull, so deleting a user releases their tickets instead of taking
+          them down or blocking the deletion. An unassigned ticket is a state
+          the product already has and the queue already shows; a ticket naming
+          an account that no longer exists is not.
+
+          The membership check in TicketGuards is what stops a stranger being
+          named in the first place. This constraint is what keeps the column
+          honest afterwards (docs/DATABASE.md).
+        */
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(ticket => ticket.AssignedUserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
