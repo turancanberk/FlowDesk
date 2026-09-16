@@ -17,7 +17,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 05 — Ekip ve Davetler
 - [x] Faz 06 — Müşteriler
 - [x] Faz 07 — Talepler
-- [ ] Faz 08 — Görevler
+- [x] Faz 08 — Görevler
 - [ ] Faz 09 — Dashboard
 - [ ] Faz 10 — RabbitMQ ve Worker
 - [ ] Faz 11 — Outbox
@@ -36,13 +36,62 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 08 — Görevler**
+**Faz 09 — Dashboard**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 08 — Görevler · Tamamlandı
+
+Domain:
+
+- `TaskItem` ve `TaskItemStatus` adlandırması `System.Threading.Tasks` ile
+  çakışmayı önlüyor (ADR-0029). Çakışma gizlenmiyor, belirsizlik üretip
+  derlemeyi kırardı.
+- Durum makinesi **yok** (ADR-0030). Tamamlandı'dan geri almak bir düzeltmedir;
+  reddetmek insanlara görevi silip yenisini açmayı öğretir ve korunmak istenen
+  geçmiş tamamen kaybolur.
+- `CompletedAt` geri alındığında temizleniyor — talebin `ResolvedAt`'ının
+  tersine. Tamamlanmamış işin tamamlanma tarihi yoktur.
+- Son tarih isteğe bağlı. Zorunlu tarih insanlara tarih uydurtur, uydurulmuş
+  son tarih geciken listesini güvenilmez yapar, güvenilmeyen liste okunmaz.
+- `IsOverdue` saklanmıyor, sorgu anında hesaplanıyor; gecikme için gece işi
+  gerekmiyor.
+
+Infrastructure:
+
+- Müşteri ve atanan kişi yabancı anahtarları `SetNull`. Kişi ayrıldığında
+  "faturayı geri ara" görevi hâlâ yapılmalı; yalnızca kimsenin üzerinde
+  olmadan duruyor.
+- İndeksler: `(TenantId, Status)`, `(TenantId, DueAt)`, `(TenantId,
+  AssignedUserId)`, `(TenantId, CustomerId)`.
+
+Application:
+
+- Altı use case: Create, Update, ChangeStatus, Delete, Get, List.
+- `PATCH` bütün düzenlenebilir alanları değiştiriyor, dolayısıyla `null` "yok"
+  demek. Kısmi gövdenin JSON'da çözemediği belirsizlik böylece ortadan kalkıyor.
+- Durum değişikliği ayrı rotada; listedeki onay kutusunun tek istek olması için.
+- İzin matrisi üç eylemle genişledi: `ViewTasks` (İzleyici), `ManageTasks`
+  (Temsilci), `DeleteTasks` (**Temsilci** — görev iç iştir, talebin aksine
+  dışarıdan kimse ona atıfta bulunmaz).
+- Varsayılan sıralama en yakın son tarih önce, tarihsiz işler en sonda.
+
+Frontend:
+
+- Tablo değil satır listesi; satır başındaki onay kutusu tamamlamayı tek tık
+  yapıyor.
+- Gecikme kendi rozetiyle gösteriliyor, kırmızı tarih metniyle değil.
+- Son tarih girdisi seçilen günün sonuna ve kullanıcının saat dilimine
+  sabitleniyor.
+- Görev listesi müşteri detay sekmesiyle paylaşılıyor.
+
+Testler: 376/376 (201 birim + 175 entegrasyon).
+
+---
 
 ### Faz 07 — Talepler · Tamamlandı
 
@@ -517,6 +566,17 @@ Faz 07 sonunda:
 | `npm --prefix frontend run lint / typecheck / build` | Başarılı |
 | Çalışan API'ye karşı 14 adımlık talep akışı | Tamamı geçti — numaralandırma, geçersiz geçiş `409`, eşzamanlılık `409`, izolasyon `404`, rol matrisi, silme |
 | `/app/{slug}/tickets` ve `/app/{slug}/tickets/{id}` | HTTP 200, doğru başlık, uygulama hatası yok |
+
+Faz 08 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 376/376 başarılı (201 birim + 175 entegrasyon) |
+| `dotnet ef migrations add AddTasks` + `database update` | Uygulandı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| Çalışan API'ye karşı 14 adımlık görev akışı | Tamamı geçti — gecikme hesabı, tamamlanma tarihinin temizlenmesi, null'un alanı temizlemesi, sıralama, izolasyon `404`, rol matrisi |
+| `/app/{slug}/tasks` | HTTP 200, doğru başlık, uygulama hatası yok |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
