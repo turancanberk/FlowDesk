@@ -20,7 +20,7 @@ public sealed class TicketListTests
     public async Task Status_and_priority_narrow_the_list()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var urgent = await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation,
@@ -56,7 +56,7 @@ public sealed class TicketListTests
     public async Task Assignment_filters_separate_mine_from_nobodys()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         using var agent = await TeamTestClient.AddMemberAsync(
             factory, workspace.Client, workspace.Slug, MembershipRole.Agent, Cancellation,
@@ -90,7 +90,7 @@ public sealed class TicketListTests
     public async Task The_customer_filter_backs_the_customer_detail_page()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         var otherCustomer = await CustomerTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, "Kuzey Yazılım", Cancellation);
@@ -121,7 +121,7 @@ public sealed class TicketListTests
     public async Task Searching_by_ticket_number_finds_exactly_that_ticket(string search)
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation, "Birinci talep");
@@ -143,7 +143,7 @@ public sealed class TicketListTests
     public async Task Searching_by_text_matches_part_of_the_subject()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation,
@@ -165,7 +165,7 @@ public sealed class TicketListTests
     public async Task Sorting_by_priority_puts_the_most_urgent_first()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         await TicketTestClient.CreateAndReadAsync(
             workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation,
@@ -200,7 +200,7 @@ public sealed class TicketListTests
     public async Task Paging_does_not_repeat_or_drop_rows()
     {
         await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
-        using var workspace = await TicketWorkspace.CreateAsync(factory, Cancellation);
+        using var workspace = await TestWorkspace.CreateAsync(factory, Cancellation);
 
         const int total = 7;
 

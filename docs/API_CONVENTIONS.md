@@ -61,6 +61,7 @@ GET    /api/workspaces/{workspaceSlug}/tasks
 POST   /api/workspaces/{workspaceSlug}/tasks
 GET    /api/workspaces/{workspaceSlug}/tasks/{id}
 PATCH  /api/workspaces/{workspaceSlug}/tasks/{id}
+POST   /api/workspaces/{workspaceSlug}/tasks/{id}/status
 DELETE /api/workspaces/{workspaceSlug}/tasks/{id}
 
 GET    /api/workspaces/{workspaceSlug}/activity
@@ -91,6 +92,13 @@ GET    /health/ready     # zorunlu bağımlılıklar hazır mı
   anlam ancak kendi rotasında net ifade edilebilir. `PATCH /tickets/{id}` geriye
   kalan alan düzenlemesini (konu, açıklama, öncelik, müşteri) yapar ve
   `version` alanını zorunlu tutar.
+- **`POST /tasks/{id}/status`** listedeki onay kutusunun tek istek olması için
+  var. `PATCH /tasks/{id}` görevin **tüm** düzenlenebilir alanlarını değiştirir
+  ve bunlar arasında liste satırının taşımadığı `description` da vardır; ayrı
+  rota olmasaydı bir görevi tamamlandı işaretlemek önce okuma, sonra güncelleme
+  gerektirirdi. `PATCH` gövdesinde her alan daima gönderildiği için `null`
+  "yok" demektir, "değiştirme" değil — kısmi gövdenin taşıdığı belirsizlik
+  böylece ortadan kalkıyor.
 
 ## HTTP fiilleri
 

@@ -28,6 +28,9 @@ public enum WorkspaceAction
     ManageTickets,
     DeleteTickets,
     CommentOnTickets,
+    ViewTasks,
+    ManageTasks,
+    DeleteTasks,
 }
 
 /// <summary>
@@ -66,6 +69,15 @@ public static class WorkspacePermissions
         [WorkspaceAction.CommentOnTickets] = MembershipRole.Agent,
         // Deleting destroys a customer conversation, so it stays with admins.
         [WorkspaceAction.DeleteTickets] = MembershipRole.Admin,
+        [WorkspaceAction.ViewTasks] = MembershipRole.Viewer,
+        [WorkspaceAction.ManageTasks] = MembershipRole.Agent,
+        /*
+          Deleting a task is an agent's own housekeeping, unlike deleting a
+          ticket. A task is internal: it carries no customer conversation and
+          nothing outside the team refers to it. Reserving this for admins would
+          only mean agents leave cancelled work lying in the list.
+        */
+        [WorkspaceAction.DeleteTasks] = MembershipRole.Agent,
         [WorkspaceAction.Update] = MembershipRole.Admin,
         [WorkspaceAction.ManageMembers] = MembershipRole.Admin,
         [WorkspaceAction.InviteMembers] = MembershipRole.Admin,
