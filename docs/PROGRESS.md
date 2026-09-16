@@ -11,7 +11,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 - [x] Faz 00 — Bootstrap
 - [x] Faz 01 — Temel
-- [ ] Faz 02 — Tasarım Sistemi
+- [x] Faz 02 — Tasarım Sistemi
 - [ ] Faz 03 — Kimlik Doğrulama
 - [ ] Faz 04 — Çok Kiracılılık
 - [ ] Faz 05 — Ekip ve Davetler
@@ -36,13 +36,51 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 02 — Tasarım Sistemi**
+**Faz 03 — Kimlik Doğrulama**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 02 — Tasarım Sistemi · Tamamlandı
+
+Token sistemi:
+
+- `docs/DESIGN_SYSTEM.md` içindeki nötr, petrol ve anlamsal renk ölçekleri CSS
+  değişkeni olarak tanımlandı ve `@theme inline` ile Tailwind'e bağlandı.
+- Yarıçap ölçeği tek bir tabandan türetildi (`--radius: 6px`): rozet ~4 px,
+  buton ve girdi 6 px, kart ~8 px, diyalog ~11 px.
+- Yoğunluk ölçüleri token'landı: tablo satırı 44 px, tablo başlığı 36 px,
+  üst çubuk 48 px.
+- Grafik renkleri talep durumlarına birebir eşlendi; böylece bir pasta dilimi
+  ile tablodaki rozet aynı rengi taşır (Faz 09'da kullanılacak).
+
+Bileşenler:
+
+- shadcn CLI ile Base UI tabanlı 18 bileşen depoya kaynak olarak alındı
+  (ADR-0020) ve FlowDesk kararlarına göre uyarlandı.
+- Elle yazılanlar: `Field` (etiket, girdi, yardımcı metin ve hatayı tek
+  erişilebilir birim olarak bağlar), `Pagination`, `StatusBadge` ailesi,
+  `PageHeader`, `EmptyState`, `AppSidebar`.
+- Domain kodları (`src/types/domain.ts`) ile Türkçe etiketler
+  (`src/lib/domain-labels.ts`) ayrıldı. Eşleme `Record<...>` ile kuruldu:
+  domain'e yeni bir durum eklendiğinde eksik etiket derleme hatası üretir.
+- `src/lib/format.ts`: tr-TR tarih, sayı ve göreli zaman biçimlendirmesi.
+
+Vitrin:
+
+- `/design-system` sayfası 16 bölümle yayında. Her bölüm yalnızca bileşeni
+  değil, kararın gerekçesini de gösteriyor.
+- Tüm içerik Türkçe. Demo verisi gerçekçi ve kurgusal; lorem ipsum yok.
+
+Varsayılan kurulumdan sapılan noktalar: rozet hap biçiminden küçük yarıçapa
+çevrildi, tablo yoğunluğu ayarlandı, `Alert`'e anlamsal ton varyantları
+eklendi, `Toaster`'ın `next-themes` bağımlılığı kaldırıldı.
+
+Görsel doğrulama: üretim derlemesi başlatılıp headless tarayıcıyla ekran
+görüntüsü alındı ve bölümler tek tek incelendi.
 
 ### Faz 01 — Temel · Tamamlandı
 
@@ -157,3 +195,13 @@ Faz 01 sonunda gerçekten çalıştırılan komutlar:
 | `GET /health/ready` | HTTP 200, `postgres = Healthy` |
 | `dotnet list package --vulnerable --include-transitive` | Açık yok |
 | `npm --prefix frontend audit` | 0 açık |
+
+Faz 02 sonunda:
+
+| Komut | Sonuç |
+|---|---|
+| `npm --prefix frontend run lint` | Başarılı |
+| `npm --prefix frontend run typecheck` | Başarılı |
+| `npm --prefix frontend run format:check` | Başarılı |
+| `npm --prefix frontend run build` | Başarılı — `/design-system` statik üretildi |
+| Görsel inceleme | Tipografi, renk, tablo, kenar çubuğu ve buton bölümleri ekran görüntüsüyle doğrulandı |

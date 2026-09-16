@@ -26,6 +26,7 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0017 | ESLint 9 hattı (10 değil) | Kabul edildi |
 | ADR-0018 | xUnit v3 ve Microsoft.Testing.Platform | Kabul edildi |
 | ADR-0019 | Çözüm dosyası biçimi olarak .slnx | Kabul edildi |
+| ADR-0020 | shadcn/ui kaynak bileşenleri + Base UI primitifleri | Kabul edildi |
 
 ---
 
@@ -436,3 +437,46 @@ için bir sebep yok.
 
 **Sonuçlar.** `.slnx` desteği Visual Studio 2022 17.13 ve sonrasını gerektirir.
 CI, depoda sabitlenen .NET 10 SDK'sını kullandığı için etkilenmez.
+
+
+---
+
+## ADR-0020 — shadcn/ui kaynak bileşenleri + Base UI primitifleri
+
+**Bağlam.** Erişilebilir bileşenler için üç yol vardı: her şeyi elle yazmak,
+hazır bir bileşen kütüphanesini paket olarak kullanmak, ya da bileşen kaynağını
+depoya alıp sahiplenmek.
+
+Elle yazmak, diyalog odak tuzağı, menü klavye gezintisi ve select
+konumlandırması gibi doğru yapılması zor işleri sıfırdan çözmek demekti. Paket
+olarak kullanmak ise tasarım sistemini paketin görsel kararlarına bağlardı;
+FlowDesk'in kendi token sistemi ve yoğunluk hedefi var.
+
+**Karar.** shadcn CLI ile bileşenler **Base UI tabanlı** olarak (`--base base`)
+depoya kaynak biçiminde eklenecek ve yerelde sahiplenilecek. Erişilebilirlik
+primitifleri `@base-ui/react` paketinden gelir.
+
+**Gerekçe.** Kaynak depoda olduğu için bileşen davranışı ve görünümü doğrudan
+değiştirilebilir; bir kütüphane sürümünün arkasında beklemek gerekmez. Base UI,
+odak yönetimi ve klavye gezintisi gibi zor kısımları çözer.
+
+shadcn'in semantik değişken sözleşmesi (`--background`, `--primary`, `--border`,
+`--ring` ...) korunur ve değerleri FlowDesk paletiyle doldurulur. Böylece
+ileride eklenen bir bileşen yeniden boyanmadan doğru görünür. FlowDesk'e özgü
+ek token'lar (`--canvas`, `--accent-surface`, anlamsal renk üçlüleri) bu
+sözleşmenin yanında durur.
+
+**Sonuçlar.**
+
+- Üretilen bileşenlerde koyu tema (`dark:`) sınıfları kalır. Koyu tema çekirdek
+  kapsam dışıdır (`docs/ROADMAP.md`) ve `.dark` sınıfı hiçbir yerde
+  uygulanmadığı için bu sınıflar etkisizdir. Her bileşenden tek tek
+  temizlemek, ileride koyu tema eklenirse geri yazılacak bir işi bugün yapmak
+  olurdu.
+- Varsayılan kurulumun getirdiği bazı seçimler FlowDesk kararlarıyla
+  çakıştığı için değiştirildi: rozet varsayılanı hap biçiminden küçük yarıçapa
+  çevrildi, tablo yoğunluğu 44 px satır ve 36 px başlığa ayarlandı, `Alert`
+  bileşenine anlamsal ton varyantları eklendi, `Toaster` bileşeninin
+  `next-themes` bağımlılığı kaldırıldı.
+- shadcn paketi çalışma zamanı bağımlılığı değil, geliştirme aracıdır ve
+  `devDependencies` altına alındı.

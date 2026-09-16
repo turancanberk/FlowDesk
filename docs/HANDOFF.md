@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/foundation` |
+| Aktif dal | `feat/design-system` |
 | Son commit | Faz 01 commit'i ile güncellenecek |
 | Working tree | Faz 01 commit'i ile temizlenecek |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -26,14 +26,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 - Faz 00 — Bootstrap
 - Faz 01 — Temel
+- Faz 02 — Tasarım Sistemi
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 02 — Tasarım Sistemi** (henüz başlanmadı)
+**Faz 03 — Kimlik Doğrulama** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 02 kapsamında henüz iş yapılmadı.
+Faz 03 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -41,34 +42,35 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 02'nin tamamı:
+Faz 03'ün tamamı:
 
-- `docs/DESIGN_SYSTEM.md` içindeki token'ların CSS değişkeni olarak
-  tanımlanması ve Tailwind temasına bağlanması
-- Genel UI bileşenleri (`src/components/ui/`): buton, girdi, textarea, select,
-  checkbox, rozet, uyarı, toast, tablo, sekme, açılır menü, diyalog, tooltip,
-  sayfalama
-- Ürün bileşenleri (`src/components/product/`): sayfa başlığı, boş durum,
-  durum rozeti
-- `/design-system` vitrin sayfası, tüm içerik Türkçe
-- Erişilebilirlik: klavye gezintisi, görünür odak, etiketli girdiler
+- ASP.NET Core Identity ve `FlowDeskDbContext` (ilk migration burada oluşur)
+- `RefreshToken` varlığı: `FamilyId`, `TokenHash`, `UsedAt`, `RevokedAt`
+- `POST /api/auth/register`, `login`, `refresh`, `logout`; `GET /api/me`
+- Access token üretimi (kısa ömürlü JWT) ve refresh token rotasyonu
+- Replay tespiti: kullanılmış bir token tekrar sunulursa ailenin tamamı iptal
+- Çerez politikası, CORS ve CSRF savunma katmanları
+- Rate limiting: login, register, refresh
+- Frontend: bellekte auth store, `Authorization: Bearer` ekleyen HTTP
+  istemcisi, sessiz yenileme, tek uçuşlu (single-flight) refresh,
+  giriş/kayıt ekranları, korumalı rota guard'ı
+- Entegrasyon testleri: rotasyon, replay, iptal, logout, rate limit
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/design-system` dalını aç. Önce `frontend/src/app/globals.css` içinde
-`docs/DESIGN_SYSTEM.md` bölüm 3'teki nötr, petrol ve anlamsal renk ölçeklerini
-CSS değişkeni olarak tanımla ve `@theme inline` ile Tailwind'e bağla. Ardından
-tipografi ölçeğini, yarıçap ve yükseklik token'larını ekle. Bileşen yazmaya
-buton ile başla; varyantları `primary`, `secondary`, `ghost`, `danger` ve
-boyutları 28/32/36 px olacak.
+`feat/authentication` dalını aç. Backend'de `FlowDesk.Infrastructure` içinde
+`FlowDeskDbContext` oluştur ve ASP.NET Core Identity'yi bağla
+(`Microsoft.AspNetCore.Identity.EntityFrameworkCore`). `AspNetRoles`
+**uygulama rolleri için kullanılmaz**; roller Faz 04'te `Membership` üzerinde
+olacak (ADR-0003). Ardından `RefreshToken` varlığını
+`docs/DATABASE.md` içindeki şemaya göre ekle, ilk migration'ı üret ve boş
+veritabanına uygula.
 
-shadcn/ui bileşenleri kaynak olarak eklenip yerelde sahiplenilecek. Base UI
-paketinin stabil adı `@base-ui/react`'tır; `@base-ui-components/react` eski
-RC isimlendirmedir ve kullanılmaz. Paket sürümlerini kurulum anında resmî
-registry'den doğrula (ADR-0016).
+Kimlik doğrulama modelinin tamamı `docs/SECURITY.md` bölüm 1'de tanımlı ve
+bağlayıcıdır: access token yalnızca bellekte, refresh token `HttpOnly` çerezde
+ve veritabanında yalnızca SHA-256 hash'i olarak saklanır.
 
-Görsel anti-pattern listesi `docs/DESIGN_SYSTEM.md` bölüm 2'dedir ve
-bağlayıcıdır.
+Paket sürümlerini kurulum anında resmî registry'den doğrula (ADR-0016).
 
 ## Son Doğrulama Durumu
 
@@ -84,6 +86,8 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `npm --prefix frontend run format:check` | Başarılı |
 | `npm --prefix frontend run build` | Başarılı |
 | `docker compose --env-file .env -f infra/docker-compose.yml up -d` | `flowdesk-postgres` healthy |
+| `npm --prefix frontend run format:check` (Faz 02) | Başarılı |
+| `/design-system` görsel inceleme (Faz 02) | Tipografi, renk, tablo, kenar çubuğu ve butonlar doğrulandı |
 | `GET http://localhost:5080/health/live` | HTTP 200 |
 | `GET http://localhost:5080/health/ready` | HTTP 200, `postgres = Healthy` |
 | `dotnet list ... package --vulnerable --include-transitive` | Açık yok |
@@ -140,11 +144,26 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - xUnit v3 + Microsoft.Testing.Platform; çalıştırıcı kökteki `global.json`
   içinde (ADR-0018)
 - Çözüm dosyası `.slnx` (ADR-0019)
+- shadcn/ui bileşenleri Base UI tabanlı olarak depoda sahiplenilir; shadcn'in
+  semantik değişken sözleşmesi korunur, değerleri FlowDesk paletiyle
+  doldurulur (ADR-0020)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 02'de eklenenler:
+
+- `frontend/src/app/globals.css` — tüm tasarım token'ları burada
+- `frontend/src/components/ui/` — 18 shadcn/Base UI bileşeni + elle yazılan
+  `field.tsx` ve `pagination.tsx`
+- `frontend/src/components/product/` — `status-badge.tsx`, `page-header.tsx`,
+  `empty-state.tsx`, `app-sidebar.tsx`
+- `frontend/src/types/domain.ts` ve `frontend/src/lib/domain-labels.ts` —
+  domain kodu / Türkçe etiket sınırı
+- `frontend/src/lib/format.ts` — tr-TR biçimlendirme
+- `frontend/src/app/design-system/` — vitrin sayfası ve bölümleri
 
 Faz 01'de eklenenler:
 
