@@ -24,6 +24,15 @@ using FlowDesk.Application.Customers.GetCustomer;
 using FlowDesk.Application.Customers.ListCustomers;
 using FlowDesk.Application.Customers.RestoreCustomer;
 using FlowDesk.Application.Customers.UpdateCustomer;
+using FlowDesk.Application.Tickets.AddTicketComment;
+using FlowDesk.Application.Tickets.AssignTicket;
+using FlowDesk.Application.Tickets.ChangeTicketStatus;
+using FlowDesk.Application.Tickets.CreateTicket;
+using FlowDesk.Application.Tickets.DeleteTicket;
+using FlowDesk.Application.Tickets.GetTicket;
+using FlowDesk.Application.Tickets.ListTicketComments;
+using FlowDesk.Application.Tickets.ListTickets;
+using FlowDesk.Application.Tickets.UpdateTicket;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -69,6 +78,16 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<RestoreCustomerHandler>();
         services.AddScoped<GetCustomerHandler>();
         services.AddScoped<ListCustomersHandler>();
+
+        services.AddScoped<CreateTicketHandler>();
+        services.AddScoped<UpdateTicketHandler>();
+        services.AddScoped<ChangeTicketStatusHandler>();
+        services.AddScoped<AssignTicketHandler>();
+        services.AddScoped<DeleteTicketHandler>();
+        services.AddScoped<GetTicketHandler>();
+        services.AddScoped<ListTicketsHandler>();
+        services.AddScoped<AddTicketCommentHandler>();
+        services.AddScoped<ListTicketCommentsHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 
