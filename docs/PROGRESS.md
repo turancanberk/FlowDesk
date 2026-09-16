@@ -15,7 +15,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 03 — Kimlik Doğrulama
 - [x] Faz 04 — Çok Kiracılılık
 - [x] Faz 05 — Ekip ve Davetler
-- [ ] Faz 06 — Müşteriler
+- [x] Faz 06 — Müşteriler
 - [ ] Faz 07 — Talepler
 - [ ] Faz 08 — Görevler
 - [ ] Faz 09 — Dashboard
@@ -36,13 +36,58 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 06 — Müşteriler**
+**Faz 07 — Talepler**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 06 — Müşteriler · Tamamlandı
+
+Domain:
+
+- `Customer`, `ITenantOwned` uyguladığı için global query filter'a
+  kendiliğinden kaydoldu. Filtre bu varlıkta arşiv koşulunu da taşıdığından
+  adlandırılmış özel durum olarak yazıldı.
+- Arşivlenen tek varlık (ADR-0012). Arşivli müşteri listeden çıkıyor ama detay
+  sayfasından okunabiliyor; eski bağlantılar çalışmaya devam ediyor.
+- `CustomerDetails` kaydı: oluşturma ve güncelleme aynı doğrulamadan geçiyor.
+- `TurkishText.Fold`: ortak Türkçe harf katlaması; `WorkspaceSlug` de bunu
+  kullanıyor.
+
+Application:
+
+- Altı use case: Create, Update, Archive, Restore, Get, List.
+- `PagedResult` ve `PageRequest`: sayfa boyutu reddedilmiyor, kırpılıyor.
+- Sıralama her zaman `Id` ile tie-break yapıyor.
+- Arama katlanmış `SearchIndex` sütunu üzerinden (ADR-0025).
+
+Frontend:
+
+- TanStack Table v8 ile yoğun liste, debounce'lu arama, durum ve sıralama
+  filtreleri, arşivlenenleri göster seçeneği.
+- Detay sayfası: genel bakış, talepler ve görevler sekmeleri.
+- Form diyaloğu oluşturma ve düzenleme için ortak; `key` ile yeniden bağlanıyor.
+- Dört ayrı asenkron durum: yükleniyor, hiç kayıt yok, filtreye uyan yok, hata.
+
+Testler: 241/241. Kiracı izolasyonu davranışsal olarak doğrulandı — iki
+kiracının müşterileri aynı tabloda dururken her sorgu yalnızca kendi kiracısının
+satırlarını görüyor, arşivli kayıtları istemek bile başka bir alana uzanmıyor.
+
+Bu faz sırasında çözülen dört gerçek hata:
+
+1. **Türkçe arama çalışmıyordu.** "YAZILIM" araması "Kuzey Yazılım" kaydını
+   bulamıyordu; noktalı ve noktasız i hiçbir küçültme stratejisiyle
+   eşleşmiyordu. Katlanmış `SearchIndex` sütunuyla çözüldü (ADR-0025).
+2. **Mimari sınır sağlayıcı sızıntısı yakaladı.** `EF.Functions.ILike` Npgsql'e
+   ait ve Application katmanı bilinçli olarak sağlayıcıya bağımlı değil.
+3. **Select bileşenleri İngilizce kod gösteriyordu.** Filtre ve sıralama
+   seçicilerinde "all" ve "RecentlyUpdated" görünüyordu. Base UI'ye `items`
+   eşlemesi verilerek Türkçe etiketlere çevrildi.
+4. **Bulut senkronizasyonu 10 yinelenmiş dosya üretip derlemeyi bozdu.**
+   `scripts/clean-sync-duplicates.sh` eklendi.
 
 ### Faz 05 — Ekip ve Davetler · Tamamlandı
 

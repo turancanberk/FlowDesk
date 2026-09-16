@@ -50,6 +50,17 @@ export const customerStatusLabels: Record<CustomerStatus, DomainLabel> = {
   Inactive: { label: "Pasif", tone: "neutral" },
 };
 
+/** Sıralama seçeneklerinin görünen adları. */
+export const customerSortLabels: Record<
+  "RecentlyUpdated" | "NameAscending" | "NameDescending" | "RecentlyCreated",
+  string
+> = {
+  RecentlyUpdated: "Son güncellenen",
+  NameAscending: "Ada göre (A-Z)",
+  NameDescending: "Ada göre (Z-A)",
+  RecentlyCreated: "Son eklenen",
+};
+
 export const membershipRoleLabels: Record<MembershipRole, DomainLabel> = {
   Owner: { label: "Sahip", tone: "accent" },
   Admin: { label: "Yönetici", tone: "info" },

@@ -1,4 +1,5 @@
 using FlowDesk.Domain.Authentication;
+using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,13 @@ public interface IFlowDeskDbContext
     DbSet<Membership> Memberships { get; }
 
     DbSet<Invitation> Invitations { get; }
+
+    /// <summary>
+    /// Scoped to the current workspace and filtered to non-archived rows by the
+    /// global query filter. Use <c>IgnoreQueryFilters</c> only where an
+    /// archived customer is genuinely the subject.
+    /// </summary>
+    DbSet<Customer> Customers { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -11,13 +11,13 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-16 (UTC)
+2026-09-17 (UTC)
 
 ## Repository Durumu
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/team-invitations` |
+| Aktif dal | `feat/customers` |
 | Son commit | Faz 01 commit'i ile güncellenecek |
 | Working tree | Faz 01 commit'i ile temizlenecek |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -30,14 +30,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 03 — Kimlik Doğrulama
 - Faz 04 — Çok Kiracılılık
 - Faz 05 — Ekip ve Davetler
+- Faz 06 — Müşteriler
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 06 — Müşteriler** (henüz başlanmadı)
+**Faz 07 — Talepler** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 06 kapsamında henüz iş yapılmadı.
+Faz 07 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -45,37 +46,38 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 06'nın tamamı:
+Faz 07'nin tamamı:
 
-- `Customer` domain varlığı; `ITenantOwned` uygulayacak ve global query
-  filter'a **otomatik** kaydolacak
-- Soft delete (arşivleme) — yalnızca `Customer` (ADR-0012)
-- CRUD use case'leri + arama, filtre, sıralama, sayfalama
-- İzin matrisine müşteri eylemleri
-- Frontend: TanStack Table tabanlı liste, detay sayfası, formlar
-- Yükleniyor / boş / sonuç yok / hata durumları
-- Kiracı izolasyon testleri ve query filter'ın **davranışsal** testi
+- `Ticket` ve `TicketComment` domain varlıkları
+- Kiracı içinde sıralı talep numarası (`TLP-1042`)
+- Durum geçişleri: geçersiz geçişler domain seviyesinde reddedilecek
+- İyimser eşzamanlılık (`xmin`), çakışmada `409`
+- Atama, öncelik, müşteri ilişkisi, yorumlar
+- Filtre, arama, sayfalama, detay arayüzü
+- Müşteri detayındaki "Talepler" sekmesinin doldurulması
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/customers` dalını aç. `FlowDesk.Domain/Customers/Customer.cs` dosyasını
-`docs/DATABASE.md` şemasına göre yaz ve `ITenantOwned` uygula — bu, varlığı
-global query filter'a otomatik kaydeder (ADR-0024); ayrıca bir şey yapmaya
-gerek yok ve `TenantQueryFilterTests` kaydın yapıldığını doğrular.
+`feat/tickets` dalını aç. `FlowDesk.Domain/Tickets/Ticket.cs` dosyasını
+`docs/DATABASE.md` şemasına göre yaz ve `ITenantOwned` uygula.
 
-`Customer` soft delete destekleyen **tek** varlık (ADR-0012): müşteri kayıtları
-geçmiş taleplerin ve görevlerin bağlamını taşıdığı için kalıcı silinmiyor,
-arşivleniyor. `ArchivedAt IS NULL` koşulu da query filter'a eklenecek.
+İki nokta özellikle dikkat ister:
 
-Faz 06, query filter'ın ilk gerçek tüketicisi. Mekanizma model seviyesinde
-doğrulanmış durumda; bu fazda **davranışsal** testi de yazılacak: iki kiracının
-müşterileri aynı tabloda dururken her sorgu yalnızca kendi kiracısının
-satırlarını görmeli.
+**Talep numarası.** Kiracı başına sıralı olacak ve eşzamanlı oluşturmada
+çakışmamalı. `TenantCounters` tablosundaki satır aynı transaction içinde
+kilitlenip artırılacak (`docs/DATABASE.md`). `(TenantId, Number)` benzersiz
+indeksi son savunma hattı.
 
-Sayfalama sözleşmesi `docs/API_CONVENTIONS.md` içinde tanımlı: `page`,
-`pageSize` (varsayılan 25, üst sınır 100), `search`, `sort`. Sıralama alanı
-benzersiz değilse `Id` ile tie-break yapılacak; aksi halde sayfalar arasında
-kayıt tekrarlanır veya atlanır.
+**Durum geçişleri.** `Ticket` kendi geçiş kurallarını koruyacak; geçersiz bir
+geçiş entity tarafından reddedilecek, yalnızca use case'te kontrol edilmeyecek.
+`RefreshToken` ve `Invitation` aynı deseni izliyor, onlara bakılabilir.
+
+İyimser eşzamanlılık yalnızca `Ticket` için (ADR-0013): PostgreSQL `xmin`
+sistem sütunu eşzamanlılık belirteci olarak yapılandırılacak, çakışmada `409`
+dönülecek.
+
+İzin matrisine talep eylemleri eklenecek; `Every_defined_action_is_mapped`
+testi eksik eşlemeyi yakalar.
 
 ## Son Doğrulama Durumu
 
@@ -85,7 +87,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 183/183 başarılı |
+| `dotnet test backend/FlowDesk.slnx` | 241/241 başarılı |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -102,6 +104,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | Çerezler (Faz 03) | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |
 | Tarayıcıda çok kiracılı akış (Faz 04) | Yedi adımın tamamı geçti; izolasyon doğrulandı |
 | Tarayıcıda davet akışı (Faz 05) | Dokuz adımın tamamı geçti; yanlış hesap ve ikinci kullanım reddedildi |
+| Tarayıcıda müşteri akışı (Faz 06) | On adımın tamamı geçti; Türkçe arama ve arşivleme doğrulandı |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -182,11 +185,25 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   `FlowDeskJson.Options` kullanmalıdır (ADR-0023)
 - `ITenantOwned` işaretleyicisi global query filter'a otomatik kayıt sağlar;
   `Membership` bilinçli istisnadır (ADR-0024)
+- Türkçe arama katlanmış `SearchIndex` sütunu üzerinden yapılır; SQL `LOWER()`
+  noktalı/noktasız i'yi doğru katlayamaz (ADR-0025)
+- TanStack Table **v8** kullanılır, v9 değil (ADR-0026)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 06'da eklenenler:
+
+- `backend/src/FlowDesk.Domain/Customers/` — `Customer`, `CustomerStatus`
+- `backend/src/FlowDesk.Domain/Common/TurkishText.cs` — ortak harf katlaması
+- `backend/src/FlowDesk.Application/Customers/` — altı use case
+- `backend/src/FlowDesk.Application/Common/PagedResult.cs`
+- `backend/src/FlowDesk.Api/Endpoints/CustomerEndpoints.cs`
+- `backend/tests/.../Customers/` — izolasyon ve liste testleri
+- `frontend/src/features/customers/` — liste, detay, form
+- `scripts/clean-sync-duplicates.sh`
 
 Faz 05'te eklenenler:
 
@@ -257,9 +274,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddInvitations` |
+| Son migration | `AddCustomers` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
