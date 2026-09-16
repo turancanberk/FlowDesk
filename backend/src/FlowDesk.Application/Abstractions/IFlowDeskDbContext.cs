@@ -1,4 +1,5 @@
 using FlowDesk.Domain.Authentication;
+using FlowDesk.Domain.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowDesk.Application.Abstractions;
@@ -16,6 +17,16 @@ namespace FlowDesk.Application.Abstractions;
 public interface IFlowDeskDbContext
 {
     DbSet<RefreshToken> RefreshTokens { get; }
+
+    DbSet<Tenant> Tenants { get; }
+
+    /// <summary>
+    /// Memberships are deliberately <em>not</em> covered by the workspace query
+    /// filter. "Which workspaces do I belong to?" has to look across all of
+    /// them, and a filter scoped to the current workspace would make that
+    /// question unanswerable.
+    /// </summary>
+    DbSet<Membership> Memberships { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

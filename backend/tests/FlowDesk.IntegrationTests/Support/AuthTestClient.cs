@@ -5,6 +5,12 @@ using FlowDesk.Application.Authentication.RegisterUser;
 
 namespace FlowDesk.IntegrationTests.Support;
 
+/// <summary>A registered user together with an authenticated client.</summary>
+internal sealed record SignedInUser(HttpClient Client, string Email, Guid Id) : IDisposable
+{
+    public void Dispose() => Client.Dispose();
+}
+
 /// <summary>
 /// Helpers for driving the authentication endpoints from a test.
 /// </summary>
@@ -91,6 +97,30 @@ internal static class AuthTestClient
     }
 
     /// <summary>Reads the <c>code</c> extension that ProblemDetails responses carry.</summary>
+    /// <summary>
+    /// Registers a user and returns a client already carrying their bearer
+    /// token, so a test can get to the thing it is actually asserting.
+    /// </summary>
+    public static async Task<SignedInUser> SignInNewUserAsync(
+        FlowDeskApiFactory factory,
+        CancellationToken cancellationToken,
+        string displayName = "Ahmet Yılmaz")
+    {
+        var client = factory.CreateApiClient();
+        var email = UniqueEmail();
+
+        using var response = await RegisterAsync(client, email, cancellationToken, displayName);
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+
+        var session = await ReadSessionAsync(response, cancellationToken);
+
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session.AccessToken);
+
+        return new SignedInUser(client, email, session.User.Id);
+    }
+
     public static async Task<string?> ReadProblemCodeAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

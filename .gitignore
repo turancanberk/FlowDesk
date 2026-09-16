@@ -68,6 +68,11 @@ pnpm-debug.log*
 
 # İşletim sistemi
 .DS_Store
+# Bulut senkronizasyonu (iCloud Drive, Dropbox) çakışma kopyaları. Depo
+# senkronize edilen bir dizinde tutulduğunda "Program 2.cs" gibi kopyalar
+# oluşuyor ve derlemeyi bozuyor; commit edilmemeleri gerekir.
+* 2.*
+*conflicted copy*
 Thumbs.db
 desktop.ini
 

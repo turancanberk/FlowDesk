@@ -78,6 +78,17 @@ public static class InfrastructureServiceCollectionExtensions
                 npgsql => npgsql.MigrationsAssembly(typeof(FlowDeskDbContext).Assembly.FullName));
         });
 
+        /*
+          Replaces EF's own registration so the context is built with the
+          request's ITenantContext. AddDbContext resolves the type through the
+          container, and the two-argument constructor is what enables the
+          workspace query filter; without it the context falls back to the
+          options-only constructor and the filter stays inert.
+        */
+        services.AddScoped(provider => new FlowDeskDbContext(
+            provider.GetRequiredService<DbContextOptions<FlowDeskDbContext>>(),
+            provider.GetRequiredService<ITenantContext>()));
+
         // The application layer depends on the contract, never on the concrete
         // context (ADR-0021). Resolving through the registered context keeps a
         // single instance per request, so both views share one change tracker.

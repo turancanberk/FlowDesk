@@ -13,7 +13,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 01 — Temel
 - [x] Faz 02 — Tasarım Sistemi
 - [x] Faz 03 — Kimlik Doğrulama
-- [ ] Faz 04 — Çok Kiracılılık
+- [x] Faz 04 — Çok Kiracılılık
 - [ ] Faz 05 — Ekip ve Davetler
 - [ ] Faz 06 — Müşteriler
 - [ ] Faz 07 — Talepler
@@ -36,13 +36,70 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 04 — Çok Kiracılılık**
+**Faz 05 — Ekip ve Davetler**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 04 — Çok Kiracılılık · Tamamlandı
+
+Domain:
+
+- `Tenant`, `Membership` ve `WorkspaceSlug` değer nesnesi.
+- `WorkspaceSlug` Türkçe adları çevir yazıyor: "Kuzey Yazılım" →
+  `kuzey-yazilim`. Noktalı/noktasız i açıkça ele alınıyor; invariant
+  küçültme "I" harfini yanlış eşler, kültüre duyarlı küçültme ise sonucu
+  sunucunun yereline bağlardı.
+- Son sahibin sahipliği bırakması engelleniyor: sahipsiz bir çalışma alanını
+  kimse yönetemezdi.
+- `ITenantOwned` işaretleyicisi, global query filter'a otomatik kayıt sağlıyor.
+
+Application:
+
+- `ITenantContext` ve `ICurrentUser` sözleşmeleri.
+- `WorkspaceAction` + `WorkspacePermissions`: izin matrisi tek bir tabloda.
+  Eşlenmemiş bir eylem reddediliyor; kapalı başarısız oluyor.
+- Use case'ler: Create, List, Get, Update, Delete.
+
+API:
+
+- `WorkspaceResolutionFilter` birincil izolasyon sınırı. Rotadaki slug'dan
+  tenant'a ve üyeliğe tek sorguyla gidiyor; ikisi de yoksa `404`.
+- Filtre uç nokta grubuna uygulanıyor, tek tek uç noktalara değil; böylece
+  ileride eklenecek bir uç nokta onu sessizce atlayamaz.
+- `TenantContext` istek başına bir kez, yalnızca çözümleme filtresi tarafından
+  dolduruluyor. Aşağı akıştaki her okuyucu çözümlenmiş bir bağlamı üyelik
+  kanıtı sayabiliyor.
+
+Frontend:
+
+- Çalışma alanı listesi, oluşturma ekranı, `/app/{slug}/dashboard` kabuğu ve
+  çalışma alanı seçici.
+- Adres önizlemesi render sırasında türetiliyor; effect ile state'e
+  aynalanmıyor.
+- Türkçe hata sınırı ve 404 sayfası eklendi.
+
+Testler: 135/135 geçiyor. Kiracı izolasyonu için yedi zorunlu senaryo, izin
+matrisi için tam kapsamlı tablo testi, `WorkspaceSlug` için Türkçe çevir yazım
+testleri ve rate limiting testleri dahil.
+
+Bu faz sırasında çözülen beş gerçek hata:
+
+1. Bulut senkronizasyonu (iCloud Drive) 37 adet " 2." ekli yinelenmiş dosya
+   üretmişti; `dotnet run` "birden fazla proje dosyası" hatası veriyordu.
+   Dosyalar silindi ve desen `.gitignore`'a eklendi.
+2. API enum'ları sayı olarak serileştiriyordu; arayüz rol etiketini
+   bulamayıp çöküyordu. Ada göre serileştirmeye geçildi (ADR-0023).
+3. `ListWorkspaces` sorgusunda `OrderBy` projeksiyondan sonra geliyordu; EF
+   sorguyu çeviremiyordu. Sıralama projeksiyondan öne alındı.
+4. Base UI menü etiketi grup bağlamı gerektiriyor; `DropdownMenuLabel` grup
+   dışında kullanıldığı için seçici açılırken çöküyordu.
+5. `not-found.tsx` bir Server Component olduğu hâlde Client Component'a
+   fonksiyon prop'u geçiriyordu; üretim derlemesi kırılıyordu. Bağlantı
+   `buttonVariants` ile biçimlendirildi.
 
 ### Faz 03 — Kimlik Doğrulama · Tamamlandı
 

@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `feat/authentication` |
+| Aktif dal | `feat/multi-tenancy` |
 | Son commit | Faz 01 commit'i ile güncellenecek |
 | Working tree | Faz 01 commit'i ile temizlenecek |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -28,14 +28,17 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 01 — Temel
 - Faz 02 — Tasarım Sistemi
 - Faz 03 — Kimlik Doğrulama
+- Faz 04 — Çok Kiracılılık
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 04 — Çok Kiracılılık** (henüz başlanmadı)
+**Faz 05 — Ekip ve Davetler** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 04 kapsamında henüz iş yapılmadı.
+Faz 05 kapsamında henüz iş yapılmadı. İzin matrisi altyapısı
+(`WorkspaceAction` + `WorkspacePermissions`) Faz 04'te kuruldu; bu fazda üye
+ve davet eylemleriyle genişletilecek.
 
 ### Devam Eden İş
 
@@ -43,35 +46,38 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 04'ün tamamı:
+Faz 05'in tamamı:
 
-- `Tenant` ve `Membership` domain varlıkları; `WorkspaceSlug` üretimi ve
-  benzersizliği
-- `POST /api/workspaces` (oluşturan Owner olur), `GET /api/workspaces`,
-  `GET/PATCH/DELETE /api/workspaces/{workspaceSlug}`
-- `TenantContext` çözümleme: rotadaki slug'dan tenant'a, her istekte üyelik
-  doğrulaması
-- EF Core global query filter (ikinci savunma hattı)
-- Frontend: çalışma alanı seçici, `/app/{workspaceSlug}/...` rotaları
-- **Kiracı izolasyonu güvenlik testleri** — bu fazın geçme şartı
+- `Invitation` domain varlığı: hash'li token, süre dolumu, tek kullanımlık
+  kabul
+- Üye listeleme, rol değiştirme, üyeyi çıkarma uç noktaları
+- Davet oluşturma, listeleme, iptal etme ve kabul etme
+- İzin matrisinin üye/davet eylemleriyle genişletilmesi
+- Frontend: Ekip ekranı, davet gönderme, davet kabul ekranı
+- Yetkilendirme testleri: her rol × her eylem
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/multi-tenancy` dalını aç. `FlowDesk.Domain/Tenancy/` altında `Tenant` ve
-`Membership` varlıklarını `docs/DATABASE.md` şemasına göre yaz. `Membership`
-üzerinde `(UserId, TenantId)` benzersiz olacak ve rol burada duracak; `User`
-üzerinde kalıcı `TenantId` **olmayacak** (ADR-0003).
+`feat/team-invitations` dalını aç. `FlowDesk.Domain/Tenancy/Invitation.cs`
+dosyasını `docs/DATABASE.md` şemasına göre yaz. Davet token'ı **ham olarak
+saklanmaz**, yalnızca hash'i; üretim ve hash'leme için mevcut
+`ISecureTokenGenerator` kullanılacak (Faz 03'te yazıldı, refresh token için
+aynı sözleşme).
 
-Ardından `IFlowDeskDbContext`'e `Tenants` ve `Memberships` ekle, EF
-yapılandırmalarını ve migration'ı üret.
+Domain invariantları: süresi dolmuş davet kabul edilemez, kabul edilmiş davet
+ikinci kez kabul edilemez, davet yalnızca davet edilen e-posta adresiyle
+eşleşen hesap tarafından kabul edilebilir.
 
-Önemli: kiracı izolasyonu üç savunma katmanıyla kurulacak ve sırası önemli —
-birincil hat her istekte üyelik doğrulaması, ikincisi global query filter,
-üçüncüsü yazma tarafı sahiplik kontrolü. Global query filter tek başına
-güvenlik sınırı sayılmaz; `IgnoreQueryFilters` ile atlanabilir. Ayrıntı
-`docs/SECURITY.md` bölüm 6.
+`WorkspaceAction` enum'una üye ve davet eylemleri eklenecek. Matris tek bir
+tabloda; `Every_defined_action_is_mapped` testi eksik eşlemeyi yakalar.
 
-Yabancı kiracı kaynağı için `404` dönülecek, `403` değil (ADR-0007).
+Davet kabul uç noktası çalışma alanı kapsamının **dışında** olacak
+(`POST /api/invitations/accept`): kabul eden kişi henüz üye değildir ve
+`WorkspaceResolutionFilter` isteği reddederdi. Bu sapma
+`docs/API_CONVENTIONS.md` içinde belgeli.
+
+Bu fazda e-posta gönderimi yok; davet bağlantısı arayüzden alınır. Mailpit
+Faz 12'de geliyor.
 
 ## Son Doğrulama Durumu
 
@@ -81,7 +87,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 51/51 başarılı (13 mimari + 12 domain + 26 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 135/135 başarılı |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -96,6 +102,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | Tarayıcıda uçtan uca akış (Faz 03) | Kayıt → yenileme → çıkış → hatalı giriş → giriş tamam |
 | `localStorage` / `sessionStorage` (Faz 03) | Boş — ADR-0006 doğrulandı |
 | Çerezler (Faz 03) | Yalnızca `flowdesk_refresh_token`; `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` |
+| Tarayıcıda çok kiracılı akış (Faz 04) | Yedi adımın tamamı geçti; izolasyon doğrulandı |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -121,6 +128,19 @@ Bilinen blocker yok.
 3. **Docker Compose ve `.env` konumu.** Compose, `.env` dosyasını compose
    dosyasının dizinine göre arar. Depo kökündeki `.env` için komutlarda
    `--env-file .env` verilmelidir.
+
+4. **Bulut senkronizasyonu çakışma kopyaları.** Depo iCloud Drive ile
+   senkronize edilen bir dizinde (`Desktop`). Senkronizasyon zaman zaman
+   `Program 2.cs` gibi kopyalar üretiyor ve `dotnet run` "birden fazla proje
+   dosyası" hatası veriyor. Desen `.gitignore`'a eklendi; hata görülürse:
+   ```bash
+   find . -name "* 2.*" -not -path "*/node_modules/*" -not -path "*/bin/*" \
+     -not -path "*/obj/*" -not -path "./.git/*" -not -path "*/.next/*" -delete
+   ```
+
+5. **Rate limiting ve elle doğrulama.** Kayıt limiti IP başına 10 dakikada 5.
+   Tarayıcıda arka arkaya doğrulama yaparken bu limit dolar ve kayıt `429`
+   döner. Limiter bellek içidir; API'yi yeniden başlatmak sayaçları sıfırlar.
 
 ## Önemli Mimari Kararlar
 
@@ -155,11 +175,28 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   sınır `IFlowDeskDbContext` ve mimari testle korunur (ADR-0021)
 - Kullanıcı hesabı Identity'ye aittir, Domain'de `User` varlığı yoktur;
   domain varlıkları kullanıcıya `Guid` ile referans verir (ADR-0022)
+- API'de enum'lar **ada göre** serileştirilir; .NET istemcileri
+  `FlowDeskJson.Options` kullanmalıdır (ADR-0023)
+- `ITenantOwned` işaretleyicisi global query filter'a otomatik kayıt sağlar;
+  `Membership` bilinçli istisnadır (ADR-0024)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 04'te eklenenler:
+
+- `backend/src/FlowDesk.Domain/Tenancy/` — `Tenant`, `Membership`,
+  `WorkspaceSlug`, `MembershipRole`, `ITenantOwned`
+- `backend/src/FlowDesk.Application/Tenancy/` — izin matrisi ve beş use case
+- `backend/src/FlowDesk.Api/Tenancy/` — `WorkspaceResolutionFilter`,
+  `TenantContext`, `CurrentUser`
+- `backend/src/FlowDesk.Infrastructure/Persistence/FlowDeskDbContext.cs` —
+  global query filter mekanizması
+- `backend/tests/.../Tenancy/` — izolasyon, query filter ve sözleşme testleri
+- `frontend/src/features/workspaces/` — liste, oluşturma, kabuk, seçici
+- `frontend/src/app/error.tsx`, `not-found.tsx` — Türkçe hata ekranları
 
 Faz 03'te eklenenler:
 
@@ -208,9 +245,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `20260916134921_InitialIdentityAndRefreshTokens` |
+| Son migration | `20260916141442_AddTenantsAndMemberships` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | `AspNetUsers`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserTokens`, `RefreshTokens` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
