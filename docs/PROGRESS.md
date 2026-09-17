@@ -21,7 +21,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 09 — Dashboard
 - [x] Faz 10 — RabbitMQ ve Worker
 - [x] Faz 11 — Outbox
-- [ ] Faz 12 — E-posta ve Bildirimler
+- [x] Faz 12 — E-posta ve Bildirimler
 - [ ] Faz 13 — Dosya Ekleri
 - [ ] Faz 14 — Denetim ve Etkinlik
 - [ ] Faz 15 — Redis Önbellek
@@ -36,13 +36,63 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 12 — E-posta ve Bildirimler**
+**Faz 13 — Dosya Ekleri**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 12 — E-posta ve Bildirimler · Tamamlandı
+
+Mailpit bu fazda Compose'a eklendi (ADR-0008). Sistemin ilk gerçek tüketicileri
+burada; Faz 10 ve 11 altyapıyı kurmuş, kuyrukları boş bırakmıştı.
+
+Üç mesaj, üç tüketici:
+
+- **Davet** → yalnızca e-posta. Alıcının henüz hesabı yok, uygulamada
+  gösterilecek yer yok ve ham token yalnızca bu e-postada taşınıyor.
+- **Atama** → uygulama içi bildirim **ve** e-posta. Atama bir devirdir ve gelen
+  kutusunu kesmeyi hak eder.
+- **Yorum** → yalnızca uygulama içi bildirim. Zaten üzerinde çalışılan bir
+  talebe gelen yorum kesinti hak etmiyor; yorum başına e-posta, insanlara
+  FlowDesk'i filtrelemeyi öğretirdi.
+
+**Tüketicide sıra bir karar** (ADR-0034). Bildirim satırı önce yazılıyor,
+e-posta en son gönderiliyor. Satır transaction'ın içinde, e-posta değil;
+gönderim başarısız olursa transaction geri dönüyor ve hiçbir şey gönderilmemiş
+oluyor. Tersi sırada, gönderimden sonraki bir hata yeniden teslimde ikinci bir
+e-posta demekti.
+
+Davet tüketicisi kabul edilmiş, iptal edilmiş veya süresi dolmuş bir davet için
+e-posta göndermiyor. Outbox geride kalabilir ve ölü bir bağlantı hiç
+göndermemekten kötü: alıcı tıklıyor, reddediliyor ve davetin gerçek olup
+olmadığını anlayamıyor.
+
+E-posta gövdelerindeki her insan kaynaklı değer kaçırılıyor; test bir talep
+konusuna `<script>` koyup çıktıda kaçırılmış olduğunu doğruluyor.
+
+Bildirim listesi her zaman çağıranın kendi bildirimleri. Alıcı koşulu çalışma
+alanı filtresinin yaptığı iş değil — meslektaşlar aynı alanı paylaşıyor — ve
+test bunu ayrıca doğruluyor: bir meslektaş başkasının bildirim kimliğini
+gönderdiğinde hiçbir şey değişmiyor.
+
+Arayüz: kenar çubuğunda bildirim kontrolü ve açılır panel. Üst bar yok, çünkü
+ürünün sayfaları tüm genişliği kendileri kullanıyor; bir üst bar eklemek günde
+birkaç kez kullanılan bir kontrol için her ekranı aşağı iterdi.
+
+**Testlerin yakaladığı iki tuzak:**
+
+1. `Guid.CreateVersion7()` zaman önekli. İlk sekiz karakterini benzersiz sanmak,
+   aynı milisaniyede oluşturulan iki fixture'ın slug'ının çakışmasına yol açtı.
+2. Bildirim ve talep atamasının `AspNetUsers`'a yabancı anahtarı var. Kimlik
+   uydurup satır yazmaya çalışan fixture kısıta takıldı — ve haklı olarak:
+   kısıt tam da kimseye ait olmayan bildirim yazılmasını engellemek için var.
+
+Testler: 421/421 (201 birim + 220 entegrasyon).
+
+---
 
 ### Faz 11 — Outbox · Tamamlandı
 
@@ -753,6 +803,19 @@ Faz 11 sonunda:
 | `dotnet ef migrations add AddOutbox` + `database update` | Uygulandı; `OutboxMessages` ve `ProcessedMessages` |
 | `dotnet run --project backend/src/FlowDesk.Worker` | Outbox işleyici başladı ve `FOR UPDATE SKIP LOCKED` sorgusunu gerçekten çalıştırdı |
 | Çalışan API'ye karşı 14 adımlık talep akışı | Tekrar koşuldu; yayınlayıcı değişimi ürün akışını bozmadı |
+
+Faz 12 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 421/421 başarılı (201 birim + 220 entegrasyon) |
+| `dotnet ef migrations add AddNotifications` + `database update` | Uygulandı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| `docker compose ... up -d` | `postgres`, `rabbitmq` ve `mailpit` healthy |
+| Worker | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
+| Mailpit üzerinden 8 adımlık uçtan uca akış | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
+| `/app/{slug}/...` render | HTTP 200, uygulama hatası yok |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda

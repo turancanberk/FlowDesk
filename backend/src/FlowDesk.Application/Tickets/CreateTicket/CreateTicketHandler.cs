@@ -17,15 +17,18 @@ namespace FlowDesk.Application.Tickets.CreateTicket;
 public sealed class CreateTicketHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
     public CreateTicketHandler(
         IFlowDeskDbContext dbContext,
+        IMessagePublisher publisher,
         ITenantContext tenantContext,
         IClock clock)
     {
         _dbContext = dbContext;
+        _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
     }
@@ -79,6 +82,25 @@ public sealed class CreateTicketHandler
                     _clock.UtcNow);
 
                 _dbContext.Tickets.Add(ticket);
+
+                // A ticket raised straight onto someone is an assignment like
+                // any other, and the person it lands on should hear about it.
+                if (command.AssignedUserId is { } assignedUserId)
+                {
+                    await _publisher.PublishAsync(
+                        new TicketAssigned(
+                            Guid.CreateVersion7(),
+                            tenantId,
+                            _clock.UtcNow,
+                            ticket.Id,
+                            ticket.Number,
+                            ticket.Subject,
+                            assignedUserId,
+                            _tenantContext.UserId,
+                            _tenantContext.Slug),
+                        token);
+                }
+
                 await _dbContext.SaveChangesAsync(token);
 
                 return ticket.Id;

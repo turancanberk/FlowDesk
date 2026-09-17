@@ -1000,3 +1000,79 @@ sonsuza dek başarısız olan bir outbox satırı üst sınıra kadar geri çeki
 orada kalıyor — `LastError` sütunuyla görünür hâlde. Otomatik bir çöp kutusu
 eklemek, henüz görülmemiş bir başarısızlık biçimine karşı politika yazmak
 olurdu.
+
+---
+
+## ADR-0034 — Bildirim politikası ve dışa dönük yan etkinin sırası
+
+**Bağlam.** ADR-0033 outbox'ın neyi korumadığını adlandırmıştı: veritabanı
+dışındaki etkiler geri alınamaz. Faz 12 bu sorunla gerçekten karşılaştı, çünkü
+ilk gerçek tüketiciler e-posta gönderiyor.
+
+Ayrıca hangi olayın hangi kanaldan duyurulacağına karar vermek gerekiyordu.
+
+**Karar.**
+
+1. Tüketicide **veritabanı yazması önce, e-posta gönderimi en son**.
+2. **Atama** hem uygulama içi bildirim hem e-posta üretir. **Yorum** yalnızca
+   uygulama içi bildirim üretir. **Davet** yalnızca e-posta üretir.
+3. Kendi eyleminin bildirimi üretilmez.
+4. Bildirim listesi her zaman çağıranın kendi bildirimleridir.
+5. E-posta gövdelerindeki her insan kaynaklı değer kaçırılır.
+
+**Gerekçe.**
+
+**Sıra.** Bildirim satırı transaction'ın içinde, e-posta değil. Gönderim
+başarısız olursa transaction geri dönüyor: hiçbir şey gönderilmemiş, hiçbir şey
+kaydedilmemiş oluyor ve mesaj yeniden teslim edilip baştan deneniyor. Tersi
+sırada, gönderimden sonraki herhangi bir hata transaction'ı geri alır, mesaj
+yeniden teslim edilir ve **ikinci bir e-posta** gider. Gönderimi son adım
+yapmak, geri alınamayan işi geri alınabilir olan her şeyin arkasına koyuyor.
+
+Bu kusursuz değil: gönderim başarılı olup hemen ardından süreç ölürse mesaj
+yeniden teslim edilir ve e-posta ikinci kez gider. Bu pencereyi kapatmak
+gönderimi ayrıca kaydetmeyi gerektirir, o da aynı sorunu bir adım öteye taşır.
+Kabul edilen ödünleşim: en fazla bir kopya fazla, hiç gitmemesindense.
+
+**Kanallar.** Atama bir devirdir — iş artık birinin üzerinde — ve gelen kutusunu
+kesmeyi hak eder. Zaten üzerinde çalışılan bir talebe gelen yorum etmez; yorum
+başına e-posta, insanlara FlowDesk'i filtrelemeyi öğretmenin en hızlı yolu
+olurdu ve o noktadan sonra atama e-postası da okunmaz. Davet e-postası
+zorunludur: alıcının henüz hesabı yok, uygulamada gösterilecek yer yok ve ham
+token yalnızca bu e-postada taşınıyor (ADR-0033).
+
+**Kendi eylemi.** Kimse kendi yaptığı şeyi kendisinden öğrenmemeli. Talebi
+kendine atayan ya da kendi talebine yorum yazan kişiye bildirim gitmiyor.
+
+**Kendi listesi.** Kimin akışının okunacağını söyleyen bir parametre yok, çünkü
+başkasının akışı diye bir şey yok — sahip için bile. Alıcı koşulu, çalışma alanı
+filtresinin yaptığı iş **değil**: meslektaşlar aynı alanı paylaşıyor ve filtre
+onları birbirinden ayırmıyor. Okundu işaretlemede de aynı koşul var; başkasının
+bildirim kimliğini göndermek hiçbir şeyi değiştirmiyor.
+
+**Kaçırma.** Talep konusu, yorum ve görünen ad insanlar tarafından yazılıyor.
+Kaçırılmamış bir konu, onu yazan kişinin bir meslektaşın gelen kutusuna HTML
+yazmasına izin verirdi. Düz metin gövdesi kaçırılmıyor, çünkü düz metin biçim
+değil — orada kaçırmak okuyucuya ampersan yerine `&amp;` gösterirdi.
+
+**Sonuçlar.**
+
+E-posta gövdeleri şablon motoru olmadan, dizgi olarak üretiliyor. Üç mesaj var,
+tek düzeni paylaşıyorlar ve bir şablon motoru bu boyutta paket, dosya biçimi ve
+mantığın saklanacağı bir yer eklemekten başka bir şey getirmezdi. Sayı bir
+dosyaya sığmayacak kadar artarsa bu ödünleşim değişir.
+
+Yalnızca satır içi stil kullanılıyor. Posta istemcileri stil sayfalarını
+kaldırıyor ve çoğu `<style>` bloğunu yok sayıyor; elemanın üzerine yazılmamış
+her şey okuyucunun hiç görmeyebileceği bir öneri.
+
+Bildirim akışı sayfalanmıyor ve yoklanarak (polling) tazeleniyor. Akış üstten
+okunup birkaç satır sonra bırakılıyor; eski bildirimlerde sayfa çevirmek
+kimsenin yaptığı bir şey değil. Rozet için bir dakikalık gecikme, WebSocket ve
+beraberindeki bağlantı yönetimine değmiyor (`docs/ROADMAP.md`).
+
+Bildirim `payload`'ı sunucuda yorumlanmıyor, olduğu gibi geçiriliyor. Bir
+bildirimin nasıl göründüğü sunum kararı; burada ayrıştırmak, bir metin satırı
+her değiştiğinde sunucu değişikliği demekti. İstemci tanımadığı bir tipi ya da
+eşleşmeyen bir payload'ı **atlıyor** — tahmin etmek, birinin önüne yarım
+render edilmiş bir satır koymak olurdu.

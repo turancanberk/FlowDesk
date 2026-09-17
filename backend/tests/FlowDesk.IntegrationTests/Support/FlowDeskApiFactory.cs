@@ -68,6 +68,19 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
                 ["Messaging:ExchangeName"] = $"flowdesk.tests.{Guid.CreateVersion7():N}",
                 ["Messaging:PublishTimeoutSeconds"] = "5",
 
+                /*
+                  The API never sends mail — the worker does — but the options
+                  are validated at startup, so the host needs values. Port 1 is
+                  deliberate: if a test ever did send, it would fail loudly
+                  rather than quietly reaching a mail server on this machine.
+                */
+                ["Email:Host"] = "127.0.0.1",
+                ["Email:Port"] = "1",
+                ["Email:UseStartTls"] = "false",
+                ["Email:FromAddress"] = "tests@flowdesk.invalid",
+                ["Email:FromDisplayName"] = "FlowDesk Tests",
+                ["Email:WebBaseUrl"] = "http://localhost:3000",
+
                 ["Auth:SigningKey"] = TestSigningKey,
                 ["Auth:Issuer"] = "flowdesk-api-tests",
                 ["Auth:Audience"] = "flowdesk-web-tests",
