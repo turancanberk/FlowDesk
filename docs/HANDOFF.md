@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 12 birleştirildi) |
-| Son commit | `07b583f — Merge branch 'feat/outbox'` (Faz 11) |
+| Son commit | `dc17aa0 — Merge branch 'feat/notifications'` (Faz 12) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
