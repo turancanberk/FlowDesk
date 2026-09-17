@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 12 birleştirildi) |
+| Aktif dal | `main` (Faz 13 birleştirildi) |
 | Son commit | `dc17aa0 — Merge branch 'feat/notifications'` (Faz 12) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -37,14 +37,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 10 — RabbitMQ ve Worker
 - Faz 11 — Outbox
 - Faz 12 — E-posta ve Bildirimler
+- Faz 13 — Dosya Ekleri
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 13 — Dosya Ekleri** (henüz başlanmadı)
+**Faz 14 — Denetim ve Etkinlik** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 13 kapsamında henüz iş yapılmadı.
+Faz 14 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -52,43 +53,40 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 13'ün tamamı:
+Faz 14'ün tamamı:
 
-- Azurite **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
-- `IFileStorage` soyutlaması ve Blob uygulaması
-- Güvenli yükleme: boyut limiti, içerik tipi doğrulama, dosya adı temizleme,
-  kiracı sahipliği kontrolü, sunucuda üretilen depolama anahtarı
-- İndirme yetkilendirmesi ve kiracı izolasyon testleri
+- `ActivityEvent` modeli ve migration (`docs/DATABASE.md` şeması hazır)
+- Önemli eylemlerin kaydı
+- `GET /api/workspaces/{slug}/activity` uç noktası
+- Türkçe etkinlik akışı arayüzü
+- Hassas veri sızdırmayan bağlam
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/attachments` dalını aç. Önce `infra/docker-compose.yml`'a Azurite'i ekle
-(blob 10000, queue 10001, table 10002) ve `.env.example`'a karşılık gelen
-değişkenleri yaz — **gerçek kimlik bilgisi değil**, örnek değer. Azurite'in iyi
-bilinen geliştirme hesabı anahtarı herkese açıktır ve yalnızca yerelde
-geçerlidir; yine de örnek dosyaya yazılırken bunun bir geliştirme anahtarı
-olduğu açıkça belirtilmeli.
+`feat/activity` dalını aç. `FlowDesk.Domain/Activity/ActivityEvent.cs` varlığını
+`docs/DATABASE.md` şemasına göre yaz, `ITenantOwned` uygula, EF
+yapılandırmasını ver ve migration üret.
 
-Ardından `FlowDesk.Application/Abstractions/IFileStorage.cs` sözleşmesini yaz ve
-`FlowDesk.Infrastructure/Storage/` altında Blob uygulamasını ver.
-`Azure.Storage.Blobs` paketi henüz `Directory.Packages.props` içinde **yok**;
-sürümünü kurulum anında resmî registry'den doğrula (ADR-0016).
+Bu faz **yeni altyapı eklemiyor**. Redis Faz 15'e, gözlemlenebilirlik Faz 18'e
+ait (ADR-0008).
 
 Dikkat edilecekler:
 
-- **Depolama anahtarı sunucuda üretilir.** İstemciden gelen dosya adı asla yol
-  olarak kullanılmaz: `../` içeren bir ad başka bir kiracının alanına yazardı.
-  Anahtar `TenantId` içermeli, böylece yanlışlıkla çapraz erişim bile yol
-  düzeyinde ayrılmış olur (`docs/DATABASE.md`, Attachment şeması).
-- **İçerik tipi beyaz listeyle doğrulanır**, kara listeyle değil. Kara liste
-  her yeni tehlikeli tip için güncellenmek zorundadır ve biri her zaman atlanır.
-- **İndirme de yetkilendirilir.** Dosyanın kendisi kiracıya ait; bağlantıyı
-  bilen herkesin indirebilmesi izolasyonu deler. Testler bunu ayrıca
-  doğrulamalı.
-- **Boyut limiti hem uygulamada hem sunucuda.** ASP.NET Core'un varsayılan
-  istek gövdesi limiti ayrı bir ayar; yalnızca uygulama tarafında kontrol
-  etmek, limitin üstündeki isteğin okunmadan reddedilmesini sağlamaz.
-- Mevcut `TestWorkspace` fixture'ı ve `TicketTestClient` deseni izlenebilir.
+- **Kaydın nerede yazılacağı bir karar.** İki seçenek var: use case içinde
+  doğrudan (aynı transaction, senkron) ya da mevcut outbox üzerinden tüketiciyle
+  (asenkron). Denetim kaydının iş değişikliğiyle **birlikte** commit edilmesi
+  gerekiyorsa birincisi; kaydın kaybolması kabul edilebilir değilse yine
+  birincisi. Seçim ADR'ye gerekçesiyle yazılmalı.
+- **Hassas veri sızdırmama zorunluluğu.** `Payload` içine parola, token, e-posta
+  gövdesi veya davet token'ı girmemeli. Faz 12'de `MemberInvited` mesajı token
+  taşıyor; etkinlik kaydı **taşımamalı**.
+- **Kiracı kapsamı.** `ActivityEvent` `ITenantOwned` olmalı ve global query
+  filter'a kendiliğinden kaydolmalı (ADR-0024).
+- **Etkinlik akışı dashboard'da yer tutmuyor.** Faz 09 bilinçli olarak "son
+  hareket eden talepler" ve "yaklaşan görevler" gösteriyor; etkinlik akışı
+  eklendiğinde dashboard'un değişip değişmeyeceği ayrı bir karar (ADR-0031).
+- Aktör silinmiş olabilir: şema `ActorUserId`'yi nullable tutuyor (sistem
+  olayları için). Görünen ad tüketici/okuyucu tarafında çözülmeli.
 
 ## Son Doğrulama Durumu
 
@@ -98,7 +96,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 421/421 başarılı (201 birim + 220 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 458/458 başarılı (225 birim + 233 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -132,6 +130,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `docker compose ... up -d` (Faz 12) | `postgres`, `rabbitmq` ve `mailpit` healthy |
 | Worker (Faz 12) | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
 | Mailpit üzerinden 8 adımlık akış (Faz 12) | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
+| 13 adımlık dosya akışı (Faz 13) | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -180,7 +179,15 @@ Bilinen blocker yok.
    dotnet test backend/FlowDesk.slnx 2>&1 | tee /tmp/flowdesk-test.log
    ```
 
-7. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
+7. **Docker VM'in durması.** Bir kez tüm projelerin konteynerleri aynı anda
+   çıktı (RabbitMQ 137, diğerleri 0) ve Testcontainers tabanlı testler
+   başlayamadı. Belirtisi, konteyner başlatma hatası veren ve kodla ilgisi
+   olmayan toplu başarısızlık. Çözüm:
+   ```bash
+   docker compose -f infra/docker-compose.yml --env-file .env up -d
+   ```
+
+8. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
    için `waitUntil: "networkidle"` hiç sonuçlanmayabilir. Elle doğrulama
    betiklerinde `domcontentloaded` + açık seçici beklemesi kullanın.
 
@@ -244,11 +251,31 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Tüketicide veritabanı yazması **önce**, e-posta gönderimi **en son**; atama
   e-posta üretir, yorum üretmez; bildirim listesi her zaman çağıranın kendi
   bildirimleridir (ADR-0034)
+- Depolama anahtarı sunucuda üretilir ve yüklenen adı içermez; içerik tipi
+  beyaz listeyle doğrulanır (SVG hariç); her indirme API'den geçer, imzalı
+  bağlantı verilmez (ADR-0035)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 13'te eklenenler:
+
+- `infra/docker-compose.yml` — `azurite` servisi ve `azurite-data` volume
+- `.env.example` — `Storage__*` değişkenleri
+- `backend/src/FlowDesk.Application/Abstractions/IFileStorage.cs`
+- `backend/src/FlowDesk.Application/Tickets/AttachmentRules.cs` — beyaz liste,
+  ad temizleme, anahtar üretimi
+- `backend/src/FlowDesk.Application/Tickets/{Upload,Download,List,Delete}Attachment/`
+- `backend/src/FlowDesk.Domain/Tickets/Attachment.cs`
+- `backend/src/FlowDesk.Infrastructure/Storage/` — `StorageOptions`,
+  `BlobFileStorage`, `AttachmentLimits`
+- `backend/tests/.../Support/AzuriteContainerFixture.cs`
+- `backend/tests/.../Attachments/AttachmentTests.cs`,
+  `backend/tests/FlowDesk.UnitTests/Tickets/AttachmentRulesTests.cs`
+- `frontend/src/lib/api/http-client.ts` — çok parçalı gövde ve `apiDownload`
+- `frontend/src/features/tickets/ticket-attachments.tsx`
 
 Faz 12'de eklenenler:
 
@@ -419,9 +446,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddNotifications` |
+| Son migration | `AddAttachments` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
@@ -436,7 +463,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 | PostgreSQL | **Aktif** — `flowdesk-postgres`, host portu 5433 |
 | RabbitMQ | **Aktif** — `flowdesk-rabbitmq`, host portları 5672 / 15672 (yönetim arayüzü) |
 | Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025 |
-| Azurite | Henüz projeye eklenmedi (Faz 13) |
+| Azurite | **Aktif** — `flowdesk-azurite`, blob 10000 (yalnızca blob servisi) |
 | Redis | Henüz projeye eklenmedi (Faz 15) |
 | Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |
 

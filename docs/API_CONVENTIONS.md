@@ -55,7 +55,9 @@ POST   /api/workspaces/{workspaceSlug}/tickets/{id}/assignment
 POST   /api/workspaces/{workspaceSlug}/tickets/{id}/comments
 GET    /api/workspaces/{workspaceSlug}/tickets/{id}/comments
 POST   /api/workspaces/{workspaceSlug}/tickets/{id}/attachments
+GET    /api/workspaces/{workspaceSlug}/tickets/{id}/attachments
 GET    /api/workspaces/{workspaceSlug}/tickets/{id}/attachments/{attachmentId}
+DELETE /api/workspaces/{workspaceSlug}/tickets/{id}/attachments/{attachmentId}
 
 GET    /api/workspaces/{workspaceSlug}/tasks
 POST   /api/workspaces/{workspaceSlug}/tasks
@@ -93,6 +95,11 @@ GET    /health/ready     # zorunlu bağımlılıklar hazır mı
   anlam ancak kendi rotasında net ifade edilebilir. `PATCH /tickets/{id}` geriye
   kalan alan düzenlemesini (konu, açıklama, öncelik, müşteri) yapar ve
   `version` alanını zorunlu tutar.
+- **`POST /tickets/{id}/attachments`** `multipart/form-data` alır, JSON değil —
+  taşınan şey bir dosya. İndirme uç noktası da JSON değil dosya döner ve her
+  zaman `Content-Disposition: attachment` kullanır; imzalı depolama bağlantısı
+  verilmez, çünkü bu kiracı izolasyonunu adresi bilen herkesin eline bırakırdı
+  (ADR-0035).
 - **`POST /notifications/read`** tek bir bildirimi değil, bir kümeyi okundu
   işaretler. Paneli açmak birden fazla satırı aynı anda okunur yapıyor ve satır
   başına bir istek, kimsenin izlemediği bir şey için yazma yığını üretirdi. Boş

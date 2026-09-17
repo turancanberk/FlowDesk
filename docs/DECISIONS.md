@@ -1076,3 +1076,82 @@ bildirimin nasıl göründüğü sunum kararı; burada ayrıştırmak, bir metin
 her değiştiğinde sunucu değişikliği demekti. İstemci tanımadığı bir tipi ya da
 eşleşmeyen bir payload'ı **atlıyor** — tahmin etmek, birinin önüne yarım
 render edilmiş bir satır koymak olurdu.
+
+---
+
+## ADR-0035 — Dosya eki güvenliği: anahtar, tip, erişim ve sıra
+
+**Bağlam.** Dosya yükleme, üründe kullanıcıdan gelen veriye en çok güvenmek
+zorunda kalınan yer. Dört ayrı karar gerekiyordu: baytlar nereye yazılır, ne
+yüklenebilir, kim indirebilir, hangi sırayla yazılır.
+
+**Karar.**
+
+1. **Depolama anahtarı sunucuda üretilir** ve `{TenantId}/{TicketId}/{AttachmentId}`
+   biçimindedir. Yüklenen ad anahtara hiç katılmaz.
+2. **İçerik tipi beyaz listeyle** doğrulanır. SVG listede yoktur.
+3. **Her indirme API'den geçer.** Konteyner özeldir; imzalı bağlantı (SAS)
+   verilmez.
+4. **Baytlar önce, satır sonra** yazılır. Silmede tersi: satır önce, baytlar
+   sonra.
+
+**Gerekçe.**
+
+**Anahtar.** Yüklenen ad yola girerse `../` içeren bir ad başka bir kiracının
+ön ekine yazar. Adı "temizleyip" kullanmak da yetmez; temizleme her zaman bir
+kodlama biçimiyle atlatılabilir. Adın anahtara hiç katılmaması bu sınıfın
+tamamını ortadan kaldırıyor. Çalışma alanı kimliğinin başta olması ayrıca
+yetkilendirme katmanındaki bir hatanın bile iki kuruluşun dosyalarını aynı yere
+koymamasını sağlıyor.
+
+Ad yine de saklanıyor, çünkü insanlara gösterilmesi ve indirme başlığına
+yazılması gerekiyor — ve orada da temizleniyor: yalnızca son segment alınıyor,
+kontrol karakterleri değiştiriliyor, baştaki nokta düşürülüyor. Yol yeniden
+yazılmıyor, **atılıyor**; yolu düzeltmeye çalışmak traversal hatalarının hayatta
+kalma biçimi.
+
+**Beyaz liste.** Kara liste her yeni tehlikeli tip için güncellenmek zorundadır
+ve biri her zaman atlanır. Beyaz liste kapalı başarısız oluyor; bir tipi
+bilinçli eklemenin maliyeti tek satır.
+
+**SVG** özellikle dışarıda. Adı görsel, gerçekte betik taşıyabilen bir belge.
+Kendi origin'imizden sunulması, yükleyen kişinin açan kişinin oturumunda kod
+çalıştırması demekti. Aynı sebeple indirme her zaman `Content-Disposition:
+attachment`; tarayıcının kararına bırakılan hiçbir şey yok.
+
+**Erişim.** İmzalı bağlantı (SAS) vermek, kiracı izolasyonunu adresi bilen
+herkesin eline bırakırdı — ve bir bağlantı paylaşılabilir, kaydedilebilir,
+sızabilir. Her indirmenin API'den geçmesi, üyelik kontrolünün sunulan her bayt
+için çalışması demek. Maliyeti, dosya trafiğinin API üzerinden akması; bu
+ürünün dosya boyutlarında bu bir sorun değil ve ölçüldüğünde yeniden
+değerlendirilebilir.
+
+**Sıra.** Yüklemede baytlar önce yazılıyor: depolama yazması başarısız olursa
+hiçbir kayıt olmuyor. Tersi sırada, içeriği olmayan bir kayıt ve her denemede
+başarısız olan bir indirme kalırdı. Bunun bedeli, yükleme ile commit arasındaki
+bir hatanın kimsenin referans vermediği baytlar bırakması — bu daha iyi sızıntı:
+boşa giden alan ucuza bulunup temizlenir, bozuk bir indirme müşteriye görünür.
+
+Silmede sıra tersine dönüyor: satır önce. Depolama silmesi başarısız olursa
+kayıt zaten gitmiştir ve dosya erişilemez — istenen sonuç budur; geriye kalan
+yer israfı, görünen bir dosya değil.
+
+**Sonuçlar.**
+
+Yükleme sınırı iki yerde: uygulamada ve istek gövdesinde. Yalnızca uygulamada
+kontrol etmek, limitin üstündeki isteğin tamamen okunup sonra reddedilmesi
+demekti. Gövde sınırı ürünün sınırının biraz üstünde tutuluyor, böylece tam
+sınırdaki bir dosya ürünün hata mesajıyla karşılaşıyor, sunucunun bağlantı
+kesmesiyle değil.
+
+Talep silindiğinde ek satırları cascade ile gidiyor ama **baytlar gitmiyor**:
+veritabanındaki hiçbir şey nesne depolamasına ulaşamaz. Anahtarlar önce
+okunuyor, blob'lar sonra siliniyor. Test bunu ayrıca doğruluyor.
+
+Ek, yalnızca ait olduğu talebin altından erişilebilir. Aynı çalışma alanındaki
+başka bir talebin altından istenmesi `404` dönüyor — kiracı sızıntısı değil, ama
+döndürdüğü şey hakkında yalan söyleyen bir rota.
+
+Virüs taraması **yok**. Gerçek bir ürün için gerekli olurdu; burada kapsam dışı
+ve `docs/ROADMAP.md` içinde belirtiliyor. Eksikliğin bilinerek bırakıldığını
+yazmak, unutulmuş gibi görünmesinden iyi.

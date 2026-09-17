@@ -22,7 +22,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 10 — RabbitMQ ve Worker
 - [x] Faz 11 — Outbox
 - [x] Faz 12 — E-posta ve Bildirimler
-- [ ] Faz 13 — Dosya Ekleri
+- [x] Faz 13 — Dosya Ekleri
 - [ ] Faz 14 — Denetim ve Etkinlik
 - [ ] Faz 15 — Redis Önbellek
 - [ ] Faz 16 — Gelişmiş Entegrasyon Testleri
@@ -36,13 +36,56 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 13 — Dosya Ekleri**
+**Faz 14 — Denetim ve Etkinlik**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 13 — Dosya Ekleri · Tamamlandı
+
+Azurite bu fazda Compose'a eklendi (ADR-0008); yalnızca blob servisi açılıyor,
+kuyruk ve tablo bu üründe kullanılmıyor.
+
+Dört güvenlik kararı ADR-0035'te:
+
+- **Depolama anahtarı sunucuda üretiliyor** ve çalışma alanı kimliğiyle
+  başlıyor. Yüklenen ad anahtara hiç katılmıyor — temizlenmiş bir hâli bile
+  yola saldırgan etkisindeki metin koymak olurdu. Ad yalnızca gösterim için
+  saklanıyor ve orada da son segmente indiriliyor.
+- **İçerik tipi beyaz listeyle** doğrulanıyor. SVG bilinçli olarak dışarıda:
+  adı görsel, içinde betik taşıyabilen bir belge.
+- **Her indirme API'den geçiyor.** Konteyner özel, imzalı bağlantı verilmiyor;
+  adresi bilmek asla yeterli değil.
+- **Yükleme sırası** baytlar önce, satır sonra; silme sırası tersi. Gerekçe
+  ADR'de.
+
+Yükleme sınırı iki yerde: uygulamada ve istek gövdesinde. Yalnızca uygulamada
+kontrol etmek, limitin üstündeki isteğin tamamen okunup sonra reddedilmesi
+demekti.
+
+Talep silindiğinde ek satırları cascade ile gidiyor ama baytlar gitmiyor —
+veritabanındaki hiçbir şey nesne depolamasına ulaşamaz. Anahtarlar önce
+okunuyor, blob'lar sonra siliniyor; test bunu ayrıca doğruluyor.
+
+Arayüz: talep detayında dosya bölümü. İndirme `fetch` ile yapılıp nesne URL'i
+üzerinden tarayıcıya veriliyor, çünkü düz bir bağlantı token taşımaz ve
+reddedilirdi.
+
+**Bu faz sırasında karşılaşılan iki durum:**
+
+1. **Docker VM durmuş.** Tüm projelerin konteynerleri aynı anda çıkmıştı; testler
+   Azurite'i başlatamadı. Yığın yeniden kaldırıldı.
+2. **Azurite Testcontainers komutu eksikti.** `-l /data` verilmeyince konteyner
+   durum 0 ile hemen çıkıyor — temiz kapanış gibi görünen bir başarısızlık.
+   Bekleme stratejisi de portu değil, servisin yazdığı satırı bekleyecek şekilde
+   düzeltildi.
+
+Testler: 458/458 (225 birim + 233 entegrasyon).
+
+---
 
 ### Faz 12 — E-posta ve Bildirimler · Tamamlandı
 
@@ -816,6 +859,17 @@ Faz 12 sonunda:
 | Worker | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
 | Mailpit üzerinden 8 adımlık uçtan uca akış | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
 | `/app/{slug}/...` render | HTTP 200, uygulama hatası yok |
+
+Faz 13 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 458/458 başarılı (225 birim + 233 entegrasyon) |
+| `dotnet ef migrations add AddAttachments` + `database update` | Uygulandı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| `docker compose ... up -d` | Dört servis de healthy |
+| Çalışan API'ye karşı 13 adımlık dosya akışı | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
