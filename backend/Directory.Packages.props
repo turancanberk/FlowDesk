@@ -31,6 +31,15 @@
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
   </ItemGroup>
 
+  <!--
+    RabbitMQ.Client 7.x tamamen async bir API'dir; 6.x için yazılmış örnekler
+    derlenmez. Sürüm kurulum anında resmî NuGet registry'sinden doğrulandı
+    (ADR-0016).
+  -->
+  <ItemGroup Label="Mesajlaşma">
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
+  </ItemGroup>
+
   <ItemGroup Label="Doğrulama">
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
@@ -63,6 +72,7 @@
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.15.0" />
   </ItemGroup>
 
 </Project>

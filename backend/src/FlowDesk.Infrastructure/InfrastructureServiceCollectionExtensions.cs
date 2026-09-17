@@ -2,6 +2,7 @@ using FlowDesk.Application.Abstractions;
 using FlowDesk.Application.Authentication;
 using FlowDesk.Infrastructure.Authentication;
 using FlowDesk.Infrastructure.HealthChecks;
+using FlowDesk.Infrastructure.Messaging;
 using FlowDesk.Infrastructure.Identity;
 using FlowDesk.Infrastructure.Persistence;
 using FlowDesk.Infrastructure.Time;
@@ -25,6 +26,8 @@ public static class InfrastructureServiceCollectionExtensions
     /// <summary>Name of the PostgreSQL readiness health check.</summary>
     public const string PostgresHealthCheckName = "postgres";
 
+    public const string RabbitMqHealthCheckName = "rabbitmq";
+
     /// <summary>Tag applied to checks that must pass before traffic is accepted.</summary>
     public const string ReadinessTag = "ready";
 
@@ -40,6 +43,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddFlowDeskPersistence(configuration);
         services.AddFlowDeskIdentity();
         services.AddFlowDeskAuthentication(configuration);
+        services.AddFlowDeskMessaging(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
 
         return services;
@@ -160,12 +164,45 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 
+    private static IServiceCollection AddFlowDeskMessaging(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<MessagingOptions>()
+            .Bind(configuration.GetSection(MessagingOptions.SectionName))
+            .ValidateDataAnnotations()
+            // Fail at startup rather than on the first publish: missing broker
+            // credentials are a deployment error, not a runtime condition.
+            .ValidateOnStart();
+
+        /*
+          One connection for the process, opened lazily on first use. Opening it
+          at startup would mean the API refuses to boot when the broker is down,
+          and the API serves every read and most writes without it.
+        */
+        services.AddSingleton<RabbitMqConnection>();
+        services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
+
+        return services;
+    }
+
     private static IServiceCollection AddFlowDeskInfrastructureHealthChecks(this IServiceCollection services)
     {
         services.AddHealthChecks()
             .AddCheck<PostgresHealthCheck>(
                 PostgresHealthCheckName,
                 failureStatus: HealthStatus.Unhealthy,
+                tags: [ReadinessTag])
+            /*
+              Degraded, not unhealthy. The API works without the broker; only the
+              messages that would have followed are delayed. Failing readiness
+              here would take every healthy instance out of rotation at once over
+              a dependency none of them needs to answer a request.
+            */
+            .AddCheck<RabbitMqHealthCheck>(
+                RabbitMqHealthCheckName,
+                failureStatus: HealthStatus.Degraded,
                 tags: [ReadinessTag]);
 
         return services;
