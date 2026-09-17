@@ -13,6 +13,13 @@ builder.Services.AddFlowDeskInfrastructure(builder.Configuration);
 builder.Services.AddFlowDeskMessageConsumers();
 
 /*
+  Drains the outbox into the broker. Use cases queue messages by writing a row
+  in their own transaction; nothing reaches RabbitMQ until this runs
+  (ADR-0033).
+*/
+builder.Services.AddFlowDeskOutboxProcessor(builder.Configuration);
+
+/*
   Consumer registrations go here as the features that need them arrive:
 
       builder.Services.AddMessageConsumer<TicketAssigned, SendAssignmentEmail>(

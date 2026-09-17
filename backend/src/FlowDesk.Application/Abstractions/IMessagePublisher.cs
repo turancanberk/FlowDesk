@@ -1,27 +1,41 @@
 namespace FlowDesk.Application.Abstractions;
 
 /// <summary>
-/// Publishes an integration message for something that has already happened.
+/// Queues an integration message for something that has already happened.
 /// </summary>
 /// <remarks>
 /// The application states that a fact should leave the process; which broker
 /// carries it, and how, is infrastructure's business (ADR-0001).
 ///
-/// Publishing is not transactional with the database. A message sent from
-/// inside a transaction that later rolls back describes something that never
-/// happened, and one sent after a commit can be lost if the process dies in
-/// between. Faz 11 closes that gap with an outbox; until then callers publish
-/// after committing and accept that a crash in the window loses the message.
+/// <para>
+/// <b>This does not reach the broker.</b> It records the message alongside the
+/// change that caused it, in the same transaction, and a background processor
+/// hands it on afterwards. Talking to the broker here could not be made atomic
+/// with the commit: a message sent from inside a transaction that later rolls
+/// back describes something that never happened, and one sent after the commit
+/// is lost if the process dies in between (ADR-0033).
+/// </para>
+///
+/// <para>
+/// The caller therefore has to save. Nothing is queued until its own
+/// <c>SaveChangesAsync</c> runs, which is exactly the guarantee: the message
+/// and the change land together or neither does.
+/// </para>
 /// </remarks>
 public interface IMessagePublisher
 {
     /// <summary>
-    /// Sends <paramref name="message"/> under its own routing key.
+    /// Queues <paramref name="message"/> under its own routing key.
     /// </summary>
     /// <param name="message">
     /// Serialised as JSON. Its <see cref="IntegrationMessage.MessageId"/> is
     /// what lets a consumer recognise a redelivery.
     /// </param>
+    /// <remarks>
+    /// Synchronous by nature — it adds a row to the current unit of work and
+    /// nothing else — but declared async so an implementation that needs to
+    /// await is not shut out.
+    /// </remarks>
     Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken)
         where TMessage : IntegrationMessage;
 }

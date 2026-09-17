@@ -1,4 +1,5 @@
 using FlowDesk.Application.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FlowDesk.Infrastructure.Messaging;
@@ -19,6 +20,34 @@ public static class MessagingServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddHostedService<MessageConsumerService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Drains the outbox into the broker.
+    /// </summary>
+    /// <remarks>
+    /// The worker's job, not the API's. Both draining the same table would work
+    /// — <c>SKIP LOCKED</c> keeps them off each other's rows — but it would put
+    /// broker latency inside request-handling processes for no gain
+    /// (ADR-0033).
+    /// </remarks>
+    public static IServiceCollection AddFlowDeskOutboxProcessor(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services
+            .AddOptions<OutboxOptions>()
+            .Bind(configuration.GetSection(OutboxOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<OutboxDrain>();
+        services.AddHostedService<OutboxProcessor>();
 
         return services;
     }

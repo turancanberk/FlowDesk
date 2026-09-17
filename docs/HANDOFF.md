@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 10 birleştirildi) |
+| Aktif dal | `main` (Faz 11 birleştirildi) |
 | Son commit | `7007e6c — Merge branch 'feat/messaging'` (Faz 10) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -35,14 +35,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 08 — Görevler
 - Faz 09 — Dashboard
 - Faz 10 — RabbitMQ ve Worker
+- Faz 11 — Outbox
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 11 — Outbox** (henüz başlanmadı)
+**Faz 12 — E-posta ve Bildirimler** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 11 kapsamında henüz iş yapılmadı.
+Faz 12 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -50,44 +51,44 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 11'in tamamı:
+Faz 12'nin tamamı:
 
-- `OutboxMessage` tablosu ve migration
-- İş değişikliğiyle **aynı transaction** içinde kayıt
-- `FOR UPDATE SKIP LOCKED` tabanlı yayınlayıcı (Worker'da barındırılan)
-- Yeniden deneme sayacı ve hata görünürlüğü
-- Tüketici tarafında `ProcessedMessage` tablosu (mesaj kimliği birincil anahtar)
-- Gerçek PostgreSQL ve gerçek RabbitMQ üzerinde testler
+- Mailpit **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
+- `IEmailSender` soyutlaması ve MailKit tabanlı uygulaması
+- Davet e-postası ve talep atama bildirimi — ilk gerçek tüketiciler
+- `Notification` tablosu ve uygulama içi bildirim arayüzü
+- Mailpit üzerinden uçtan uca doğrulama
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/outbox` dalını aç. `FlowDesk.Domain/Messaging/OutboxMessage.cs` varlığını
-`docs/DATABASE.md` şemasına göre yaz, EF yapılandırmasını ver ve migration
-üret.
+`feat/notifications` dalını aç. Önce `infra/docker-compose.yml`'a Mailpit'i
+ekle (SMTP 1025, arayüz 8025) ve `.env.example`'a karşılık gelen değişkenleri
+yaz — **gerçek kimlik bilgisi değil**, örnek değer.
 
-Bu fazın çözdüğü somut boşluk `ADR-0032`'nin sonunda yazılı: yayınlama
-veritabanı transaction'ıyla atomik değil. Geri alınan bir transaction'ın
-içinden gönderilen mesaj hiç olmamış bir şeyi anlatır; commit sonrası
-gönderilen ise süreç arada ölürse kaybolur.
+Ardından `FlowDesk.Application/Abstractions/IEmailSender.cs` sözleşmesini yaz
+ve `FlowDesk.Infrastructure/Email/` altında MailKit uygulamasını ver.
+`MailKit` paketi henüz `Directory.Packages.props` içinde **yok**; sürümünü
+kurulum anında resmî registry'den doğrula (ADR-0016).
 
 Dikkat edilecekler:
 
-- **Kayıt iş değişikliğiyle aynı transaction'da olmalı.** `FlowDeskDbContext`
-  zaten `ExecuteInTransactionAsync` sunuyor; talep oluşturma bunu kullanıyor ve
-  örnek alınabilir.
-- **`FOR UPDATE SKIP LOCKED`.** Aynı desen `TakeNextTicketNumberAsync` içinde
-  var (satır kilidi + ham SQL). Faz 07'de bu yöntemin bir tuzağı ortaya çıktı:
-  `FOR UPDATE` yalnızca **var olan** satırı kilitler. Outbox'ta satır zaten
-  insert edilmiş olacağı için aynı sorun yok, ama kilitlenen satır kümesinin
-  boş olabileceği unutulmamalı.
-- **Idempotency tüketici tarafında.** `ProcessedMessage` tablosunun birincil
-  anahtarı mesaj kimliği olacak; teslimat en az bir kez ve aynı mesaj iki kez
-  gelebilir (ADR-0032).
-- **Yayınlayıcı Worker'da barındırılacak**, API'de değil. API yayınlar ama
-  outbox'ı boşaltmaz; iki host aynı satırları işlerse `SKIP LOCKED` çakışmayı
-  önler ama gereksiz yere iki kez denenir.
-- Dead-letter kuyruğu ve yeniden deneme politikası da bu fazda; Faz 10 bunları
-  bilinçli olarak bıraktı.
+- **İlk gerçek tüketiciler burada.** `AddMessageConsumer<TMessage, TConsumer>`
+  hazır ve `FlowDesk.Worker/Program.cs` içinde nereye yazılacağı yorumla
+  belirtilmiş. Kuyruk adı aynı zamanda `ProcessedMessages` içindeki tüketici
+  adıdır (ADR-0033), bu yüzden anlamlı ve kalıcı seçilmeli.
+- **Idempotency zaten host'ta.** Tüketici kendi kaydını tutmuyor; ancak
+  **e-posta gönderimi veritabanı dışında** ve geri alınamıyor. Bir tüketici
+  önce e-postayı gönderip sonra hata alırsa transaction geri döner ve mesaj
+  yeniden teslim edilir — e-posta ikinci kez gider. Bunu önlemenin yolu
+  gönderimi işin **son** adımı yapmak ya da gönderimi ayrıca kaydetmek;
+  hangisi seçilirse ADR'ye yazılmalı (ADR-0033'ün son bölümü bu sorunu
+  adlandırıyor).
+- **Kiracı kapsamı mesajdan gelir.** Tüketicinin `ITenantContext`'i yok ve
+  `FlowDeskDbContext` filtresi Worker'da etkisiz; yazılan her satırın
+  `TenantId`'si mesajın taşıdığı değerden gelmeli.
+- **Davet e-postası mevcut akışı değiştirmemeli.** Faz 05'te davet bağlantısı
+  arayüzden alınıyor ve token yalnızca bir kez dönüyor; e-posta bunun yerine
+  değil, yanına ekleniyor.
 
 ## Son Doğrulama Durumu
 
@@ -97,7 +98,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 398/398 başarılı (201 birim + 197 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 406/406 başarılı (201 birim + 205 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -126,6 +127,8 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `GET /health/ready` (Faz 10, broker ayakta) | 200, `postgres: Healthy`, `rabbitmq: Healthy` |
 | `GET /health/ready` (Faz 10, broker erişilemez) | 200, genel `Degraded`, `rabbitmq: Degraded` |
 | `dotnet run --project backend/src/FlowDesk.Worker` (Faz 10) | Başladı; "hiçbir kuyruk dinlenmiyor" logladı |
+| `dotnet run --project backend/src/FlowDesk.Worker` (Faz 11) | Outbox işleyici başladı ve `FOR UPDATE SKIP LOCKED` sorgusunu gerçekten çalıştırdı |
+| Uçtan uca talep akışı (Faz 11) | Tekrar koşuldu; yayınlayıcı değişimi ürün akışını bozmadı |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -231,11 +234,29 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Tek topic exchange, mesaj tipi başına kuyruk; abonelik `StartAsync`'te
   kurulur; tüketiciler yalnızca Worker'da koşar; broker hazırlıkta `Degraded`
   döner, `Unhealthy` değil (ADR-0032)
+- Use case'ler broker'a **yazmaz**: `IMessagePublisher` kendi transaction'ına
+  outbox satırı ekler, `IBrokerPublisher`'ı yalnızca Worker'daki işleyici
+  çağırır; idempotency host'ta, `ProcessedMessages` anahtarı mesaj **ve**
+  tüketici (ADR-0033)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 11'de eklenenler:
+
+- `backend/src/FlowDesk.Domain/Messaging/` — `OutboxMessage`, `ProcessedMessage`
+- `backend/src/FlowDesk.Infrastructure/Messaging/` — `OutboxMessagePublisher`,
+  `IBrokerPublisher`, `RabbitMqBrokerPublisher` (eski
+  `RabbitMqMessagePublisher`), `OutboxDrain`, `OutboxProcessor`,
+  `OutboxOptions`, `MessageIdempotency`
+- `backend/src/FlowDesk.Infrastructure/Persistence/Configurations/` — outbox ve
+  işlenmiş mesaj yapılandırmaları
+- `backend/src/FlowDesk.Infrastructure/InfrastructureServiceCollectionExtensions.cs`
+  — `ITenantContext` artık isteğe bağlı çözülüyor (Worker için zorunlu)
+- `backend/tests/.../Messaging/OutboxTests.cs`
+- `.env.example` — `Outbox__*` değişkenleri
 
 Faz 10'da eklenenler:
 
@@ -372,9 +393,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddTasks` (Faz 09 migration üretmedi; yalnızca okuma yapıyor) |
+| Son migration | `AddOutbox` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).

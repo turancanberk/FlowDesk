@@ -179,6 +179,7 @@ görevler, `(TenantId, AssignedUserId)`.
 |---|---|---|
 | `Id` | uuid | PK, mesaj kimliği olarak da kullanılır |
 | `Type` | text | Olay tipi |
+| `RoutingKey` | text | Yayınlama anahtarı — tipten türetilmez (ADR-0033) |
 | `Payload` | jsonb | Serileştirilmiş olay |
 | `OccurredAt` | timestamptz | |
 | `ProcessedAt` | timestamptz? | |
@@ -194,12 +195,17 @@ tutmaz.
 
 | Sütun | Tip | Not |
 |---|---|---|
-| `MessageId` | uuid | PK — idempotency anahtarı |
+| `MessageId` | uuid | Bileşik PK'nın parçası |
 | `Consumer` | text | Aynı mesajı birden fazla tüketici işleyebilir |
 | `ProcessedAt` | timestamptz | |
 
-Kısıt: `(MessageId, Consumer)` **unique**. Tekrar teslimat bu kısıta takılır ve
-yan etki ikinci kez uygulanmaz.
+Birincil anahtar `(MessageId, Consumer)` **bileşiktir**. Yalnızca `MessageId`
+anahtar olsaydı bir mesajı ancak tek bir tüketici kaydedebilirdi ve tablonun
+varlık sebebi olan "aynı mesajı birden fazla tüketici işleyebilir" cümlesi
+yanlış olurdu (ADR-0033).
+
+Bileşik anahtar aynı zamanda benzersizlik kısıtıdır: tekrar teslimat insert
+sırasında takılır ve yan etki ikinci kez uygulanmaz.
 
 ### Notification (Faz 12)
 

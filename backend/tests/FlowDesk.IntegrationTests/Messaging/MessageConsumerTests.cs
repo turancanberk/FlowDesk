@@ -3,6 +3,9 @@ using System.Text;
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Infrastructure.Messaging;
 using FlowDesk.IntegrationTests.Support;
+using FlowDesk.Infrastructure.Persistence;
+using FlowDesk.Infrastructure.Time;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,8 +28,13 @@ namespace FlowDesk.IntegrationTests.Messaging;
 public sealed class MessageConsumerTests
 {
     private readonly RabbitMqContainerFixture _broker;
+    private readonly PostgresContainerFixture _postgres;
 
-    public MessageConsumerTests(RabbitMqContainerFixture broker) => _broker = broker;
+    public MessageConsumerTests(RabbitMqContainerFixture broker, PostgresContainerFixture postgres)
+    {
+        _broker = broker;
+        _postgres = postgres;
+    }
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
@@ -36,12 +44,12 @@ public sealed class MessageConsumerTests
         var received = new ConcurrentQueue<ProbeMessage>();
 
         await using var host = await ConsumerHost.StartAsync(
-            _broker, services => services.AddSingleton(new ProbeRecorder(received)), Cancellation);
+            _broker, _postgres, services => services.AddSingleton(new ProbeRecorder(received)), Cancellation);
 
         var sent = new ProbeMessage(
             Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "tüketildi");
 
-        await host.Publisher.PublishAsync(sent, Cancellation);
+        await host.PublishAsync(sent, Cancellation);
 
         var handled = await WaitForAsync(received, Cancellation);
 
@@ -67,6 +75,7 @@ public sealed class MessageConsumerTests
 
         await using var host = await ConsumerHost.StartAsync(
             _broker,
+            _postgres,
             services =>
             {
                 services.AddSingleton(new ProbeRecorder(received));
@@ -77,7 +86,7 @@ public sealed class MessageConsumerTests
 
         for (var index = 0; index < 3; index++)
         {
-            await host.Publisher.PublishAsync(
+            await host.PublishAsync(
                 new ProbeMessage(
                     Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, $"{index}"),
                 Cancellation);
@@ -104,12 +113,13 @@ public sealed class MessageConsumerTests
 
         await using var host = await ConsumerHost.StartAsync(
             _broker,
+            _postgres,
             // Fails the first time and succeeds afterwards, so the test proves
             // redelivery rather than an endless loop.
             services => services.AddSingleton(new ProbeRecorder(attempts, failFirst: true)),
             Cancellation);
 
-        await host.Publisher.PublishAsync(
+        await host.PublishAsync(
             new ProbeMessage(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "yeniden"),
             Cancellation);
@@ -119,6 +129,44 @@ public sealed class MessageConsumerTests
         // The same message, twice.
         var all = attempts.ToArray();
         Assert.Equal(all[0].MessageId, all[1].MessageId);
+    }
+
+    /// <summary>
+    /// The same message delivered twice is handled once.
+    /// </summary>
+    /// <remarks>
+    /// Delivery is at-least-once by design (ADR-0032): the broker resends
+    /// anything it is not sure was handled. This is the check that makes that
+    /// safe — without it, every network hiccup would duplicate whatever the
+    /// consumer does.
+    /// </remarks>
+    [Fact]
+    public async Task The_same_message_delivered_twice_is_handled_once()
+    {
+        var received = new ConcurrentQueue<ProbeMessage>();
+
+        await using var host = await ConsumerHost.StartAsync(
+            _broker, _postgres, services => services.AddSingleton(new ProbeRecorder(received)),
+            Cancellation);
+
+        var message = new ProbeMessage(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "bir kez");
+
+        await host.PublishAsync(message, Cancellation);
+        await WaitUntilAsync(() => !received.IsEmpty, Cancellation);
+
+        // The identical message again, as a redelivery would arrive.
+        await host.PublishAsync(message, Cancellation);
+
+        /*
+          The queue drains whether the second delivery was handled or skipped,
+          so waiting on the consumer's own count would pass either way. Waiting
+          for the queue to empty and then checking the count is what
+          distinguishes them.
+        */
+        await WaitUntilQueueIsEmptyAsync(host, Cancellation);
+
+        Assert.Single(received.ToArray());
     }
 
     /// <summary>
@@ -135,7 +183,7 @@ public sealed class MessageConsumerTests
         var received = new ConcurrentQueue<ProbeMessage>();
 
         await using var host = await ConsumerHost.StartAsync(
-            _broker, services => services.AddSingleton(new ProbeRecorder(received)), Cancellation);
+            _broker, _postgres, services => services.AddSingleton(new ProbeRecorder(received)), Cancellation);
 
         await host.PublishRawAsync("{ bu JSON değil", ProbeMessage.Key, Cancellation);
 
@@ -143,7 +191,7 @@ public sealed class MessageConsumerTests
         var good = new ProbeMessage(
             Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "arkadan geldi");
 
-        await host.Publisher.PublishAsync(good, Cancellation);
+        await host.PublishAsync(good, Cancellation);
 
         var handled = await WaitForAsync(received, Cancellation);
 
@@ -187,6 +235,38 @@ public sealed class MessageConsumerTests
         }
 
         Assert.Fail("Beklenen tüketim 20 saniyede gerçekleşmedi.");
+    }
+
+    /// <summary>
+    /// Waits until the queue is empty and stays empty.
+    /// </summary>
+    /// <remarks>
+    /// The extra settle time is not padding: a message leaves the queue when it
+    /// is delivered, before the consumer has finished with it, so an empty
+    /// queue on its own does not mean the work is done.
+    /// </remarks>
+    private static async Task WaitUntilQueueIsEmptyAsync(
+        ConsumerHost host,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(20);
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (await host.CountAsync(cancellationToken) == 0)
+            {
+                await Task.Delay(500, cancellationToken);
+
+                if (await host.CountAsync(cancellationToken) == 0)
+                {
+                    return;
+                }
+            }
+
+            await Task.Delay(50, cancellationToken);
+        }
+
+        Assert.Fail("Kuyruk 20 saniyede boşalmadı.");
     }
 
     /// <summary>Collects what the consumer saw, so a test can assert on it.</summary>
@@ -271,11 +351,30 @@ public sealed class MessageConsumerTests
             _queue = queue;
         }
 
-        public RabbitMqMessagePublisher Publisher =>
-            (RabbitMqMessagePublisher)_host.Services.GetRequiredService<IMessagePublisher>();
+        private IBrokerPublisher Broker => _host.Services.GetRequiredService<IBrokerPublisher>();
+
+        /// <summary>
+        /// Hands a message to the broker the way the outbox processor does.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately not through <c>IMessagePublisher</c>: that writes an
+        /// outbox row and would not reach the broker at all (ADR-0033). These
+        /// tests are about what happens once a message is delivered.
+        /// </remarks>
+        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken)
+            where TMessage : IntegrationMessage =>
+            Broker.PublishAsync(
+                message.MessageId,
+                message.GetType().Name,
+                message.RoutingKey,
+                message.OccurredAt,
+                System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                    message, message.GetType(), FlowDeskMessageJson.Options),
+                cancellationToken);
 
         public static async Task<ConsumerHost> StartAsync(
             RabbitMqContainerFixture broker,
+            PostgresContainerFixture postgres,
             Action<IServiceCollection> configure,
             CancellationToken cancellationToken)
         {
@@ -306,7 +405,19 @@ public sealed class MessageConsumerTests
                 .ValidateDataAnnotations();
 
             builder.Services.AddSingleton<RabbitMqConnection>();
-            builder.Services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
+            builder.Services.AddSingleton<IBrokerPublisher, RabbitMqBrokerPublisher>();
+
+            /*
+              The consumer host claims each message in the processed-message
+              table before handling it, so it needs persistence. No
+              ITenantContext is registered, which is how the worker runs: the
+              filter stays inert because a consumer acts across workspaces.
+            */
+            builder.Services.AddDbContext<FlowDeskDbContext>(options =>
+                options.UseNpgsql(postgres.ConnectionString));
+            builder.Services.AddScoped<IFlowDeskDbContext>(provider =>
+                provider.GetRequiredService<FlowDeskDbContext>());
+            builder.Services.AddSingleton<IClock, SystemClock>();
 
             configure(builder.Services);
 

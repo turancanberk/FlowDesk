@@ -20,7 +20,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 08 — Görevler
 - [x] Faz 09 — Dashboard
 - [x] Faz 10 — RabbitMQ ve Worker
-- [ ] Faz 11 — Outbox
+- [x] Faz 11 — Outbox
 - [ ] Faz 12 — E-posta ve Bildirimler
 - [ ] Faz 13 — Dosya Ekleri
 - [ ] Faz 14 — Denetim ve Etkinlik
@@ -36,13 +36,61 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 11 — Outbox**
+**Faz 12 — E-posta ve Bildirimler**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 11 — Outbox · Tamamlandı
+
+Faz 10'un bilerek bıraktığı boşluk kapatıldı: yayınlama artık veritabanı
+transaction'ıyla atomik (ADR-0033).
+
+- Use case mesajı **kuyruğa alıyor**: kendi transaction'ına bir satır yazıyor.
+  `IMessagePublisher` artık bunu yapıyor, broker'a hiçbir şey göndermiyor.
+- Worker'daki işleyici satırları broker'a taşıyor; `IBrokerPublisher` yalnızca
+  bunun için var.
+- Yönlendirme anahtarı satırda saklanıyor. Tipten türetmek, adları tiplere geri
+  eşleyen ve elle güncel tutulan bir kayıt defteri gerektirirdi.
+- `FOR UPDATE SKIP LOCKED` ile parti alınıyor; birden fazla worker farklı
+  satırları alıyor, birbirini beklemiyor.
+- Başarısız yayınlamada `LastError` satıra yazılıyor ve `NextAttemptAt`
+  katlanarak ileri itiliyor, üst sınırla. "Neden takıldı" sorusu operatörün
+  zaten baktığı tablodan cevaplanıyor.
+- Bekleyen satırlar için kısmi indeks; tablo neredeyse tamamen işlenmiş
+  geçmişten oluşuyor ve tamamını kapsayan bir indeks sınırsız büyürdü.
+- Parti alma (`OutboxDrain`) ile zamanlama (`OutboxProcessor`) ayrı sınıflarda.
+  Bir turu tek tek koşturabilmek, her doğrulamayı bir zamanlayıcıyla yarışa
+  sokmaktan kurtarıyor.
+
+Tüketici tarafında idempotency **host'ta**, tüketicide değil. Her tüketicinin
+hatırlaması gereken bir kural, birinin er geç unutacağı kuraldır.
+`ProcessedMessages` anahtarı mesaj **ve** tüketici; yalnızca mesaja konan bir
+anahtar, önce biten tüketicinin diğerini sessizce bastırmasına yol açardı.
+
+`OutboxMessage` ve `ProcessedMessage` bilinçli olarak `ITenantOwned` değil:
+Worker'ın kiracı bağlamı yok ve filtreye dâhil olsalardı hiçbir şey
+bulamazlardı. `FlowDeskDbContext` kaydı kiracı bağlamını isteğe bağlı çözerek
+tek kayıtla iki host'a hizmet ediyor — API'de filtreli, Worker'da etkisiz.
+
+Testler gerçek PostgreSQL ve gerçek RabbitMQ üzerinde: kuyruğa alma satır
+yazıyor ve hiçbir şey göndermiyor, geri alınan transaction hiçbir şey
+bırakmıyor, işleyici yayınlayıp satırı işaretliyor, işlenmiş satır ikinci kez
+yayınlanmıyor, başarısız yayınlama hatayı kaydedip geri çekiliyor, bekleyen
+satır alınmıyor, bir tur en fazla bir parti alıyor, aynı mesaj iki kez
+teslim edilince bir kez işleniyor.
+
+**Testlerin yakaladığı bir tuzak.** Outbox tablosu testler arasında paylaşılıyor
+ve işleyici tasarımı gereği küresel — kim yazmışsa yazsın, vadesi gelen her
+satırı alıyor. Bir testin doğrulaması başka bir testin artıklarını sayıyordu;
+koşum başında bekleyen satırlar temizlenerek düzeltildi.
+
+Testler: 406/406 (201 birim + 205 entegrasyon).
+
+---
 
 ### Faz 10 — RabbitMQ ve Worker · Tamamlandı
 
@@ -695,6 +743,16 @@ Faz 10 sonunda:
 | `GET /health/ready` (broker erişilemez) | 200, genel `Degraded`, `rabbitmq: Degraded` — testle doğrulandı |
 | `dotnet run --project backend/src/FlowDesk.Worker` | Başladı; "hiçbir kuyruk dinlenmiyor" logladı |
 | Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 11 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 406/406 başarılı (201 birim + 205 entegrasyon) |
+| `dotnet ef migrations add AddOutbox` + `database update` | Uygulandı; `OutboxMessages` ve `ProcessedMessages` |
+| `dotnet run --project backend/src/FlowDesk.Worker` | Outbox işleyici başladı ve `FOR UPDATE SKIP LOCKED` sorgusunu gerçekten çalıştırdı |
+| Çalışan API'ye karşı 14 adımlık talep akışı | Tekrar koşuldu; yayınlayıcı değişimi ürün akışını bozmadı |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda

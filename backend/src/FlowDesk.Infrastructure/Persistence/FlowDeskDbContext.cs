@@ -3,6 +3,7 @@ using FlowDesk.Application.Abstractions;
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
+using FlowDesk.Domain.Messaging;
 using FlowDesk.Domain.Tasks;
 using FlowDesk.Domain.Tickets;
 using FlowDesk.Infrastructure.Identity;
@@ -69,6 +70,10 @@ public sealed class FlowDeskDbContext
     public DbSet<TenantCounter> TenantCounters => Set<TenantCounter>();
 
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.
