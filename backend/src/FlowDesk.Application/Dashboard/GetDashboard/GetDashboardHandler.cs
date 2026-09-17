@@ -11,14 +11,21 @@ namespace FlowDesk.Application.Dashboard.GetDashboard;
 /// Reads the operational figures for a workspace.
 /// </summary>
 /// <remarks>
-/// No caching. Redis arrives in Faz 15 and only once a real measurement shows
-/// these queries are slow (ADR-0008, ADR-0015); caching a handful of indexed
-/// counts before then would add a staleness problem to solve a speed problem
-/// nobody has.
+/// Cached, briefly and per workspace. The page runs eight queries and is opened
+/// far more often than the figures change, which is what makes it the one place
+/// a cache earns its staleness (ADR-0015).
 ///
+/// <para>
+/// The cached copy carries the instant it was read, so the screen can say how
+/// fresh it is rather than implying it is live. A figure at most a minute old,
+/// labelled as such, is more honest than one that looks current and is not.
+/// </para>
+///
+/// <para>
 /// Every figure is read against one instant, taken once at the top. Reading the
 /// clock per query would let a task be overdue in the count and not in the list
 /// beside it.
+/// </para>
 /// </remarks>
 public sealed class GetDashboardHandler
 {
@@ -35,19 +42,27 @@ public sealed class GetDashboardHandler
 
     private readonly IFlowDeskDbContext _dbContext;
     private readonly IUserAccountStore _accountStore;
+    private readonly ICache _cache;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
+    private readonly TimeSpan _cacheTtl;
 
     public GetDashboardHandler(
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
+        ICache cache,
+        IDashboardCachePolicy cachePolicy,
         ITenantContext tenantContext,
         IClock clock)
     {
+        ArgumentNullException.ThrowIfNull(cachePolicy);
+
         _dbContext = dbContext;
         _accountStore = accountStore;
+        _cache = cache;
         _tenantContext = tenantContext;
         _clock = clock;
+        _cacheTtl = cachePolicy.DashboardTtl;
     }
 
     public async Task<Result<DashboardSummary>> HandleAsync(CancellationToken cancellationToken)
@@ -58,9 +73,25 @@ public sealed class GetDashboardHandler
                 TenancyErrors.InsufficientRole("Çalışma alanını görüntülemek"));
         }
 
+        var tenantId = _tenantContext.TenantId;
+
+        /*
+          The key carries the workspace, and that is the one thing that must
+          never be wrong here: without it a cache would serve one organisation's
+          figures to another. It is built in one place for exactly that reason
+          (ADR-0037).
+        */
+        var cacheKey = CacheKeys.Dashboard(tenantId);
+
+        var cached = await _cache.GetAsync<DashboardSummary>(cacheKey, cancellationToken);
+
+        if (cached is not null)
+        {
+            return Result.Success(cached);
+        }
+
         var now = _clock.UtcNow;
         var dueSoonBefore = now + DueSoonWindow;
-        var tenantId = _tenantContext.TenantId;
 
         // Customers, tickets and tasks are all scoped by the global query
         // filter (ADR-0024).
@@ -120,7 +151,7 @@ public sealed class GetDashboardHandler
         var recentTickets = await ReadRecentTicketsAsync(cancellationToken);
         var upcomingTasks = await ReadUpcomingTasksAsync(now, cancellationToken);
 
-        return Result.Success(new DashboardSummary(
+        var summary = new DashboardSummary(
             customerCount,
             openTicketCount,
             unassignedTicketCount,
@@ -132,7 +163,16 @@ public sealed class GetDashboardHandler
             [.. ticketsByStatus.OrderBy(entry => entry.Status)],
             recentTickets,
             upcomingTasks,
-            now));
+            now);
+
+        /*
+          Stored after the figures are read, not before. A failed write simply
+          means the next request recomputes them, which is what would have
+          happened anyway.
+        */
+        await _cache.SetAsync(cacheKey, summary, _cacheTtl, cancellationToken);
+
+        return Result.Success(summary);
     }
 
     private async Task<IReadOnlyList<RecentTicket>> ReadRecentTicketsAsync(

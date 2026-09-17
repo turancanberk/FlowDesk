@@ -4,9 +4,9 @@
 # Kademeli altyapı ilkesi (ADR-0008): bir servis, onu gerçekten kullanan faz
 # gelmeden buraya eklenmez.
 #
-# Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10), Mailpit (Faz 12) ve
-# Azurite (Faz 13) vardır.
-# Sıradaki eklemeler: Redis (Faz 15), Prometheus ve Grafana (Faz 18).
+# Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10), Mailpit (Faz 12),
+# Azurite (Faz 13) ve Redis (Faz 15) vardır.
+# Sıradaki ekleme: Prometheus ve Grafana (Faz 18).
 #
 # Kullanım (depo kökünden):
 #   cp .env.example .env
@@ -119,6 +119,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    container_name: flowdesk-redis
+    restart: unless-stopped
+    # Kalıcılık kapalı. Buradaki her şey türetilmiş veri; kaybolduğunda yeniden
+    # hesaplanıyor. Diske yazmak, hiçbir zaman geri okunmayacak veriyi
+    # kaydetmek olurdu.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      # Bu makinede 6379 baska bir Redis tarafindan kullaniliyor.
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   postgres-data:
