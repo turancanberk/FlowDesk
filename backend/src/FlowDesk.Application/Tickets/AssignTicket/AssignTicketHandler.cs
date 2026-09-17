@@ -16,17 +16,20 @@ public sealed class AssignTicketHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
     private readonly IUserAccountStore _accountStore;
+    private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
     public AssignTicketHandler(
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
+        IMessagePublisher publisher,
         ITenantContext tenantContext,
         IClock clock)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
+        _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
     }
@@ -58,7 +61,35 @@ public sealed class AssignTicketHandler
             return Result.Failure<TicketDetail>(assigneeCheck.Error);
         }
 
-        ticket.Assign(command.AssignedUserId, _clock.UtcNow);
+        var now = _clock.UtcNow;
+        var previousAssignee = ticket.AssignedUserId;
+
+        ticket.Assign(command.AssignedUserId, now);
+
+        /*
+          Queued before saving, so the message and the assignment commit
+          together (ADR-0033). Nothing reaches the broker here — this writes an
+          outbox row through the same DbContext.
+
+          Only when the ticket actually changed hands. Re-saving the same
+          assignee, which the interface allows, is not news and should not
+          produce a second notification.
+        */
+        if (command.AssignedUserId is { } assignedUserId && assignedUserId != previousAssignee)
+        {
+            await _publisher.PublishAsync(
+                new TicketAssigned(
+                    Guid.CreateVersion7(),
+                    _tenantContext.TenantId,
+                    now,
+                    ticket.Id,
+                    ticket.Number,
+                    ticket.Subject,
+                    assignedUserId,
+                    _tenantContext.UserId,
+                    _tenantContext.Slug),
+                cancellationToken);
+        }
 
         var save = await TicketWorkflow.SaveAsync(_dbContext, cancellationToken);
 

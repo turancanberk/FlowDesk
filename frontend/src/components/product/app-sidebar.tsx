@@ -35,12 +35,21 @@ type AppSidebarProps = {
   activeHref: string;
   /** Çalışma alanı seçici. Faz 04'te gerçek bileşenle doldurulur. */
   workspaceSlot?: React.ReactNode;
+  /** Kullanıcı satırının üstünde duran bildirim kontrolü. */
+  notificationSlot?: React.ReactNode;
   /** Alt kısımdaki kullanıcı kimliği. */
   userSlot?: React.ReactNode;
   className?: string;
 };
 
-function AppSidebar({ groups, activeHref, workspaceSlot, userSlot, className }: AppSidebarProps) {
+function AppSidebar({
+  groups,
+  activeHref,
+  workspaceSlot,
+  notificationSlot,
+  userSlot,
+  className,
+}: AppSidebarProps) {
   return (
     <nav
       aria-label="Ana gezinme"
@@ -108,6 +117,10 @@ function AppSidebar({ groups, activeHref, workspaceSlot, userSlot, className }: 
           </div>
         ))}
       </div>
+
+      {notificationSlot ? (
+        <div className="border-sidebar-border border-t p-2">{notificationSlot}</div>
+      ) : null}
 
       {userSlot ? <div className="border-sidebar-border border-t p-2">{userSlot}</div> : null}
     </nav>

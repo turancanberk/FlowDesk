@@ -40,6 +40,8 @@ using FlowDesk.Application.Tasks.GetTask;
 using FlowDesk.Application.Tasks.ListTasks;
 using FlowDesk.Application.Tasks.UpdateTask;
 using FlowDesk.Application.Dashboard.GetDashboard;
+using FlowDesk.Application.Notifications.ListNotifications;
+using FlowDesk.Application.Notifications.MarkNotificationsRead;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -104,6 +106,9 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ListTasksHandler>();
 
         services.AddScoped<GetDashboardHandler>();
+
+        services.AddScoped<ListNotificationsHandler>();
+        services.AddScoped<MarkNotificationsReadHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserValidator>(ServiceLifetime.Singleton);
 

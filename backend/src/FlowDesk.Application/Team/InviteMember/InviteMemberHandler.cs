@@ -11,8 +11,11 @@ namespace FlowDesk.Application.Team.InviteMember;
 /// </summary>
 /// <remarks>
 /// The raw token is returned once and never stored; only its hash is persisted,
-/// so a database leak yields no usable invitations. Delivery by e-mail arrives
-/// in Faz 12 — until then the caller passes the link on themselves.
+/// so a database leak yields no usable invitations.
+///
+/// It is also queued for delivery by e-mail. The token still comes back in the
+/// response: an admin who wants to hand the link over directly can, and a
+/// mail server that is down should not stop them.
 /// </remarks>
 public sealed class InviteMemberHandler
 {
@@ -25,6 +28,7 @@ public sealed class InviteMemberHandler
     private readonly IFlowDeskDbContext _dbContext;
     private readonly IUserAccountStore _accountStore;
     private readonly ISecureTokenGenerator _tokenGenerator;
+    private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
@@ -32,12 +36,14 @@ public sealed class InviteMemberHandler
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
         ISecureTokenGenerator tokenGenerator,
+        IMessagePublisher publisher,
         ITenantContext tenantContext,
         IClock clock)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _tokenGenerator = tokenGenerator;
+        _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
     }
@@ -109,6 +115,23 @@ public sealed class InviteMemberHandler
             InvitationLifetime);
 
         _dbContext.Invitations.Add(invitation);
+
+        // Queued before saving, so a rejected invitation never produces an
+        // e-mail for an invitation that does not exist (ADR-0033).
+        await _publisher.PublishAsync(
+            new MemberInvited(
+                Guid.CreateVersion7(),
+                tenantId,
+                now,
+                invitation.Id,
+                invitation.Email,
+                invitation.Role,
+                secureToken.RawValue,
+                invitation.ExpiresAt,
+                _tenantContext.UserId,
+                _tenantContext.Slug),
+            cancellationToken);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreatedInvitation(

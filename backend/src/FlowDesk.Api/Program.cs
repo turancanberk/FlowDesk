@@ -42,6 +42,7 @@ app.MapCustomerEndpoints();
 app.MapTicketEndpoints();
 app.MapTaskEndpoints();
 app.MapDashboardEndpoints();
+app.MapNotificationEndpoints();
 
 await app.RunAsync();
 

@@ -1,6 +1,7 @@
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Application.Authentication;
 using FlowDesk.Infrastructure.Authentication;
+using FlowDesk.Infrastructure.Email;
 using FlowDesk.Infrastructure.HealthChecks;
 using FlowDesk.Infrastructure.Messaging;
 using FlowDesk.Infrastructure.Identity;
@@ -44,6 +45,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddFlowDeskIdentity();
         services.AddFlowDeskAuthentication(configuration);
         services.AddFlowDeskMessaging(configuration);
+        services.AddFlowDeskEmail(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
 
         return services;
@@ -210,6 +212,29 @@ public static class InfrastructureServiceCollectionExtensions
           DbContext.
         */
         services.AddScoped<IMessagePublisher, OutboxMessagePublisher>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddFlowDeskEmail(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            // Fail at startup rather than on the first send: a missing sender
+            // address is a deployment error, not a runtime condition.
+            .ValidateOnStart();
+
+        /*
+          Singleton, because it holds no state between sends — a connection is
+          opened and closed per message. Sending is not a readiness dependency:
+          the API never sends, and the worker's failure to send is a message
+          that retries rather than an instance that should leave rotation.
+        */
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
         return services;
     }

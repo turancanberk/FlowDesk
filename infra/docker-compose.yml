@@ -4,8 +4,8 @@
 # Kademeli altyapı ilkesi (ADR-0008): bir servis, onu gerçekten kullanan faz
 # gelmeden buraya eklenmez.
 #
-# Şu an PostgreSQL (Faz 01) ve RabbitMQ (Faz 10) vardır.
-# Sıradaki eklemeler: Mailpit (Faz 12), Azurite (Faz 13), Redis (Faz 15),
+# Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10) ve Mailpit (Faz 12) vardır.
+# Sıradaki eklemeler: Azurite (Faz 13), Redis (Faz 15),
 # Prometheus ve Grafana (Faz 18).
 #
 # Kullanım (depo kökünden):
@@ -69,8 +69,35 @@ services:
       # RabbitMQ ilk açılışta Erlang dağıtımını kurar; bu süre bilerek uzun.
       start_period: 40s
 
+  mailpit:
+    # Yerel geliştirme için SMTP sunucusu ve posta kutusu. Gerçek bir sağlayıcıya
+    # bağlanmadan, gönderilen postanın biçimini ve içeriğini tarayıcıdan görmeyi
+    # sağlıyor; test ortamında kimseye posta gitmemesi de bunun bir sonucu.
+    image: axllent/mailpit:latest
+    container_name: flowdesk-mailpit
+    restart: unless-stopped
+    environment:
+      # Yerelde kimlik doğrulaması yok; Mailpit yalnızca bu makineden erişilen
+      # bir geliştirme aracı ve üretime hiç gitmiyor.
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    volumes:
+      - mailpit-data:/data
+    healthcheck:
+      # Mailpit imajında curl yok; kendi readiness komutunu sunuyor.
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   postgres-data:
     name: flowdesk-postgres-data
   rabbitmq-data:
     name: flowdesk-rabbitmq-data
+  mailpit-data:
+    name: flowdesk-mailpit-data

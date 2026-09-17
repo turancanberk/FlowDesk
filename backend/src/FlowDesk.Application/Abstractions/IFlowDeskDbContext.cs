@@ -1,6 +1,7 @@
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Messaging;
+using FlowDesk.Domain.Notifications;
 using FlowDesk.Domain.Tasks;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Domain.Tickets;
@@ -64,6 +65,15 @@ public interface IFlowDeskDbContext
     /// What each consumer has already handled, so a redelivery acts once.
     /// </summary>
     DbSet<ProcessedMessage> ProcessedMessages { get; }
+
+    /// <summary>
+    /// In-app notices, scoped to the current workspace by the query filter.
+    /// </summary>
+    /// <remarks>
+    /// Written by a consumer, which has no workspace context of its own, so the
+    /// <c>TenantId</c> comes from the message being handled (ADR-0033).
+    /// </remarks>
+    DbSet<Notification> Notifications { get; }
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.

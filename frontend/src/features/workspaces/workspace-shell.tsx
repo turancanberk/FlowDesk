@@ -12,6 +12,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { NotificationPanel } from "@/features/notifications/notification-panel";
 import { Button } from "@/components/ui/button";
 import { AppSidebar, type SidebarGroup } from "@/components/product/app-sidebar";
 import { EmptyState } from "@/components/product/empty-state";
@@ -122,6 +123,7 @@ function WorkspaceShellContent({
         workspaceSlot={
           <WorkspaceSwitcher current={workspace} workspaces={workspacesQuery.data ?? [workspace]} />
         }
+        notificationSlot={<NotificationPanel workspaceSlug={workspace.slug} />}
         userSlot={
           <UserIdentity user={user} roleLabel={membershipRoleLabels[workspace.role].label} />
         }

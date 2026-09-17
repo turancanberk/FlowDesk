@@ -1,5 +1,8 @@
+using FlowDesk.Application.Team;
+using FlowDesk.Application.Tickets;
 using FlowDesk.Infrastructure;
 using FlowDesk.Infrastructure.Messaging;
+using FlowDesk.Infrastructure.Notifications;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -20,17 +23,23 @@ builder.Services.AddFlowDeskMessageConsumers();
 builder.Services.AddFlowDeskOutboxProcessor(builder.Configuration);
 
 /*
-  Consumer registrations go here as the features that need them arrive:
+  The consumers.
 
-      builder.Services.AddMessageConsumer<TicketAssigned, SendAssignmentEmail>(
-          queueName: "flowdesk.ticket-assigned.email",
-          routingPattern: "ticket.assigned");
-
-  None are registered yet. The host says so in its log rather than looking busy;
-  a consumer that handles nothing would be harder to notice than a line saying
-  nothing is subscribed. The first real consumer arrives with notifications
-  (Faz 12).
+  A queue per message type, and the queue name is also the consumer's name in
+  the processed-message table (ADR-0033) — so these names are a contract, not a
+  label. Renaming one makes every message it has already handled look unhandled.
 */
+builder.Services.AddMessageConsumer<TicketAssigned, TicketAssignedConsumer>(
+    queueName: TicketAssignedConsumer.QueueName,
+    routingPattern: TicketAssigned.Key);
+
+builder.Services.AddMessageConsumer<TicketCommented, TicketCommentedConsumer>(
+    queueName: TicketCommentedConsumer.QueueName,
+    routingPattern: TicketCommented.Key);
+
+builder.Services.AddMessageConsumer<MemberInvited, MemberInvitedConsumer>(
+    queueName: MemberInvitedConsumer.QueueName,
+    routingPattern: MemberInvited.Key);
 
 var host = builder.Build();
 await host.RunAsync();

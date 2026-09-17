@@ -40,6 +40,15 @@
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
   </ItemGroup>
 
+  <!--
+    MailKit, .NET'in kullanımdan kaldırılmış SmtpClient'ı yerine kullanılıyor:
+    o sınıfın kendi belgesi modern protokoller için önerilmediğini söylüyor.
+    Sürüm kurulum anında resmî NuGet registry'sinden doğrulandı (ADR-0016).
+  -->
+  <ItemGroup Label="E-posta">
+    <PackageVersion Include="MailKit" Version="4.18.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Doğrulama">
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
