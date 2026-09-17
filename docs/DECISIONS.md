@@ -845,3 +845,67 @@ Dashboard'daki rakamlar ilgili listeye bağlanıyor ama **filtrelenmiş** listey
 değil: liste filtrelerini bileşen durumunda tutuyor, dolayısıyla sorgu dizesi
 filtresiz bir sayfaya düşer ve bağlantının verdiği sözü sessizce bozardı.
 Filtreleri URL'den okumak yapılmaya değer, ama listeye ait bir iş.
+
+---
+
+## ADR-0032 — Mesajlaşma topolojisi ve tüketici barındırma
+
+**Bağlam.** İlk gerçek asenkron iş akışı için RabbitMQ ekleniyor. Dört soru
+birlikte cevaplanmalıydı: kaç exchange, kuyrukları kim bildirir, tüketiciler
+nerede koşar, broker düştüğünde ne olur.
+
+**Karar.**
+
+1. **Tek topic exchange** (`flowdesk.events`), mesaj tipi başına ayrı kuyruk.
+2. **Kuyrukları tüketici bildirir**, ve bunu `StartAsync` içinde, host başlamış
+   sayılmadan önce yapar.
+3. **Tüketiciler yalnızca Worker'da koşar**; API yayınlar, tüketmez.
+4. **Broker hazırlık kontrolünde `Degraded`**, `Unhealthy` değil.
+
+**Gerekçe.**
+
+Mesaj tipi başına exchange, her yeni tip için yayıncı ile tüketici arasında
+koordinasyon gerektirirdi. Topic exchange'de tüketici bir desene bağlanır ve
+yeni bir tip eklemek topolojide hiçbir değişiklik istemez. Buna karşılık
+kuyruklar ayrıdır: paylaşılan tek kuyruk, yavaş bir tüketicinin arkasında her
+türden mesajı bekletir ve zehirli bir mesajı onu hiç istememiş işleyicilerin de
+sorunu yapar.
+
+Aboneliğin `ExecuteAsync` yerine `StartAsync`'te kurulması bir test tarafından
+zorunlu kılındı. `ExecuteAsync` arka planda çalışır ve host kendini ilk
+`await`'te başlamış sayar; aynı anda ayağa kalkan bir yayıncı hiçbir kuyruk
+bağlanmadan mesaj gönderebilir, topic exchange de dinleyicisi olmayan mesajı
+sessizce düşürür. `StartAsync`'te bildirmek, host başlamadan topolojinin var
+olmasını garanti ediyor.
+
+Bunun sonucu, broker başlangıçta erişilemezse worker'ın hiç başlamamasıdır. Tek
+işi tüketmek olan bir süreç için doğru başarısızlık budur: yüksek sesle çökmek
+yeniden başlatılmasını sağlar, başarıyla başlayıp hiçbir şey tüketmemek ise
+bakan herkese sağlıklı görünür.
+
+API'nin tüketmemesi, aynı mesajın iki kez işlenmemesi içindir. İki host da aynı
+kuyrukları okusaydı her mesaj iki kez ele alınır ve ikinci ele alış API'nin
+kendi loglarında görünmezdi.
+
+`Degraded` ile `Unhealthy` ayrımı en önemli karar. API broker olmadan her
+okumayı ve her yazmayı yapabiliyor; yalnızca ardından gidecek mesajlar
+gecikiyor. Hazırlık kontrolünü düşürmek, hiçbir örneğin isteğe cevap vermek
+için ihtiyaç duymadığı bir bağımlılık yüzünden bütün sağlam örnekleri aynı anda
+rotasyondan çıkarır — ve e-posta kuyruğa alınamadığı için bütün ürünü
+durdururdu. PostgreSQL ise zorunludur ve `Unhealthy` döndürür.
+
+**Sonuçlar.** Teslimat **en az bir kez**. Broker, işlendiğinden emin olmadığı
+her şeyi yeniden gönderir; tüketici aynı mesajı iki kez görebilmeli ve bir kez
+davranmalıdır. `IntegrationMessage.MessageId` bunun içindir. Faz 11 bunu
+`ProcessedMessage` tablosuyla otomatikleştirecek; o zamana kadar her tüketici
+kendi idempotency'sinden sorumlu.
+
+Yayınlama veritabanı transaction'ıyla atomik **değil**. Geri alınan bir
+transaction'ın içinden gönderilen mesaj hiç olmamış bir şeyi anlatır; commit
+sonrası gönderilen ise süreç arada ölürse kaybolur. Bu boşluğu Faz 11'deki
+outbox kapatacak.
+
+Okunamayan gövde yeniden kuyruğa **alınmıyor**: sonsuza dek aynı şekilde
+başarısız olur ve prefetch bir olduğu için arkasındaki her mesajı tıkardı.
+İşleyici hatası ise yeniden kuyruğa alınıyor, çünkü geçici olabilir. Dead-letter
+kuyruğu ve yeniden deneme politikası Faz 11'e ait.

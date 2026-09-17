@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 09 birleştirildi) |
+| Aktif dal | `main` (Faz 10 birleştirildi) |
 | Son commit | `49a2645 — Merge branch 'feat/dashboard'` (Faz 09) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -34,14 +34,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 07 — Talepler
 - Faz 08 — Görevler
 - Faz 09 — Dashboard
+- Faz 10 — RabbitMQ ve Worker
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 10 — RabbitMQ ve Worker** (henüz başlanmadı)
+**Faz 11 — Outbox** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 10 kapsamında henüz iş yapılmadı.
+Faz 11 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -49,41 +50,44 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 10'un tamamı:
+Faz 11'in tamamı:
 
-- RabbitMQ **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
-- `IMessagePublisher` soyutlaması Application katmanında
-- `FlowDesk.Worker` barındırma altyapısı ve tüketici kayıt mekanizması
-- Bağlantı dayanıklılığı: yeniden bağlanma, kanal yönetimi, kapanış
-
-Outbox **Faz 11'e** ait; bu fazda mesaj yayınlama doğrudan yapılacak ve
-transaction ile atomikliği Faz 11 sağlayacak.
+- `OutboxMessage` tablosu ve migration
+- İş değişikliğiyle **aynı transaction** içinde kayıt
+- `FOR UPDATE SKIP LOCKED` tabanlı yayınlayıcı (Worker'da barındırılan)
+- Yeniden deneme sayacı ve hata görünürlüğü
+- Tüketici tarafında `ProcessedMessage` tablosu (mesaj kimliği birincil anahtar)
+- Gerçek PostgreSQL ve gerçek RabbitMQ üzerinde testler
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/messaging` dalını aç. Önce `infra/docker-compose.yml`'a RabbitMQ'yu ekle
-(yönetim arayüzüyle birlikte, host portları 5672 / 15672) ve `.env.example`'a
-karşılık gelen değişkenleri yaz — **gerçek parola değil**, örnek değer.
+`feat/outbox` dalını aç. `FlowDesk.Domain/Messaging/OutboxMessage.cs` varlığını
+`docs/DATABASE.md` şemasına göre yaz, EF yapılandırmasını ver ve migration
+üret.
 
-Ardından `FlowDesk.Application/Abstractions/IMessagePublisher.cs` sözleşmesini
-yaz ve `FlowDesk.Infrastructure/Messaging/` altında RabbitMQ uygulamasını ver.
+Bu fazın çözdüğü somut boşluk `ADR-0032`'nin sonunda yazılı: yayınlama
+veritabanı transaction'ıyla atomik değil. Geri alınan bir transaction'ın
+içinden gönderilen mesaj hiç olmamış bir şeyi anlatır; commit sonrası
+gönderilen ise süreç arada ölürse kaybolur.
 
 Dikkat edilecekler:
 
-- **Kademeli altyapı kuralı (ADR-0008).** RabbitMQ bu fazda ekleniyor çünkü ilk
-  gerçek asenkron iş akışı burada. Mailpit, Azurite, Redis, Prometheus ve
-  Grafana **eklenmeyecek**; her biri kendi fazını bekliyor.
-- **Bağlantı dayanıklılığı gerçek olmalı.** RabbitMQ.Client 7.x tamamen async
-  bir API'ye geçti; 6.x için yazılmış örnekler derlenmez. Yeniden bağlanma ve
-  kanal ömrü açıkça yönetilmeli, `try/catch` ile yutulmamalı.
-- **Sağlık kontrolü.** `/health/ready` şu an yalnızca PostgreSQL'i biliyor.
-  RabbitMQ zorunlu bir bağımlılık hâline geldiğinde buraya eklenmeli; API
-  RabbitMQ olmadan da ayakta kalabiliyorsa `live` ile `ready` ayrımı
-  korunmalı.
-- **Entegrasyon testleri.** `Testcontainers.RabbitMq` paketi var; sürümü
-  kurulum anında doğrula (ADR-0016). Mevcut `PostgresContainerFixture` deseni
-  izlenebilir.
-- Worker projesi zaten solution'da ve boş; barındırma altyapısı oraya gidecek.
+- **Kayıt iş değişikliğiyle aynı transaction'da olmalı.** `FlowDeskDbContext`
+  zaten `ExecuteInTransactionAsync` sunuyor; talep oluşturma bunu kullanıyor ve
+  örnek alınabilir.
+- **`FOR UPDATE SKIP LOCKED`.** Aynı desen `TakeNextTicketNumberAsync` içinde
+  var (satır kilidi + ham SQL). Faz 07'de bu yöntemin bir tuzağı ortaya çıktı:
+  `FOR UPDATE` yalnızca **var olan** satırı kilitler. Outbox'ta satır zaten
+  insert edilmiş olacağı için aynı sorun yok, ama kilitlenen satır kümesinin
+  boş olabileceği unutulmamalı.
+- **Idempotency tüketici tarafında.** `ProcessedMessage` tablosunun birincil
+  anahtarı mesaj kimliği olacak; teslimat en az bir kez ve aynı mesaj iki kez
+  gelebilir (ADR-0032).
+- **Yayınlayıcı Worker'da barındırılacak**, API'de değil. API yayınlar ama
+  outbox'ı boşaltmaz; iki host aynı satırları işlerse `SKIP LOCKED` çakışmayı
+  önler ama gereksiz yere iki kez denenir.
+- Dead-letter kuyruğu ve yeniden deneme politikası da bu fazda; Faz 10 bunları
+  bilinçli olarak bıraktı.
 
 ## Son Doğrulama Durumu
 
@@ -93,7 +97,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 386/386 başarılı (201 birim + 185 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 398/398 başarılı (201 birim + 197 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -118,6 +122,10 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `/app/{slug}/tasks` render (Faz 08) | HTTP 200, doğru başlık, uygulama hatası yok |
 | Uçtan uca dashboard akışı (Faz 09) | Çalışan API'ye karşı 11 adımın tamamı geçti — açık talep tanımı, atanmamış sayımı, geciken/bu hafta ayrımı, enum sıralı dağılım, izolasyon `404`, izleyici erişimi |
 | `/app/{slug}/dashboard` render (Faz 09) | HTTP 200, doğru başlık, uygulama hatası yok |
+| `docker compose ... up -d` (Faz 10) | `flowdesk-postgres` ve `flowdesk-rabbitmq` healthy |
+| `GET /health/ready` (Faz 10, broker ayakta) | 200, `postgres: Healthy`, `rabbitmq: Healthy` |
+| `GET /health/ready` (Faz 10, broker erişilemez) | 200, genel `Degraded`, `rabbitmq: Degraded` |
+| `dotnet run --project backend/src/FlowDesk.Worker` (Faz 10) | Başladı; "hiçbir kuyruk dinlenmiyor" logladı |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -220,11 +228,28 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   alanları değiştirir ve `null` "yok" demektir (ADR-0030)
 - Dashboard tek yanıt, önbelleksiz ve grafik kütüphanesiz; "açık talep"
   bitmemiş demektir ve üye sayımı elle kapsanır (ADR-0031)
+- Tek topic exchange, mesaj tipi başına kuyruk; abonelik `StartAsync`'te
+  kurulur; tüketiciler yalnızca Worker'da koşar; broker hazırlıkta `Degraded`
+  döner, `Unhealthy` değil (ADR-0032)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 10'da eklenenler:
+
+- `infra/docker-compose.yml` — `rabbitmq` servisi ve `rabbitmq-data` volume
+- `.env.example` — `RABBITMQ_*` ve `Messaging__*` değişkenleri (örnek değerler)
+- `backend/src/FlowDesk.Application/Abstractions/IMessagePublisher.cs` —
+  sözleşme ve `IntegrationMessage` taban kaydı
+- `backend/src/FlowDesk.Infrastructure/Messaging/` — bağlantı, yayınlayıcı,
+  tüketici sözleşmeleri, abonelik, barındırılan servis, JSON ayarları,
+  `MessageFormatException`
+- `backend/src/FlowDesk.Infrastructure/HealthChecks/RabbitMqHealthCheck.cs`
+- `backend/src/FlowDesk.Worker/Program.cs` — tüketici barındırma
+- `backend/tests/.../Support/RabbitMqContainerFixture.cs`
+- `backend/tests/.../Messaging/` — yayınlama, yönlendirme ve tüketici testleri
 
 Faz 09'da eklenenler:
 
@@ -362,7 +387,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 | Servis | Durum |
 |---|---|
 | PostgreSQL | **Aktif** — `flowdesk-postgres`, host portu 5433 |
-| RabbitMQ | Henüz projeye eklenmedi (Faz 10) |
+| RabbitMQ | **Aktif** — `flowdesk-rabbitmq`, host portları 5672 / 15672 (yönetim arayüzü) |
 | Mailpit | Henüz projeye eklenmedi (Faz 12) |
 | Azurite | Henüz projeye eklenmedi (Faz 13) |
 | Redis | Henüz projeye eklenmedi (Faz 15) |

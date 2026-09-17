@@ -19,7 +19,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 07 — Talepler
 - [x] Faz 08 — Görevler
 - [x] Faz 09 — Dashboard
-- [ ] Faz 10 — RabbitMQ ve Worker
+- [x] Faz 10 — RabbitMQ ve Worker
 - [ ] Faz 11 — Outbox
 - [ ] Faz 12 — E-posta ve Bildirimler
 - [ ] Faz 13 — Dosya Ekleri
@@ -36,13 +36,60 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 10 — RabbitMQ ve Worker**
+**Faz 11 — Outbox**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 10 — RabbitMQ ve Worker · Tamamlandı
+
+RabbitMQ bu fazda Compose'a eklendi; kademeli altyapı kuralı gereği daha önce
+değil (ADR-0008). Sağlık kontrolü `check_running`, çünkü portun açık olması
+broker'ın mesaj kabul etmeye hazır olduğu anlamına gelmiyor.
+
+Topoloji (ADR-0032): tek topic exchange, mesaj tipi başına ayrı kuyruk.
+Paylaşılan tek kuyruk, yavaş bir tüketicinin arkasında her türden mesajı
+bekletirdi.
+
+**Bu fazda yakalanan tasarım hatası.** Abonelik önce `ExecuteAsync` içinde
+kuruluyordu. `ExecuteAsync` arka planda çalışır ve host kendini ilk `await`'te
+başlamış sayar; aynı anda ayağa kalkan bir yayıncı hiçbir kuyruk bağlanmadan
+mesaj gönderebiliyordu ve topic exchange dinleyicisi olmayanı sessizce
+düşürüyordu. Test bunu yakaladı — tüketici hiç mesaj almadı. Kurulum
+`StartAsync`'e taşındı; artık host, topoloji var olmadan başlamış sayılmıyor.
+
+Bunun bilinçli sonucu: broker başlangıçta erişilemezse worker hiç başlamıyor.
+Tek işi tüketmek olan bir süreç için doğru başarısızlık bu.
+
+Sağlık kontrolünde broker `Degraded` döndürüyor, `Unhealthy` değil. API onsuz
+da her okumayı ve her yazmayı yapıyor; hazırlık kontrolünü düşürmek bütün
+sağlam örnekleri aynı anda rotasyondan çıkarır ve e-posta kuyruğa alınamadığı
+için ürünün tamamını durdururdu.
+
+Testler gerçek broker konteynerine karşı koşuyor (Testcontainers):
+
+- Yayınlanan mesaj, yönlendirme anahtarına bağlı kuyruğa ulaşıyor.
+- Başka anahtara bağlı kuyruk o mesajı almıyor; joker bağlama tüm aileyi alıyor.
+- Mesaj kimliğini, kiracısını ve tipini taşıyor; kalıcı olarak yazılıyor.
+- Her mesaj kendi DI kapsamında işleniyor.
+- Başarısız işleyicinin mesajı yeniden teslim ediliyor.
+- Okunamayan gövde yeniden kuyruğa alınmıyor ve arkasındaki mesajı tıkamıyor.
+- Broker erişilemezken hazırlık 200 dönüyor ve gövdede `Degraded` yazıyor.
+
+RabbitMQ 4, kalıcı olmayan ve exclusive olmayan kuyrukları reddediyor
+(`transient_nonexcl_queues` kullanımdan kalktı); test kuyrukları `durable` +
+`autoDelete` olarak bildiriliyor.
+
+Henüz kayıtlı tüketici **yok**. Worker bunu logda açıkça söylüyor; hiçbir şey
+işlemeyen bir tüketici, "hiçbir kuyruk dinlenmiyor" satırından çok daha zor fark
+edilirdi. İlk gerçek tüketici bildirimlerle geliyor (Faz 12).
+
+Testler: 398/398 (201 birim + 197 entegrasyon).
+
+---
 
 ### Faz 09 — Dashboard · Tamamlandı
 
@@ -635,6 +682,19 @@ Faz 09 sonunda:
 | Çalışan API'ye karşı 11 adımlık dashboard akışı | Tamamı geçti — açık talep tanımı, atanmamış sayımı, geciken/bu hafta ayrımı, enum sıralı dağılım, izolasyon `404`, izleyici erişimi |
 | `/app/{slug}/dashboard` | HTTP 200, doğru başlık, uygulama hatası yok |
 | Migration | **Yok** — bu faz yalnızca okuma yapıyor |
+
+Faz 10 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 398/398 başarılı (201 birim + 197 entegrasyon) |
+| `docker compose ... config` | Geçerli |
+| `docker compose ... up -d` | `flowdesk-postgres` ve `flowdesk-rabbitmq` healthy |
+| `GET /health/ready` (broker ayakta) | 200, `postgres: Healthy`, `rabbitmq: Healthy` |
+| `GET /health/ready` (broker erişilemez) | 200, genel `Degraded`, `rabbitmq: Degraded` — testle doğrulandı |
+| `dotnet run --project backend/src/FlowDesk.Worker` | Başladı; "hiçbir kuyruk dinlenmiyor" logladı |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
