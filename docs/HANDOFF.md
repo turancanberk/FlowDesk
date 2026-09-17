@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 11 birleştirildi) |
+| Aktif dal | `main` (Faz 12 birleştirildi) |
 | Son commit | `07b583f — Merge branch 'feat/outbox'` (Faz 11) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -36,14 +36,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 09 — Dashboard
 - Faz 10 — RabbitMQ ve Worker
 - Faz 11 — Outbox
+- Faz 12 — E-posta ve Bildirimler
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 12 — E-posta ve Bildirimler** (henüz başlanmadı)
+**Faz 13 — Dosya Ekleri** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 12 kapsamında henüz iş yapılmadı.
+Faz 13 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -51,44 +52,43 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 12'nin tamamı:
+Faz 13'ün tamamı:
 
-- Mailpit **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
-- `IEmailSender` soyutlaması ve MailKit tabanlı uygulaması
-- Davet e-postası ve talep atama bildirimi — ilk gerçek tüketiciler
-- `Notification` tablosu ve uygulama içi bildirim arayüzü
-- Mailpit üzerinden uçtan uca doğrulama
+- Azurite **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
+- `IFileStorage` soyutlaması ve Blob uygulaması
+- Güvenli yükleme: boyut limiti, içerik tipi doğrulama, dosya adı temizleme,
+  kiracı sahipliği kontrolü, sunucuda üretilen depolama anahtarı
+- İndirme yetkilendirmesi ve kiracı izolasyon testleri
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/notifications` dalını aç. Önce `infra/docker-compose.yml`'a Mailpit'i
-ekle (SMTP 1025, arayüz 8025) ve `.env.example`'a karşılık gelen değişkenleri
-yaz — **gerçek kimlik bilgisi değil**, örnek değer.
+`feat/attachments` dalını aç. Önce `infra/docker-compose.yml`'a Azurite'i ekle
+(blob 10000, queue 10001, table 10002) ve `.env.example`'a karşılık gelen
+değişkenleri yaz — **gerçek kimlik bilgisi değil**, örnek değer. Azurite'in iyi
+bilinen geliştirme hesabı anahtarı herkese açıktır ve yalnızca yerelde
+geçerlidir; yine de örnek dosyaya yazılırken bunun bir geliştirme anahtarı
+olduğu açıkça belirtilmeli.
 
-Ardından `FlowDesk.Application/Abstractions/IEmailSender.cs` sözleşmesini yaz
-ve `FlowDesk.Infrastructure/Email/` altında MailKit uygulamasını ver.
-`MailKit` paketi henüz `Directory.Packages.props` içinde **yok**; sürümünü
-kurulum anında resmî registry'den doğrula (ADR-0016).
+Ardından `FlowDesk.Application/Abstractions/IFileStorage.cs` sözleşmesini yaz ve
+`FlowDesk.Infrastructure/Storage/` altında Blob uygulamasını ver.
+`Azure.Storage.Blobs` paketi henüz `Directory.Packages.props` içinde **yok**;
+sürümünü kurulum anında resmî registry'den doğrula (ADR-0016).
 
 Dikkat edilecekler:
 
-- **İlk gerçek tüketiciler burada.** `AddMessageConsumer<TMessage, TConsumer>`
-  hazır ve `FlowDesk.Worker/Program.cs` içinde nereye yazılacağı yorumla
-  belirtilmiş. Kuyruk adı aynı zamanda `ProcessedMessages` içindeki tüketici
-  adıdır (ADR-0033), bu yüzden anlamlı ve kalıcı seçilmeli.
-- **Idempotency zaten host'ta.** Tüketici kendi kaydını tutmuyor; ancak
-  **e-posta gönderimi veritabanı dışında** ve geri alınamıyor. Bir tüketici
-  önce e-postayı gönderip sonra hata alırsa transaction geri döner ve mesaj
-  yeniden teslim edilir — e-posta ikinci kez gider. Bunu önlemenin yolu
-  gönderimi işin **son** adımı yapmak ya da gönderimi ayrıca kaydetmek;
-  hangisi seçilirse ADR'ye yazılmalı (ADR-0033'ün son bölümü bu sorunu
-  adlandırıyor).
-- **Kiracı kapsamı mesajdan gelir.** Tüketicinin `ITenantContext`'i yok ve
-  `FlowDeskDbContext` filtresi Worker'da etkisiz; yazılan her satırın
-  `TenantId`'si mesajın taşıdığı değerden gelmeli.
-- **Davet e-postası mevcut akışı değiştirmemeli.** Faz 05'te davet bağlantısı
-  arayüzden alınıyor ve token yalnızca bir kez dönüyor; e-posta bunun yerine
-  değil, yanına ekleniyor.
+- **Depolama anahtarı sunucuda üretilir.** İstemciden gelen dosya adı asla yol
+  olarak kullanılmaz: `../` içeren bir ad başka bir kiracının alanına yazardı.
+  Anahtar `TenantId` içermeli, böylece yanlışlıkla çapraz erişim bile yol
+  düzeyinde ayrılmış olur (`docs/DATABASE.md`, Attachment şeması).
+- **İçerik tipi beyaz listeyle doğrulanır**, kara listeyle değil. Kara liste
+  her yeni tehlikeli tip için güncellenmek zorundadır ve biri her zaman atlanır.
+- **İndirme de yetkilendirilir.** Dosyanın kendisi kiracıya ait; bağlantıyı
+  bilen herkesin indirebilmesi izolasyonu deler. Testler bunu ayrıca
+  doğrulamalı.
+- **Boyut limiti hem uygulamada hem sunucuda.** ASP.NET Core'un varsayılan
+  istek gövdesi limiti ayrı bir ayar; yalnızca uygulama tarafında kontrol
+  etmek, limitin üstündeki isteğin okunmadan reddedilmesini sağlamaz.
+- Mevcut `TestWorkspace` fixture'ı ve `TicketTestClient` deseni izlenebilir.
 
 ## Son Doğrulama Durumu
 
@@ -98,7 +98,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 406/406 başarılı (201 birim + 205 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 421/421 başarılı (201 birim + 220 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -129,6 +129,9 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `dotnet run --project backend/src/FlowDesk.Worker` (Faz 10) | Başladı; "hiçbir kuyruk dinlenmiyor" logladı |
 | `dotnet run --project backend/src/FlowDesk.Worker` (Faz 11) | Outbox işleyici başladı ve `FOR UPDATE SKIP LOCKED` sorgusunu gerçekten çalıştırdı |
 | Uçtan uca talep akışı (Faz 11) | Tekrar koşuldu; yayınlayıcı değişimi ürün akışını bozmadı |
+| `docker compose ... up -d` (Faz 12) | `postgres`, `rabbitmq` ve `mailpit` healthy |
+| Worker (Faz 12) | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
+| Mailpit üzerinden 8 adımlık akış (Faz 12) | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -238,11 +241,34 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   outbox satırı ekler, `IBrokerPublisher`'ı yalnızca Worker'daki işleyici
   çağırır; idempotency host'ta, `ProcessedMessages` anahtarı mesaj **ve**
   tüketici (ADR-0033)
+- Tüketicide veritabanı yazması **önce**, e-posta gönderimi **en son**; atama
+  e-posta üretir, yorum üretmez; bildirim listesi her zaman çağıranın kendi
+  bildirimleridir (ADR-0034)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 12'de eklenenler:
+
+- `infra/docker-compose.yml` — `mailpit` servisi ve `mailpit-data` volume
+- `.env.example` — `Email__*` değişkenleri (örnek değerler)
+- `backend/src/FlowDesk.Application/Abstractions/IEmailSender.cs`
+- `backend/src/FlowDesk.Application/Tickets/TicketMessages.cs`,
+  `Team/TeamMessages.cs` — üç entegrasyon mesajı
+- `backend/src/FlowDesk.Application/Notifications/` — liste ve okundu işaretleme
+- `backend/src/FlowDesk.Domain/Notifications/` — `Notification`,
+  `NotificationType`
+- `backend/src/FlowDesk.Infrastructure/Email/` — `EmailOptions`,
+  `SmtpEmailSender`
+- `backend/src/FlowDesk.Infrastructure/Notifications/` — üç tüketici,
+  `EmailBodies`, `NotificationPayloads`
+- `backend/src/FlowDesk.Api/Endpoints/NotificationEndpoints.cs`
+- `backend/src/FlowDesk.Worker/Program.cs` — tüketici kayıtları
+- `backend/tests/.../Notifications/` — API ve tüketici testleri
+- `frontend/src/features/notifications/` — panel ve veri katmanı
+- `frontend/src/components/product/app-sidebar.tsx` — bildirim yuvası
 
 Faz 11'de eklenenler:
 
@@ -393,9 +419,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddOutbox` |
+| Son migration | `AddNotifications` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
@@ -409,7 +435,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 |---|---|
 | PostgreSQL | **Aktif** — `flowdesk-postgres`, host portu 5433 |
 | RabbitMQ | **Aktif** — `flowdesk-rabbitmq`, host portları 5672 / 15672 (yönetim arayüzü) |
-| Mailpit | Henüz projeye eklenmedi (Faz 12) |
+| Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025 |
 | Azurite | Henüz projeye eklenmedi (Faz 13) |
 | Redis | Henüz projeye eklenmedi (Faz 15) |
 | Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |

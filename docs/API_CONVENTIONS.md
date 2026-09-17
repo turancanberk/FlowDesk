@@ -67,6 +67,7 @@ DELETE /api/workspaces/{workspaceSlug}/tasks/{id}
 GET    /api/workspaces/{workspaceSlug}/activity
 GET    /api/workspaces/{workspaceSlug}/dashboard
 GET    /api/workspaces/{workspaceSlug}/notifications
+POST   /api/workspaces/{workspaceSlug}/notifications/read
 ```
 
 ### Sağlık
@@ -92,6 +93,12 @@ GET    /health/ready     # zorunlu bağımlılıklar hazır mı
   anlam ancak kendi rotasında net ifade edilebilir. `PATCH /tickets/{id}` geriye
   kalan alan düzenlemesini (konu, açıklama, öncelik, müşteri) yapar ve
   `version` alanını zorunlu tutar.
+- **`POST /notifications/read`** tek bir bildirimi değil, bir kümeyi okundu
+  işaretler. Paneli açmak birden fazla satırı aynı anda okunur yapıyor ve satır
+  başına bir istek, kimsenin izlemediği bir şey için yazma yığını üretirdi. Boş
+  liste "hepsi" demektir. Bildirim listesi her zaman çağıranın kendi
+  bildirimleridir; kimin akışının okunacağını belirten bir parametre yoktur
+  (ADR-0034).
 - **`POST /tasks/{id}/status`** listedeki onay kutusunun tek istek olması için
   var. `PATCH /tasks/{id}` görevin **tüm** düzenlenebilir alanlarını değiştirir
   ve bunlar arasında liste satırının taşımadığı `description` da vardır; ayrı
