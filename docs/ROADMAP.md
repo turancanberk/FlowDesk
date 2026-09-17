@@ -97,3 +97,9 @@ eklenmez.
 - **İmzalı depolama bağlantısı (SAS).** Bilinçli olarak kullanılmıyor: dosya
   trafiğini API'den çıkarırdı ama kiracı izolasyonunu adresi bilen herkesin
   eline bırakırdı.
+
+## Faz 14 sonrası bilinerek bırakılan
+
+- **Etkinlik saklama süresi (retention).** `ActivityEvents` tablosu sınırsız
+  büyüyor. Gerçek bir dağıtımda kesme veya arşivleme politikası gerekirdi;
+  burada kapsam dışı (ADR-0036).

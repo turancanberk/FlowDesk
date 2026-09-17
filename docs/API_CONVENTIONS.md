@@ -67,6 +67,7 @@ POST   /api/workspaces/{workspaceSlug}/tasks/{id}/status
 DELETE /api/workspaces/{workspaceSlug}/tasks/{id}
 
 GET    /api/workspaces/{workspaceSlug}/activity
+#      ?subjectType&subjectId&type&actorUserId&page&pageSize
 GET    /api/workspaces/{workspaceSlug}/dashboard
 GET    /api/workspaces/{workspaceSlug}/notifications
 POST   /api/workspaces/{workspaceSlug}/notifications/read

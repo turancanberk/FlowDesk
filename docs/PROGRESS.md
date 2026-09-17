@@ -23,7 +23,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 11 — Outbox
 - [x] Faz 12 — E-posta ve Bildirimler
 - [x] Faz 13 — Dosya Ekleri
-- [ ] Faz 14 — Denetim ve Etkinlik
+- [x] Faz 14 — Denetim ve Etkinlik
 - [ ] Faz 15 — Redis Önbellek
 - [ ] Faz 16 — Gelişmiş Entegrasyon Testleri
 - [ ] Faz 17 — Playwright E2E
@@ -36,13 +36,44 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 14 — Denetim ve Etkinlik**
+**Faz 15 — Redis Önbellek**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 14 — Denetim ve Etkinlik · Tamamlandı
+
+Bu faz yeni altyapı eklemedi. On sekiz olay türü, on altı use case'e bağlandı.
+
+Kararlar ADR-0036'da:
+
+- **Kayıt senkron**, iş değişikliğiyle aynı transaction'da. Outbox hazırdı ama
+  kullanılmadı: değişiklik commit edilip kayıt edilmezse geçmiş tam da önemli
+  olan biçimde yanlış olur — hiçbir şey olmadığını söyler.
+- **Ekleme-yalnızca.** Değiştiren ya da silen bir metot yok.
+- **Özneye ve aktöre yabancı anahtar yok.** Cascade olsaydı, silmeyi kaydeden
+  olayı kendi cascade'i silerdi.
+- **Yük hassas veri taşımıyor.** Davet kaydında token yok, yorum metni
+  kaydedilmiyor.
+- **Her üye okuyabiliyor**, İzleyici dâhil.
+
+Her yazma değil, her **karar** kaydediliyor. Değişmeyen bir şey kayda girmiyor:
+aynı durumu tekrar seçmek, aynı rolü tekrar vermek.
+
+Davet kabulü, çalışma alanı açıkça verilerek kaydedilen tek yer — kişi o ana
+kadar üye değil. Ayrı bir metot olması bilinçli: sıradan metot çalışma alanı
+almıyor ve olayın yanlış alana yazılmasını imkânsız kılan şey bu.
+
+Arayüz: kenar çubuğundaki Etkinlik bölümü. Silinen özneler bağlantı taşımıyor —
+kayıt öznesinden uzun yaşıyor ve gitmiş bir şeye bağlantı, bağlantısızlıktan
+kötü.
+
+Testler: 470/470 (225 birim + 245 entegrasyon).
+
+---
 
 ### Faz 13 — Dosya Ekleri · Tamamlandı
 
@@ -870,6 +901,17 @@ Faz 13 sonunda:
 | `npm --prefix frontend run lint / typecheck / build` | Başarılı |
 | `docker compose ... up -d` | Dört servis de healthy |
 | Çalışan API'ye karşı 13 adımlık dosya akışı | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
+
+Faz 14 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 470/470 başarılı (225 birim + 245 entegrasyon) |
+| `dotnet ef migrations add AddActivityEvents` + `database update` | Uygulandı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| Çalışan API'ye karşı 10 adımlık etkinlik akışı | Tamamı geçti — sıra, davet kaydında token olmaması, katılımın doğru alana yazılması, durum değişiminin iki ucu, tek kaydın geçmişi, silinen talebin kaydının kalması, izolasyon, rol değişimi, izleyici erişimi |
+| `/app/{slug}/activity` | HTTP 200, doğru başlık, uygulama hatası yok |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
