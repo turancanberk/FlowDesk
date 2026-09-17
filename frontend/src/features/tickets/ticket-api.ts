@@ -1,7 +1,8 @@
-import { apiFetch } from "@/lib/api/http-client";
+import { apiDownload, apiFetch } from "@/lib/api/http-client";
 import type { TicketStatus } from "@/types/domain";
 import type {
   CreateTicketInput,
+  TicketAttachment,
   TicketComment,
   TicketDetail,
   TicketFilters,
@@ -110,6 +111,59 @@ export function listTicketComments(
   signal?: AbortSignal,
 ): Promise<TicketComment[]> {
   return apiFetch<TicketComment[]>(`${basePath(slug)}/${ticketId}/comments`, { signal });
+}
+
+export function listAttachments(
+  slug: string,
+  ticketId: string,
+  signal?: AbortSignal,
+): Promise<TicketAttachment[]> {
+  return apiFetch<TicketAttachment[]>(`${basePath(slug)}/${ticketId}/attachments`, { signal });
+}
+
+/**
+ * Uploads a file.
+ *
+ * Sent as multipart because that is what a file is. The field name matches the
+ * parameter the endpoint binds, so renaming one without the other produces a
+ * request the server reads as having no file at all.
+ */
+export function uploadAttachment(
+  slug: string,
+  ticketId: string,
+  file: File,
+): Promise<TicketAttachment> {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+
+  return apiFetch<TicketAttachment>(`${basePath(slug)}/${ticketId}/attachments`, {
+    method: "POST",
+    formData,
+  });
+}
+
+/**
+ * Fetches an attachment's content.
+ *
+ * Through the API rather than a direct link: the bytes are private and the
+ * request has to carry the bearer token.
+ */
+export function downloadAttachment(
+  slug: string,
+  ticketId: string,
+  attachmentId: string,
+): Promise<{ blob: Blob; fileName: string | null }> {
+  return apiDownload(`${basePath(slug)}/${ticketId}/attachments/${attachmentId}`);
+}
+
+export function deleteAttachment(
+  slug: string,
+  ticketId: string,
+  attachmentId: string,
+): Promise<void> {
+  return apiFetch<void>(`${basePath(slug)}/${ticketId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+  });
 }
 
 export function addTicketComment(

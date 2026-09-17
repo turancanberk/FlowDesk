@@ -33,6 +33,10 @@ using FlowDesk.Application.Tickets.GetTicket;
 using FlowDesk.Application.Tickets.ListTicketComments;
 using FlowDesk.Application.Tickets.ListTickets;
 using FlowDesk.Application.Tickets.UpdateTicket;
+using FlowDesk.Application.Tickets.DeleteAttachment;
+using FlowDesk.Application.Tickets.DownloadAttachment;
+using FlowDesk.Application.Tickets.ListAttachments;
+using FlowDesk.Application.Tickets.UploadAttachment;
 using FlowDesk.Application.Tasks.ChangeTaskStatus;
 using FlowDesk.Application.Tasks.CreateTask;
 using FlowDesk.Application.Tasks.DeleteTask;
@@ -97,6 +101,10 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ListTicketsHandler>();
         services.AddScoped<AddTicketCommentHandler>();
         services.AddScoped<ListTicketCommentsHandler>();
+        services.AddScoped<UploadAttachmentHandler>();
+        services.AddScoped<DownloadAttachmentHandler>();
+        services.AddScoped<ListAttachmentsHandler>();
+        services.AddScoped<DeleteAttachmentHandler>();
 
         services.AddScoped<CreateTaskHandler>();
         services.AddScoped<UpdateTaskHandler>();

@@ -20,6 +20,15 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  /**
+   * A multipart body, for file uploads.
+   *
+   * Sent instead of {@link body}, and deliberately without a `Content-Type`
+   * header: the browser has to set one itself because it alone knows the
+   * multipart boundary it generated. Setting it by hand produces a body the
+   * server cannot parse.
+   */
+  formData?: FormData;
   signal?: AbortSignal;
   /** Set for the auth endpoints themselves, which must not trigger a refresh. */
   skipAuthRefresh?: boolean;
@@ -122,6 +131,78 @@ export async function apiFetch<TResponse>(
   return (await response.json()) as TResponse;
 }
 
+/**
+ * Fetches a file rather than JSON.
+ *
+ * Goes through the same client as everything else, which is the point: the
+ * download is authorised by the bearer token like any other request. A plain
+ * `<a href>` would send no token and be refused, and making the file reachable
+ * without one would put tenant isolation in the hands of whoever had the
+ * address.
+ */
+export async function apiDownload(
+  path: string,
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; fileName: string | null }> {
+  if (isAccessTokenStale()) {
+    await refreshSession();
+  }
+
+  let response = await send(path, { signal });
+
+  if (response.status === 401) {
+    const refreshed = await refreshSession();
+
+    if (refreshed) {
+      response = await send(path, { signal });
+    }
+  }
+
+  if (!response.ok) {
+    const error = await toApiError(response);
+
+    if (error.isUnauthorized) {
+      clearAccessToken();
+    }
+
+    throw error;
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: readFileName(response.headers.get("Content-Disposition")),
+  };
+}
+
+/**
+ * Reads the file name the server suggested.
+ *
+ * Prefers the `filename*` form, which carries an encoding and is what a Turkish
+ * name arrives in; the plain `filename` is the fallback for names that happen
+ * to be ASCII.
+ */
+function readFileName(contentDisposition: string | null): string | null {
+  if (contentDisposition === null) {
+    return null;
+  }
+
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+
+  if (encoded?.[1] !== undefined) {
+    try {
+      return decodeURIComponent(encoded[1]);
+    } catch {
+      // A malformed header should not stop the download; the caller falls
+      // back to the name it already knows.
+      return null;
+    }
+  }
+
+  const plain = /filename="?([^";]+)"?/i.exec(contentDisposition);
+
+  return plain?.[1] ?? null;
+}
+
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = {
     // Forces a CORS preflight on cross-site requests, which blocks
@@ -136,9 +217,11 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let body: string | undefined;
+  let body: BodyInit | undefined;
 
-  if (options.body !== undefined) {
+  if (options.formData !== undefined) {
+    body = options.formData;
+  } else if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.body);
   }

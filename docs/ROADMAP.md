@@ -88,3 +88,12 @@ Talep durumları sabit bir kümedir. Kiracı başına özelleştirilebilir durum
 makinesi, domain invariantlarını çalışma zamanı verisine taşır ve doğrulamayı
 önemli ölçüde karmaşıklaştırır. Gerçek bir kullanıcı talebi oluşmadan
 eklenmez.
+
+## Faz 13 sonrası bilinerek bırakılan
+
+- **Yüklenen dosyalarda virüs taraması.** Gerçek bir üründe gerekli olurdu;
+  burada kapsam dışı. Beyaz liste ve özel konteyner, taramanın yerini tutmaz —
+  yalnızca saldırı yüzeyini daraltır (ADR-0035).
+- **İmzalı depolama bağlantısı (SAS).** Bilinçli olarak kullanılmıyor: dosya
+  trafiğini API'den çıkarırdı ama kiracı izolasyonunu adresi bilen herkesin
+  eline bırakırdı.

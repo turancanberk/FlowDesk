@@ -63,6 +63,8 @@ public sealed class FlowDeskDbContext
 
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
 
+    public DbSet<Attachment> Attachments => Set<Attachment>();
+
     /// <summary>
     /// Per-workspace ticket numbering. Not covered by the workspace query
     /// filter because it is keyed by workspace already and is only ever read

@@ -46,6 +46,12 @@ public interface IFlowDeskDbContext
 
     DbSet<TicketComment> TicketComments { get; }
 
+    /// <summary>
+    /// File records. The bytes live in object storage; this is what makes them
+    /// findable, authorisable and removable.
+    /// </summary>
+    DbSet<Attachment> Attachments { get; }
+
     /// <summary>Per-workspace ticket numbering counters.</summary>
     DbSet<TenantCounter> TenantCounters { get; }
 

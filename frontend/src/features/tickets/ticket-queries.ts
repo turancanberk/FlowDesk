@@ -7,11 +7,14 @@ import {
   assignTicket,
   changeTicketStatus,
   createTicket,
+  deleteAttachment,
   deleteTicket,
   getTicket,
+  listAttachments,
   listTicketComments,
   listTickets,
   updateTicket,
+  uploadAttachment,
 } from "./ticket-api";
 import type { CreateTicketInput, TicketDetail, TicketFilters, UpdateTicketInput } from "./ticket-types";
 
@@ -21,6 +24,8 @@ export const ticketKeys = {
   detail: (slug: string, ticketId: string) => [...ticketKeys.all(slug), "detail", ticketId] as const,
   comments: (slug: string, ticketId: string) =>
     [...ticketKeys.all(slug), "comments", ticketId] as const,
+  attachments: (slug: string, ticketId: string) =>
+    [...ticketKeys.all(slug), "attachments", ticketId] as const,
 };
 
 export function useTickets(slug: string, filters: TicketFilters) {
@@ -45,6 +50,35 @@ export function useTicketComments(slug: string, ticketId: string) {
   return useQuery({
     queryKey: ticketKeys.comments(slug, ticketId),
     queryFn: ({ signal }) => listTicketComments(slug, ticketId, signal),
+  });
+}
+
+export function useTicketAttachments(slug: string, ticketId: string) {
+  return useQuery({
+    queryKey: ticketKeys.attachments(slug, ticketId),
+    queryFn: ({ signal }) => listAttachments(slug, ticketId, signal),
+  });
+}
+
+export function useUploadAttachment(slug: string, ticketId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => uploadAttachment(slug, ticketId, file),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.attachments(slug, ticketId) });
+    },
+  });
+}
+
+export function useDeleteAttachment(slug: string, ticketId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (attachmentId: string) => deleteAttachment(slug, ticketId, attachmentId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.attachments(slug, ticketId) });
+    },
   });
 }
 

@@ -31,6 +31,7 @@ import { ApiError } from "@/lib/api/api-error";
 import type { TicketStatus } from "@/types/domain";
 import type { Workspace } from "@/features/workspaces/workspace-types";
 import { useMembers } from "@/features/team/team-queries";
+import { TicketAttachments } from "./ticket-attachments";
 import { TicketComments } from "./ticket-comments";
 import { TicketFormDialog } from "./ticket-form-dialog";
 import {
@@ -157,6 +158,17 @@ function TicketDetailContent({
                   {ticket.description}
                 </p>
               )}
+            </div>
+          </Surface>
+
+          <Surface>
+            <div className="p-4">
+              <h2 className="text-foreground mb-4 text-sm font-semibold">Dosyalar</h2>
+              <TicketAttachments
+                workspaceSlug={workspace.slug}
+                ticketId={ticket.id}
+                canManage={canManage}
+              />
             </div>
           </Surface>
 
