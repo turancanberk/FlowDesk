@@ -1,11 +1,13 @@
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Application.Authentication;
+using FlowDesk.Application.Tickets.UploadAttachment;
 using FlowDesk.Infrastructure.Authentication;
 using FlowDesk.Infrastructure.Email;
 using FlowDesk.Infrastructure.HealthChecks;
 using FlowDesk.Infrastructure.Messaging;
 using FlowDesk.Infrastructure.Identity;
 using FlowDesk.Infrastructure.Persistence;
+using FlowDesk.Infrastructure.Storage;
 using FlowDesk.Infrastructure.Time;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using Azure.Storage.Blobs;
 using Npgsql;
 
 namespace FlowDesk.Infrastructure;
@@ -46,6 +49,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddFlowDeskAuthentication(configuration);
         services.AddFlowDeskMessaging(configuration);
         services.AddFlowDeskEmail(configuration);
+        services.AddFlowDeskStorage(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
 
         return services;
@@ -235,6 +239,36 @@ public static class InfrastructureServiceCollectionExtensions
           that retries rather than an instance that should leave rotation.
         */
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddFlowDeskStorage(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<StorageOptions>()
+            .Bind(configuration.GetSection(StorageOptions.SectionName))
+            .ValidateDataAnnotations()
+            // Fail at startup rather than on the first upload: a missing
+            // connection string is a deployment error, not a runtime condition.
+            .ValidateOnStart();
+
+        // One client per process. It is thread-safe and pools its connections;
+        // building one per request would discard that pool every time.
+        services.AddSingleton(provider =>
+            new BlobServiceClient(
+                provider.GetRequiredService<IOptions<StorageOptions>>().Value.ConnectionString));
+
+        services.AddSingleton<IFileStorage, BlobFileStorage>();
+
+        /*
+          The application layer states the limit it needs without reaching for
+          infrastructure's configuration type (ADR-0021). The same number also
+          bounds the request body, which is set on the endpoint.
+        */
+        services.AddSingleton<IAttachmentLimits, AttachmentLimits>();
 
         return services;
     }

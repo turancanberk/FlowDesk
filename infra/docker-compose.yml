@@ -4,9 +4,9 @@
 # Kademeli altyapı ilkesi (ADR-0008): bir servis, onu gerçekten kullanan faz
 # gelmeden buraya eklenmez.
 #
-# Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10) ve Mailpit (Faz 12) vardır.
-# Sıradaki eklemeler: Azurite (Faz 13), Redis (Faz 15),
-# Prometheus ve Grafana (Faz 18).
+# Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10), Mailpit (Faz 12) ve
+# Azurite (Faz 13) vardır.
+# Sıradaki eklemeler: Redis (Faz 15), Prometheus ve Grafana (Faz 18).
 #
 # Kullanım (depo kökünden):
 #   cp .env.example .env
@@ -94,6 +94,32 @@ services:
       retries: 5
       start_period: 10s
 
+  azurite:
+    # Azure Blob Storage'ın yerel öykünücüsü. Üretimde gerçek bir depolama
+    # hesabı kullanılacak; bağlantı dizesi dışında hiçbir şey değişmiyor.
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: flowdesk-azurite
+    restart: unless-stopped
+    # Yalnızca blob servisi. Queue ve table bu üründe kullanılmıyor ve
+    # açık bırakmak, kullanılmayan iki dinleyici demek olurdu.
+    command: >-
+      azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
+    ports:
+      - "${AZURITE_BLOB_PORT:-10000}:10000"
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      # Azurite imajında curl yok; Node zaten var ve kendi portunu yoklayabiliyor.
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('net').connect(10000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   postgres-data:
     name: flowdesk-postgres-data
@@ -101,3 +127,5 @@ volumes:
     name: flowdesk-rabbitmq-data
   mailpit-data:
     name: flowdesk-mailpit-data
+  azurite-data:
+    name: flowdesk-azurite-data

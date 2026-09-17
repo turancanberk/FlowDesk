@@ -91,3 +91,13 @@ export const INITIAL_TICKET_FILTERS: TicketFilters = {
 export function formatTicketNumber(value: number): string {
   return `TLP-${value}`;
 }
+
+export type TicketAttachment = {
+  id: string;
+  fileName: string;
+  contentType: string;
+  /** Raw bytes; formatted for display at the presentation layer. */
+  sizeInBytes: number;
+  uploadedByUserId: string;
+  createdAt: string;
+};

@@ -46,6 +46,18 @@ public sealed record TicketDetailResponse(
     IReadOnlyCollection<TicketStatus> AvailableTransitions,
     uint Version);
 
+/// <param name="SizeInBytes">
+/// Sent raw. Turning bytes into "2,4 MB" is a presentation decision and belongs
+/// where the locale is known.
+/// </param>
+public sealed record AttachmentResponse(
+    Guid Id,
+    string FileName,
+    string ContentType,
+    long SizeInBytes,
+    Guid UploadedByUserId,
+    DateTimeOffset CreatedAt);
+
 public sealed record TicketCommentResponse(
     Guid Id,
     Guid AuthorUserId,

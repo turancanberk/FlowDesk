@@ -26,6 +26,7 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
     private readonly string _connectionString;
     private readonly string _brokerHost;
     private readonly int _brokerPort;
+    private readonly string _storageConnectionString;
 
     /// <param name="brokerHost">
     /// Optional, and unreachable by default.
@@ -37,14 +38,24 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
     /// opened lazily, so an unreachable broker costs nothing until something
     /// publishes — and refuses immediately when it does.
     /// </param>
+    /// <param name="storageConnectionString">
+    /// Optional, and deliberately unreachable by default for the same reason as
+    /// the broker: a test that never uploads should not depend on what else is
+    /// running on the machine.
+    /// </param>
     public FlowDeskApiFactory(
         string connectionString,
         string brokerHost = "127.0.0.1",
-        int brokerPort = 1)
+        int brokerPort = 1,
+        string? storageConnectionString = null)
     {
         _connectionString = connectionString;
         _brokerHost = brokerHost;
         _brokerPort = brokerPort;
+        _storageConnectionString = storageConnectionString
+            ?? "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
+               + "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
+               + "BlobEndpoint=http://127.0.0.1:1/devstoreaccount1;";
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -80,6 +91,12 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
                 ["Email:FromAddress"] = "tests@flowdesk.invalid",
                 ["Email:FromDisplayName"] = "FlowDesk Tests",
                 ["Email:WebBaseUrl"] = "http://localhost:3000",
+
+                ["Storage:ConnectionString"] = _storageConnectionString,
+                // A container per test run, so one run's blobs cannot be seen
+                // by another against a shared emulator.
+                ["Storage:ContainerName"] = $"tests-{Guid.CreateVersion7():N}",
+                ["Storage:MaximumFileSizeBytes"] = "1048576",
 
                 ["Auth:SigningKey"] = TestSigningKey,
                 ["Auth:Issuer"] = "flowdesk-api-tests",

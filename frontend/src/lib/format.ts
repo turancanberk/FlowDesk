@@ -76,6 +76,31 @@ export function formatRelativeTime(value: Date | string, now: Date = new Date())
   return relativeTimeFormatter.format(Math.round(diffInSeconds / 31_557_600), "year");
 }
 
+/**
+ * 2,4 MB · 812 KB · 640 B
+ *
+ * Bin tabanı değil 1024 tabanı kullanılır: dosya boyutu işletim sisteminde de
+ * böyle gösteriliyor ve iki farklı sayı görmek insanı dosyanın değiştiğini
+ * düşündürür.
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${formatNumber(bytes)} B`;
+  }
+
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  // Tek ondalık yeterli; ikinci hane kimsenin kararını değiştirmiyor.
+  return `${value.toLocaleString(LOCALE, { maximumFractionDigits: 1 })} ${units[unitIndex]}`;
+}
+
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
 }

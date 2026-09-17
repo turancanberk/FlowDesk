@@ -44,6 +44,29 @@ public sealed record TicketDetail(
     IReadOnlyCollection<TicketStatus> AvailableTransitions,
     uint Version);
 
+/// <param name="UploadedByUserId">
+/// Resolved to a name by the client from the team list it already has, rather
+/// than joined here: an attachment list is short and the lookup would add a
+/// query for a line of text.
+/// </param>
+public sealed record AttachmentItem(
+    Guid Id,
+    string FileName,
+    string ContentType,
+    long SizeInBytes,
+    Guid UploadedByUserId,
+    DateTimeOffset CreatedAt);
+
+/// <summary>An attachment's content, ready to be streamed back.</summary>
+/// <remarks>
+/// The caller disposes the stream. It is opened rather than buffered so a large
+/// file does not have to fit in memory twice on its way out.
+/// </remarks>
+public sealed record AttachmentDownload(
+    Stream Content,
+    string FileName,
+    string ContentType);
+
 public sealed record TicketCommentItem(
     Guid Id,
     Guid AuthorUserId,
