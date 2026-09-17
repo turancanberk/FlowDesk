@@ -11,12 +11,16 @@ using RabbitMQ.Client;
 namespace FlowDesk.IntegrationTests.Messaging;
 
 /// <summary>
-/// Publishing and consuming against a real broker.
+/// Handing messages to a real broker.
 /// </summary>
 /// <remarks>
 /// The behaviour being checked belongs to RabbitMQ: topic routing, durable
-/// queues, manual acknowledgement and redelivery. A substitute would agree with
-/// whatever the code did, which is why these run against a container.
+/// queues and message properties. A substitute would agree with whatever the
+/// code did, which is why these run against a container.
+///
+/// These drive <c>IBrokerPublisher</c>, which is what the outbox processor
+/// calls. Use cases never reach the broker directly — they write an outbox row
+/// (ADR-0033), which <c>OutboxTests</c> covers.
 /// </remarks>
 [Collection(IntegrationTestSuite.Name)]
 public sealed class MessagingTests
@@ -37,7 +41,7 @@ public sealed class MessagingTests
         var sent = new ProbeMessage(
             Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "merhaba");
 
-        await host.Publisher.PublishAsync(sent, Cancellation);
+        await host.PublishAsync(sent, Cancellation);
 
         var received = await host.ReadOneAsync<ProbeMessage>(queue, Cancellation);
 
@@ -62,7 +66,7 @@ public sealed class MessagingTests
         var probeQueue = await host.DeclareQueueAsync(ProbeMessage.Key, Cancellation);
         var otherQueue = await host.DeclareQueueAsync(OtherProbeMessage.Key, Cancellation);
 
-        await host.Publisher.PublishAsync(
+        await host.PublishAsync(
             new ProbeMessage(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "yalnızca probe"),
             Cancellation);
@@ -84,11 +88,11 @@ public sealed class MessagingTests
 
         var queue = await host.DeclareQueueAsync("test.*", Cancellation);
 
-        await host.Publisher.PublishAsync(
+        await host.PublishAsync(
             new ProbeMessage(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "ilk"),
             Cancellation);
-        await host.Publisher.PublishAsync(
+        await host.PublishAsync(
             new OtherProbeMessage(Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow),
             Cancellation);
 
@@ -109,7 +113,7 @@ public sealed class MessagingTests
         var sent = new ProbeMessage(
             Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "kimlik");
 
-        await host.Publisher.PublishAsync(sent, Cancellation);
+        await host.PublishAsync(sent, Cancellation);
 
         var delivery = await host.ReadRawAsync(queue, Cancellation);
 
@@ -150,24 +154,30 @@ public sealed class MessagingTests
     }
 
     /// <summary>
-    /// The application layer's contract resolves to the RabbitMQ implementation.
+    /// What a use case injects writes to the outbox; it does not reach the
+    /// broker.
     /// </summary>
     /// <remarks>
-    /// The other tests construct the publisher directly to talk to the
-    /// container, so without this nothing would notice if the registration were
-    /// dropped and every use case's publish silently failed to resolve.
+    /// The distinction is the whole of ADR-0033, and it is invisible at the
+    /// call site — both spellings compile. Asserting the registration is what
+    /// would catch a change that quietly restored direct publishing and, with
+    /// it, the gap between a commit and a message.
     /// </remarks>
     [Fact]
-    public void The_publisher_contract_resolves_from_the_application_host()
+    public void The_application_contract_resolves_to_the_outbox_writer()
     {
         using var factory = new FlowDeskApiFactory(
             "Host=localhost;Port=1;Database=x;Username=x;Password=x",
             _broker.Host,
             _broker.Port);
 
-        var publisher = factory.Services.GetRequiredService<IMessagePublisher>();
+        using var scope = factory.Services.CreateScope();
 
-        Assert.IsType<RabbitMqMessagePublisher>(publisher);
+        var publisher = scope.ServiceProvider.GetRequiredService<IMessagePublisher>();
+        var broker = factory.Services.GetRequiredService<IBrokerPublisher>();
+
+        Assert.IsType<OutboxMessagePublisher>(publisher);
+        Assert.IsType<RabbitMqBrokerPublisher>(broker);
     }
 
     /// <summary>
@@ -213,11 +223,26 @@ public sealed class MessagingTests
 
             _connection = new RabbitMqConnection(options, NullLogger<RabbitMqConnection>.Instance);
 
-            Publisher = new RabbitMqMessagePublisher(
-                _connection, options, NullLogger<RabbitMqMessagePublisher>.Instance);
+            Publisher = new RabbitMqBrokerPublisher(
+                _connection, options, NullLogger<RabbitMqBrokerPublisher>.Instance);
         }
 
-        public RabbitMqMessagePublisher Publisher { get; }
+        public RabbitMqBrokerPublisher Publisher { get; }
+
+        /// <summary>
+        /// Serialises a message and hands it to the broker, the way the outbox
+        /// processor does.
+        /// </summary>
+        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken)
+            where TMessage : IntegrationMessage =>
+            Publisher.PublishAsync(
+                message.MessageId,
+                message.GetType().Name,
+                message.RoutingKey,
+                message.OccurredAt,
+                JsonSerializer.SerializeToUtf8Bytes(
+                    message, message.GetType(), FlowDeskMessageJson.Options),
+                cancellationToken);
 
         /// <summary>Declares a queue bound to the given pattern and returns its name.</summary>
         public async Task<string> DeclareQueueAsync(string routingPattern, CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using FlowDesk.Application.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -160,7 +161,45 @@ public sealed partial class MessageConsumerService : BackgroundService
 
         try
         {
-            await subscription.DispatchAsync(delivery.Body, scope.ServiceProvider, cancellationToken);
+            var messageId = ReadMessageId(delivery);
+
+            var dbContext = scope.ServiceProvider.GetRequiredService<IFlowDeskDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+
+            /*
+              Claiming and handling commit together, or neither does. Running the
+              consumer outside this transaction would let the work land while the
+              claim was lost — and the next delivery would do it all again.
+
+              Idempotency is applied here rather than left to each consumer. A
+              rule every consumer must remember is a rule one of them will
+              eventually forget, and the symptom is a duplicated side effect
+              nobody notices until a customer does.
+            */
+            var handled = await dbContext.ExecuteInTransactionAsync(
+                async token =>
+                {
+                    var claimed = await MessageIdempotency.TryClaimAsync(
+                        dbContext, messageId, subscription.ConsumerName, clock.UtcNow, token);
+
+                    if (!claimed)
+                    {
+                        return false;
+                    }
+
+                    await subscription.DispatchAsync(delivery.Body, scope.ServiceProvider, token);
+                    await dbContext.SaveChangesAsync(token);
+
+                    return true;
+                },
+                cancellationToken);
+
+            if (!handled)
+            {
+                // Acknowledged rather than requeued: it was handled the first
+                // time, so the broker should stop offering it.
+                LogAlreadyHandled(_logger, subscription.QueueName, messageId);
+            }
 
             await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
         }
@@ -194,6 +233,27 @@ public sealed partial class MessageConsumerService : BackgroundService
             await channel.BasicNackAsync(
                 delivery.DeliveryTag, multiple: false, requeue: true, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Reads the id the publisher stamped on the message.
+    /// </summary>
+    /// <remarks>
+    /// Treated as a format failure when it is missing or unreadable, because
+    /// without it there is no way to tell a redelivery from a new message — and
+    /// handling it anyway would mean acting an unknown number of times.
+    /// </remarks>
+    private static Guid ReadMessageId(BasicDeliverEventArgs delivery)
+    {
+        var raw = delivery.BasicProperties.MessageId;
+
+        if (string.IsNullOrWhiteSpace(raw) || !Guid.TryParse(raw, out var messageId))
+        {
+            throw new MessageFormatException(
+                "Mesaj kimliği okunamadı; tekrar teslimat ayırt edilemeyeceği için mesaj işlenmedi.");
+        }
+
+        return messageId;
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
@@ -234,4 +294,10 @@ public sealed partial class MessageConsumerService : BackgroundService
         Level = LogLevel.Error,
         Message = "{QueueName} kuyruğundaki mesaj işlenemedi; yeniden kuyruğa alındı.")]
     private static partial void LogHandlerFailed(ILogger logger, string queueName, Exception exception);
+
+    [LoggerMessage(
+        EventId = 5,
+        Level = LogLevel.Debug,
+        Message = "{QueueName} kuyruğundaki mesaj zaten işlenmişti, atlandı: {MessageId}")]
+    private static partial void LogAlreadyHandled(ILogger logger, string queueName, Guid messageId);
 }

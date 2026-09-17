@@ -88,10 +88,27 @@ public static class InfrastructureServiceCollectionExtensions
           container, and the two-argument constructor is what enables the
           workspace query filter; without it the context falls back to the
           options-only constructor and the filter stays inert.
+
+          The worker has no ITenantContext, and must not: it drains the outbox
+          and runs consumers across every workspace, so a filter scoped to "the
+          current one" would leave it finding nothing at all. Resolving the
+          context optionally is what lets one registration serve both hosts —
+          filtered in the API, inert in the worker — instead of each host
+          wiring its own persistence.
+
+          An inert filter is safe here precisely because nothing in the worker
+          answers a user's request. Anything it writes is scoped by the TenantId
+          carried in the message it is acting on (ADR-0032).
         */
-        services.AddScoped(provider => new FlowDeskDbContext(
-            provider.GetRequiredService<DbContextOptions<FlowDeskDbContext>>(),
-            provider.GetRequiredService<ITenantContext>()));
+        services.AddScoped(provider =>
+        {
+            var options = provider.GetRequiredService<DbContextOptions<FlowDeskDbContext>>();
+            var tenantContext = provider.GetService<ITenantContext>();
+
+            return tenantContext is null
+                ? new FlowDeskDbContext(options)
+                : new FlowDeskDbContext(options, tenantContext);
+        });
 
         // The application layer depends on the contract, never on the concrete
         // context (ADR-0021). Resolving through the registered context keeps a
@@ -182,7 +199,17 @@ public static class InfrastructureServiceCollectionExtensions
           and the API serves every read and most writes without it.
         */
         services.AddSingleton<RabbitMqConnection>();
-        services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
+
+        // Talks to the broker. Only the outbox processor uses it.
+        services.AddSingleton<IBrokerPublisher, RabbitMqBrokerPublisher>();
+
+        /*
+          What use cases inject. It writes a row rather than sending anything,
+          so the message and the change that caused it commit together
+          (ADR-0033). Scoped, because it writes through the request's own
+          DbContext.
+        */
+        services.AddScoped<IMessagePublisher, OutboxMessagePublisher>();
 
         return services;
     }

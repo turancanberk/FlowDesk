@@ -1,5 +1,6 @@
 using FlowDesk.Domain.Authentication;
 using FlowDesk.Domain.Customers;
+using FlowDesk.Domain.Messaging;
 using FlowDesk.Domain.Tasks;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Domain.Tickets;
@@ -48,6 +49,21 @@ public interface IFlowDeskDbContext
     DbSet<TenantCounter> TenantCounters { get; }
 
     DbSet<TaskItem> Tasks { get; }
+
+    /// <summary>
+    /// Messages waiting to reach the broker.
+    /// </summary>
+    /// <remarks>
+    /// Not covered by the workspace query filter, and cannot be: the processor
+    /// runs in the worker with no workspace context, so a filter would leave it
+    /// finding nothing (ADR-0024). The tenant travels inside the payload.
+    /// </remarks>
+    DbSet<OutboxMessage> OutboxMessages { get; }
+
+    /// <summary>
+    /// What each consumer has already handled, so a redelivery acts once.
+    /// </summary>
+    DbSet<ProcessedMessage> ProcessedMessages { get; }
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.

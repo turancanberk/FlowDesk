@@ -38,6 +38,17 @@ public interface IMessageSubscription
     string QueueName { get; }
 
     /// <summary>
+    /// Names this consumer in the processed-message table.
+    /// </summary>
+    /// <remarks>
+    /// The queue name, because it already identifies one consumer of one
+    /// message type and is the thing an operator sees in the broker. Using the
+    /// class name instead would break the record the moment a class was
+    /// renamed, silently reprocessing everything it had already handled.
+    /// </remarks>
+    string ConsumerName { get; }
+
+    /// <summary>
     /// The routing pattern the queue binds to, such as <c>ticket.*</c>.
     /// </summary>
     string RoutingPattern { get; }

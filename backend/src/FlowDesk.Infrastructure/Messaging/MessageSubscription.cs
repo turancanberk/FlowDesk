@@ -26,6 +26,8 @@ public sealed class MessageSubscription<TMessage> : IMessageSubscription
 
     public string QueueName { get; }
 
+    public string ConsumerName => QueueName;
+
     public string RoutingPattern { get; }
 
     public async Task DispatchAsync(
