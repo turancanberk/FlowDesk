@@ -1227,3 +1227,69 @@ ise geçmiş. Aynı ekrana koymak, dashboard'un cevapladığı soruyu bulanıkla
 Saklama süresi (retention) politikası **yok**. Tablo sınırsız büyür. Gerçek bir
 dağıtımda bir kesme veya arşivleme politikası gerekirdi; burada kapsam dışı ve
 `docs/ROADMAP.md` içinde belirtiliyor.
+
+---
+
+## ADR-0037 — Önbellek bir hızlandırmadır, bağımlılık değil
+
+**Bağlam.** ADR-0015 Redis'in yalnızca dashboard için kullanılacağını ve kısa
+TTL ile geçersiz kılma uygulanacağını söylemişti. Faz 15 bunu uygularken üç
+soruya cevap gerekiyordu: hata durumunda ne olur, geçersiz kılma nereye yazılır,
+önbellek yokken ürün ne yapar.
+
+**Karar.**
+
+1. **Önbellek hatası hiçbir zaman hata değildir.** Erişilemeyen bir depo,
+   okumada ıskalama ve yazmada sessiz düşüş demektir.
+2. **Geçersiz kılma EF `SaveChangesInterceptor`'ında**, her handler'da değil.
+3. **Önbellek yokluğu desteklenen bir yapılandırmadır**; boş bağlantı dizesi
+   hiçbir şey saklamayan bir uygulamaya çözülür.
+4. **Anahtar tek yerde üretilir** ve çalışma alanı kimliğini taşır.
+
+**Gerekçe.**
+
+**Hata yutulur.** Buradaki her şey türetilmiş veri; hiçbiri veritabanından
+yeniden hesaplanamayacak bir şey saklamıyor. Dolayısıyla bir okuma hatası ile
+boş bir önbellek çağıran için aynı şey, ve öyle kalması gerekiyor: önbellek
+yüzünden çalışmayı bırakan bir ürün, hızlandırmayı tek hata noktasına
+çevirmiştir. Hatalar yine de loglanıyor — kullanıcıya görünmez olmaları,
+operatöre de görünmez olmaları gerektiği anlamına gelmiyor.
+
+**Interceptor.** Neredeyse her yazma dashboard'daki bir rakamı oynatıyor:
+müşteri, talep, görev, üye. Çağrıyı yirmi handler'a dağıtmak yirmi kez unutma
+fırsatı olurdu ve unutmanın belirtisi, kendi ömrü dolana kadar yanlış kalan bir
+sayı. Interceptor, gerçekten bir şey değiştiren bir kaydetmeden sonra çalışan ve
+context'i önbelleğin varlığından habersiz bırakan tasarlanmış nokta.
+
+Bu, TTL'in yerine geçmiyor, onu inceltiyor. Anahtar kendi başına da düşüyor ve
+başka bir süreçteki — worker, başka bir örnek — yazmayı kapsayan şey bu.
+
+**Boş yapılandırma.** Önbellek istemeyen bir dağıtımın bunu söylemek için Redis
+çalıştırması gerekmemeli. Null uygulama her çağıranı tek kod yolunda tutuyor:
+hiçbir yer önbelleğin açık olup olmadığına göre dallanmıyor.
+
+**Anahtar.** Bu fazın tek gerçek riski, bir kuruluşun rakamlarının diğerine
+gösterilmesi. Anahtarı tek yerde üretmek, bunu bir dizgi sabitinin davet ettiği
+hatadan çıkarıyor.
+
+**Sonuçlar.**
+
+**Bu fazda yakalanan gerçek hata:** hangi önbelleğin kullanılacağı kayıt anında
+`IConfiguration`'dan okunuyordu. `Bind` ile yapılan diğer ayarların aksine bu
+okuma **erken** — kendi yapılandırmasını servis kaydından sonra ekleyen bir host
+(entegrasyon testleri tam olarak böyle kuruluyor) hiç önbellek yokmuş gibi
+okunuyor ve ürün sessizce önbelleksiz çalışıyordu. Belirtisi, hiç isabet
+etmeyen bir önbellekten ayırt edilemiyordu. Karar artık `IOptions` üzerinden
+tembel veriliyor, ve hangi uygulamanın çözüldüğü testle sabitlendi.
+
+Dashboard yanıtı okunduğu anı taşıyor ve ekran bunu gösteriyor. En fazla bir
+dakikalık, öyle olduğu söylenen bir rakam, güncel görünüp olmayandan dürüst.
+
+Redis için **sağlık kontrolü yok**. RabbitMQ'nun aksine (ADR-0032) burada
+raporlanacak bir hazırlık durumu yok: önbellek düştüğünde örnek tamamen sağlıklı
+ve tek fark, dashboard'un her seferinde yeniden hesaplanması. `Degraded`
+döndürmek, olmayan bir sorunu raporlamak olurdu.
+
+Liste sorguları **önbelleklenmiyor**. Bayat bir liste, ekranda düzelttiğini
+sandığınız bir kaydın geri gelmesi demek — dashboard'un bir dakikalık
+bayatlığından bambaşka bir sorun.
