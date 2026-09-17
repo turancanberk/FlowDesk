@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 14 birleştirildi) |
-| Son commit | `3ee7a5c — Merge branch 'feat/attachments'` (Faz 13) |
+| Son commit | `036172f — Merge branch 'feat/activity'` (Faz 14) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
