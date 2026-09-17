@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 14 birleştirildi) |
+| Aktif dal | `main` (Faz 15 birleştirildi) |
 | Son commit | `036172f — Merge branch 'feat/activity'` (Faz 14) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -39,14 +39,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 12 — E-posta ve Bildirimler
 - Faz 13 — Dosya Ekleri
 - Faz 14 — Denetim ve Etkinlik
+- Faz 15 — Redis Önbellek
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 15 — Redis Önbellek** (henüz başlanmadı)
+**Faz 16 — Gelişmiş Entegrasyon Testleri** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 15 kapsamında henüz iş yapılmadı.
+Faz 16 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -54,37 +55,39 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 15'in tamamı:
+Faz 16'nın tamamı:
 
-- Redis **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
-- Dashboard toplamları için kiracı farkındalıklı önbellek
-- Anahtar şeması, TTL, bayatlama ve geçersiz kılma davranışının belgelenmesi
+- Kiracı izolasyonu ve rol yetkilendirme matrisi için kapsamlı senaryolar
+- Kimlik doğrulama yaşam döngüsünün uçtan uca kapsanması
+- Arka plan işlemenin (outbox + tüketici) birlikte doğrulanması
+- Boşlukların bulunup kapatılması
+
+Bu faz **yeni özellik eklemiyor**; mevcut davranışı daha sıkı doğruluyor.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/caching` dalını aç. Önce `infra/docker-compose.yml`'a Redis'i ekle (host
-portu 6380; 6379 bu makinede dolu) ve `.env.example`'a karşılık gelen
-değişkenleri yaz.
+`feat/hardened-tests` dalını aç. Bu faz kod yazmaktan çok **boşluk aramakla**
+ilgili: mevcut 478 test neyi kapsamıyor, onu bul ve kapat.
 
-Ardından `FlowDesk.Application/Abstractions/ICache.cs` sözleşmesini yaz ve
-`FlowDesk.Infrastructure/Caching/` altında `StackExchange.Redis` uygulamasını
-ver. Paket henüz `Directory.Packages.props` içinde **yok**; sürümünü kurulum
-anında resmî registry'den doğrula (ADR-0016).
+Başlanacak yerler:
+
+- **Kimlik doğrulama yaşam döngüsü.** Faz 03 rotasyon, replay ve iptali
+  kapsıyor; access token süresi dolduğunda sessiz yenilemenin gerçek bir istek
+  sırasında çalıştığı ayrıca doğrulanmalı.
+- **Rol matrisi uçtan uca.** Her rol × her yazma uç noktası için tablo testi.
+  Bugün modül modül kapsanıyor; tek bir tablo, yeni bir uç noktanın
+  unutulmasını imkânsız kılar.
+- **Arka plan zinciri bir arada.** Use case → outbox satırı → işleyici →
+  broker → tüketici → bildirim/e-posta, tek testte. Parçalar ayrı ayrı
+  kapsanıyor; zincirin tamamı değil.
+- **Eşzamanlılık.** Aynı talebe eşzamanlı iki atama, aynı çalışma alanına
+  eşzamanlı iki davet kabulü.
 
 Dikkat edilecekler:
 
-- **Yalnızca dashboard** (ADR-0015). Liste, talep ve görev sorguları
-  önbelleklenmeyecek; bayat bir liste, ekranda düzelttiğini sandığınız bir
-  kaydın geri gelmesi demektir.
-- **Anahtar kiracı içermeli**: `tenant:{tenantId}:dashboard`. Bunu unutmak, bir
-  kuruluşun rakamlarını diğerine göstermek demek — bu fazın tek gerçek riski.
-- **Geçersiz kılma davranışı kararlaştırılmalı.** Kısa TTL yeterli mi, yoksa
-  yazma sonrası geçersiz kılma da gerekli mi? İkincisi her yazma yoluna dokunur;
-  ölçmeden karmaşıklaştırma. Seçim ADR'ye yazılmalı.
-- **Redis düşerse dashboard çalışmaya devam etmeli.** Önbellek bir hızlandırma,
-  bağımlılık değil; `RabbitMqHealthCheck` gibi `Degraded` dönen bir sağlık
-  kontrolü deseni izlenebilir (ADR-0032).
-- `Testcontainers.Redis` paketi var; mevcut fixture deseni izlenebilir.
+- **Test zayıflatılmaz.** Bir test yanlış davranışı yakalarsa üretim kodu
+  düzeltilir, test değil.
+- Kararsız bir düşüş görülürse çıktı saklanarak tekrarlanır (madde 6).
 
 ## Son Doğrulama Durumu
 
@@ -94,7 +97,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 470/470 başarılı (225 birim + 245 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 478/478 başarılı (225 birim + 253 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -128,6 +131,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `docker compose ... up -d` (Faz 12) | `postgres`, `rabbitmq` ve `mailpit` healthy |
 | Worker (Faz 12) | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
 | Mailpit üzerinden 8 adımlık akış (Faz 12) | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
+| 8 adımlık önbellek akışı (Faz 15) | Tamamı geçti — anahtarın çalışma alanı kimliğini taşıması, önbellek isabeti, TTL, yazma sonrası silinme, alanlar arası sızmama |
 | 10 adımlık etkinlik akışı (Faz 14) | Tamamı geçti — sıra, davet kaydında token olmaması, katılımın doğru alana yazılması, silinen talebin kaydının kalması, izolasyon, rol değişimi, izleyici erişimi |
 | 13 adımlık dosya akışı (Faz 13) | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
 
@@ -256,11 +260,26 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Denetim kaydı senkron ve iş değişikliğiyle aynı transaction'da; ekleme-
   yalnızca; özneye ve aktöre yabancı anahtar yok; yük hassas veri taşımaz
   (ADR-0036)
+- Önbellek bir hızlandırma, bağımlılık değil: hata yutulur, geçersiz kılma EF
+  interceptor'ında, önbellek yokluğu desteklenen yapılandırma (ADR-0037)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 15'te eklenenler:
+
+- `infra/docker-compose.yml` — `redis` servisi (kalıcılık kapalı)
+- `.env.example` — `Cache__*` değişkenleri
+- `backend/src/FlowDesk.Application/Abstractions/ICache.cs` — sözleşme ve
+  `CacheKeys`
+- `backend/src/FlowDesk.Application/Dashboard/IDashboardCachePolicy.cs`
+- `backend/src/FlowDesk.Infrastructure/Caching/` — `CacheOptions`,
+  `RedisCache`, `NullCache`, `DashboardCachePolicy`,
+  `DashboardCacheInvalidator`
+- `backend/tests/.../Support/RedisContainerFixture.cs`
+- `backend/tests/.../Caching/` — dashboard önbelleği ve kayıt testleri
 
 Faz 14'te eklenenler:
 
@@ -479,7 +498,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 | RabbitMQ | **Aktif** — `flowdesk-rabbitmq`, host portları 5672 / 15672 (yönetim arayüzü) |
 | Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025 |
 | Azurite | **Aktif** — `flowdesk-azurite`, blob 10000 (yalnızca blob servisi) |
-| Redis | Henüz projeye eklenmedi (Faz 15) |
+| Redis | **Aktif** — `flowdesk-redis`, host portu 6380, kalıcılık kapalı |
 | Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |
 
 Bu makinede host portları `5432`, `6379` ve `5000` başka süreçlerce kullanılıyor.

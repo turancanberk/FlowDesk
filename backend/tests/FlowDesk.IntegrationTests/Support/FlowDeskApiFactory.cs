@@ -27,6 +27,7 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
     private readonly string _brokerHost;
     private readonly int _brokerPort;
     private readonly string _storageConnectionString;
+    private readonly string _cacheConnectionString;
 
     /// <param name="brokerHost">
     /// Optional, and unreachable by default.
@@ -47,7 +48,8 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
         string connectionString,
         string brokerHost = "127.0.0.1",
         int brokerPort = 1,
-        string? storageConnectionString = null)
+        string? storageConnectionString = null,
+        string? cacheConnectionString = null)
     {
         _connectionString = connectionString;
         _brokerHost = brokerHost;
@@ -56,6 +58,13 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
             ?? "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
                + "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
                + "BlobEndpoint=http://127.0.0.1:1/devstoreaccount1;";
+
+        /*
+          Empty by default, which registers the null cache. A test that does not
+          care about caching should behave as though there is none — not depend
+          on whatever Redis happens to be running on the machine.
+        */
+        _cacheConnectionString = cacheConnectionString ?? string.Empty;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -97,6 +106,9 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
                 // by another against a shared emulator.
                 ["Storage:ContainerName"] = $"tests-{Guid.CreateVersion7():N}",
                 ["Storage:MaximumFileSizeBytes"] = "1048576",
+
+                ["Cache:ConnectionString"] = _cacheConnectionString,
+                ["Cache:DashboardTtlSeconds"] = "60",
 
                 ["Auth:SigningKey"] = TestSigningKey,
                 ["Auth:Issuer"] = "flowdesk-api-tests",

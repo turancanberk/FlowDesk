@@ -1,9 +1,11 @@
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Application.Activity;
+using FlowDesk.Application.Dashboard;
 using FlowDesk.Application.Authentication;
 using FlowDesk.Application.Tickets.UploadAttachment;
 using FlowDesk.Infrastructure.Activity;
 using FlowDesk.Infrastructure.Authentication;
+using FlowDesk.Infrastructure.Caching;
 using FlowDesk.Infrastructure.Email;
 using FlowDesk.Infrastructure.HealthChecks;
 using FlowDesk.Infrastructure.Messaging;
@@ -16,8 +18,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Azure.Storage.Blobs;
+using StackExchange.Redis;
 using Npgsql;
 
 namespace FlowDesk.Infrastructure;
@@ -52,6 +56,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddFlowDeskMessaging(configuration);
         services.AddFlowDeskEmail(configuration);
         services.AddFlowDeskStorage(configuration);
+        services.AddFlowDeskCaching(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
 
         return services;
@@ -88,6 +93,15 @@ public static class InfrastructureServiceCollectionExtensions
             optionsBuilder.UseNpgsql(
                 provider.GetRequiredService<NpgsqlDataSource>(),
                 npgsql => npgsql.MigrationsAssembly(typeof(FlowDeskDbContext).Assembly.FullName));
+
+            /*
+              Drops the workspace's cached dashboard after any save that changed
+              something. Here rather than in each handler: nearly every write
+              moves a figure on that screen, and twenty call sites would be
+              twenty chances to forget (ADR-0037).
+            */
+            optionsBuilder.AddInterceptors(
+                provider.GetRequiredService<DashboardCacheInvalidator>());
         });
 
         /*
@@ -278,6 +292,75 @@ public static class InfrastructureServiceCollectionExtensions
           bounds the request body, which is set on the endpoint.
         */
         services.AddSingleton<IAttachmentLimits, AttachmentLimits>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddFlowDeskCaching(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<CacheOptions>()
+            .Bind(configuration.GetSection(CacheOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IDashboardCachePolicy, DashboardCachePolicy>();
+
+        // Scoped, because it reads the request's workspace. Registered whether
+        // or not a cache is configured: with the null cache it does nothing,
+        // which keeps the context's wiring the same either way.
+        services.AddScoped<DashboardCacheInvalidator>();
+
+        /*
+          The connection is opened lazily, and so is the decision about which
+          cache to use. Reading the configuration here, at registration time,
+          would be a real bug rather than a style choice: a host that adds its
+          own configuration after the services are registered — which is how the
+          integration tests are built — would still be read as having none, and
+          the product would quietly run with no cache at all. That is precisely
+          what happened, and it looked exactly like a cache that never hits.
+        */
+        services.AddSingleton<IConnectionMultiplexer>(provider =>
+        {
+            var connectionString =
+                provider.GetRequiredService<IOptions<CacheOptions>>().Value.ConnectionString;
+
+            var options = ConfigurationOptions.Parse(connectionString);
+
+            /*
+              AbortOnConnectFail is off so the client keeps trying in the
+              background instead of throwing at startup. A cache that is not
+              there yet must not stop the API booting, and when it comes back
+              reads start hitting again with no further action.
+            */
+            options.AbortOnConnectFail = false;
+            options.ClientName = "flowdesk";
+
+            return ConnectionMultiplexer.Connect(options);
+        });
+
+        services.AddSingleton<ICache>(provider =>
+        {
+            var connectionString =
+                provider.GetRequiredService<IOptions<CacheOptions>>().Value.ConnectionString;
+
+            /*
+              No connection string means no cache, and that is a supported
+              configuration rather than a broken one. A null implementation
+              keeps every caller on one code path: nothing branches on whether
+              caching is switched on (ADR-0037).
+            */
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return new NullCache();
+            }
+
+            return new RedisCache(
+                provider.GetRequiredService<IConnectionMultiplexer>(),
+                provider.GetRequiredService<ILogger<RedisCache>>());
+        });
 
         return services;
     }

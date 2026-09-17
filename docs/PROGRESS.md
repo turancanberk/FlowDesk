@@ -24,7 +24,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 12 — E-posta ve Bildirimler
 - [x] Faz 13 — Dosya Ekleri
 - [x] Faz 14 — Denetim ve Etkinlik
-- [ ] Faz 15 — Redis Önbellek
+- [x] Faz 15 — Redis Önbellek
 - [ ] Faz 16 — Gelişmiş Entegrasyon Testleri
 - [ ] Faz 17 — Playwright E2E
 - [ ] Faz 18 — Gözlemlenebilirlik
@@ -36,13 +36,43 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 15 — Redis Önbellek**
+**Faz 16 — Gelişmiş Entegrasyon Testleri**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 15 — Redis Önbellek · Tamamlandı
+
+Redis bu fazda Compose'a eklendi (ADR-0008). Kalıcılık kapalı: buradaki her şey
+türetilmiş veri.
+
+Kararlar ADR-0037'de:
+
+- **Önbellek hatası hiçbir zaman hata değil.** Erişilemeyen depo, okumada
+  ıskalama ve yazmada sessiz düşüş; çağıran ikisini ayırt edemiyor.
+- **Geçersiz kılma EF interceptor'ında**, her handler'da değil.
+- **Önbellek yokluğu desteklenen yapılandırma**; boş bağlantı dizesi hiçbir şey
+  saklamayan bir uygulamaya çözülüyor.
+- **Anahtar tek yerde üretiliyor** ve çalışma alanı kimliğini taşıyor.
+
+Redis için sağlık kontrolü **yok**: önbellek düştüğünde örnek tamamen sağlıklı
+ve tek fark dashboard'un yeniden hesaplanması. Raporlanacak bir hazırlık durumu
+olmadığında `Degraded` dönmek, olmayan bir sorunu raporlamak olurdu.
+
+**Bu fazda yakalanan gerçek hata.** Hangi önbelleğin kullanılacağı kayıt anında
+`IConfiguration`'dan okunuyordu. `Bind` ile yapılan diğer ayarların aksine bu
+okuma erken; kendi yapılandırmasını servis kaydından sonra ekleyen bir host —
+entegrasyon testleri tam olarak böyle kuruluyor — hiç önbellek yokmuş gibi
+okunuyor ve ürün sessizce önbelleksiz çalışıyordu. Belirtisi, hiç isabet
+etmeyen bir önbellekten ayırt edilemiyordu. Karar tembel verilecek şekilde
+düzeltildi ve hangi uygulamanın çözüldüğü ayrı bir testle sabitlendi.
+
+Testler: 478/478 (225 birim + 253 entegrasyon).
+
+---
 
 ### Faz 14 — Denetim ve Etkinlik · Tamamlandı
 
@@ -912,6 +942,17 @@ Faz 14 sonunda:
 | `npm --prefix frontend run lint / typecheck / build` | Başarılı |
 | Çalışan API'ye karşı 10 adımlık etkinlik akışı | Tamamı geçti — sıra, davet kaydında token olmaması, katılımın doğru alana yazılması, durum değişiminin iki ucu, tek kaydın geçmişi, silinen talebin kaydının kalması, izolasyon, rol değişimi, izleyici erişimi |
 | `/app/{slug}/activity` | HTTP 200, doğru başlık, uygulama hatası yok |
+
+Faz 15 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 478/478 başarılı (225 birim + 253 entegrasyon) |
+| `docker compose ... up -d` | Beş servis de healthy |
+| `npm --prefix frontend run lint / build` | Başarılı |
+| Çalışan API ve Redis'e karşı 8 adımlık önbellek akışı | Tamamı geçti — anahtarın yazılması ve çalışma alanı kimliğini taşıması, ikinci okumanın önbellekten gelmesi, TTL, yazma sonrası silinme, yeniden hesaplama, diğer alanın kendi rakamlarını alması, bir alandaki yazmanın diğerini düşürmemesi |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
 
 **Doğrulama biçimi hakkında not.** Bu fazda uçtan uca akış tarayıcıda tıklanarak
 değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu oturumda
