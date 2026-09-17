@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 
@@ -15,6 +17,7 @@ namespace FlowDesk.Application.Tickets.AssignTicket;
 public sealed class AssignTicketHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
@@ -25,13 +28,15 @@ public sealed class AssignTicketHandler
         IUserAccountStore accountStore,
         IMessagePublisher publisher,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<TicketDetail>> HandleAsync(
@@ -89,6 +94,18 @@ public sealed class AssignTicketHandler
                     _tenantContext.UserId,
                     _tenantContext.Slug),
                 cancellationToken);
+        }
+
+        if (ticket.AssignedUserId != previousAssignee)
+        {
+            _activity.Record(
+                ticket.AssignedUserId is null
+                    ? ActivityType.TicketUnassigned
+                    : ActivityType.TicketAssigned,
+                ActivitySubject.Ticket,
+                ticket.Id,
+                new TicketAssignmentActivityPayload(
+                    ticket.Number, ticket.Subject, ticket.AssignedUserId));
         }
 
         var save = await TicketWorkflow.SaveAsync(_dbContext, cancellationToken);

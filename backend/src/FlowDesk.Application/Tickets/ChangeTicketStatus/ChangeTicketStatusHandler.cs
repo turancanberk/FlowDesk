@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Common;
@@ -19,6 +21,7 @@ namespace FlowDesk.Application.Tickets.ChangeTicketStatus;
 public sealed class ChangeTicketStatusHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
@@ -27,12 +30,14 @@ public sealed class ChangeTicketStatusHandler
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<TicketDetail>> HandleAsync(
@@ -68,6 +73,18 @@ public sealed class ChangeTicketStatusHandler
             // current state that makes it impossible.
             return Result.Failure<TicketDetail>(
                 TicketErrors.InvalidTransition(previousStatus, command.Status));
+        }
+
+        // Only when it actually moved. Pressing the same button twice is a
+        // no-op in the domain and should not be a line in the history either.
+        if (ticket.Status != previousStatus)
+        {
+            _activity.Record(
+                ActivityType.TicketStatusChanged,
+                ActivitySubject.Ticket,
+                ticket.Id,
+                new TicketStatusActivityPayload(
+                    ticket.Number, ticket.Subject, previousStatus, ticket.Status));
         }
 
         var save = await TicketWorkflow.SaveAsync(_dbContext, cancellationToken);

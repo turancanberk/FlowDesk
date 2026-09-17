@@ -1,4 +1,5 @@
 using FlowDesk.Domain.Authentication;
+using FlowDesk.Domain.Activity;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Messaging;
 using FlowDesk.Domain.Notifications;
@@ -80,6 +81,12 @@ public interface IFlowDeskDbContext
     /// <c>TenantId</c> comes from the message being handled (ADR-0033).
     /// </remarks>
     DbSet<Notification> Notifications { get; }
+
+    /// <summary>
+    /// The workspace's history. Append-only; nothing here updates or removes a
+    /// row (ADR-0036).
+    /// </summary>
+    DbSet<ActivityEvent> ActivityEvents { get; }
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.

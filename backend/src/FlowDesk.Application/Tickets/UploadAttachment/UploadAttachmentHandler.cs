@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tickets;
@@ -24,6 +26,7 @@ namespace FlowDesk.Application.Tickets.UploadAttachment;
 public sealed class UploadAttachmentHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IFileStorage _fileStorage;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
@@ -34,7 +37,8 @@ public sealed class UploadAttachmentHandler
         IFileStorage fileStorage,
         IAttachmentLimits limits,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         ArgumentNullException.ThrowIfNull(limits);
 
@@ -43,6 +47,7 @@ public sealed class UploadAttachmentHandler
         _tenantContext = tenantContext;
         _clock = clock;
         _maximumFileSizeBytes = limits.MaximumFileSizeBytes;
+        _activity = activity;
     }
 
     public async Task<Result<AttachmentItem>> HandleAsync(
@@ -75,13 +80,18 @@ public sealed class UploadAttachmentHandler
             return Result.Failure<AttachmentItem>(TicketErrors.AttachmentTypeNotAllowed);
         }
 
-        // The query filter scopes this to the workspace, so a ticket belonging
-        // to another organisation is simply not found (ADR-0024).
-        var ticketExists = await _dbContext.Tickets
+        /*
+          The query filter scopes this to the workspace, so a ticket belonging
+          to another organisation is simply not found (ADR-0024). The number is
+          read at the same time, for the line the history will show.
+        */
+        var ticketNumber = await _dbContext.Tickets
             .AsNoTracking()
-            .AnyAsync(ticket => ticket.Id == ticketId, cancellationToken);
+            .Where(ticket => ticket.Id == ticketId)
+            .Select(ticket => (int?)ticket.Number)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!ticketExists)
+        if (ticketNumber is null)
         {
             return Result.Failure<AttachmentItem>(TicketErrors.NotFound);
         }
@@ -107,6 +117,13 @@ public sealed class UploadAttachmentHandler
             _clock.UtcNow);
 
         _dbContext.Attachments.Add(attachment);
+
+        _activity.Record(
+            ActivityType.AttachmentUploaded,
+            ActivitySubject.Attachment,
+            attachment.Id,
+            new AttachmentActivityPayload(attachment.FileName, ticketId, ticketNumber.Value));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AttachmentItem(

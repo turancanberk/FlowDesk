@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tenancy;
@@ -17,12 +19,14 @@ namespace FlowDesk.Application.Team.RemoveMember;
 public sealed class RemoveMemberHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
 
-    public RemoveMemberHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext)
+    public RemoveMemberHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext, IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(Guid userId, CancellationToken cancellationToken)
@@ -61,6 +65,12 @@ public sealed class RemoveMemberHandler
             // leave the workspace unmanageable.
             return Result.Failure(TeamErrors.LastOwner);
         }
+
+        _activity.Record(
+            ActivityType.MemberRemoved,
+            ActivitySubject.Member,
+            membership.UserId,
+            new MemberActivityPayload(membership.UserId, membership.Role, membership.Role));
 
         _dbContext.Memberships.Remove(membership);
         await _dbContext.SaveChangesAsync(cancellationToken);

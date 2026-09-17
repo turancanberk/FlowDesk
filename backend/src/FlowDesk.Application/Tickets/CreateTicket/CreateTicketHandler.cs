@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tickets;
@@ -17,6 +19,7 @@ namespace FlowDesk.Application.Tickets.CreateTicket;
 public sealed class CreateTicketHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
@@ -25,12 +28,14 @@ public sealed class CreateTicketHandler
         IFlowDeskDbContext dbContext,
         IMessagePublisher publisher,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<Guid>> HandleAsync(
@@ -100,6 +105,12 @@ public sealed class CreateTicketHandler
                             _tenantContext.Slug),
                         token);
                 }
+
+                _activity.Record(
+                    ActivityType.TicketCreated,
+                    ActivitySubject.Ticket,
+                    ticket.Id,
+                    new TicketActivityPayload(ticket.Number, ticket.Subject));
 
                 await _dbContext.SaveChangesAsync(token);
 

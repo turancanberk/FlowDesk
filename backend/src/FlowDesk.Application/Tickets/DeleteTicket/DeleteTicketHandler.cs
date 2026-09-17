@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -18,17 +20,20 @@ namespace FlowDesk.Application.Tickets.DeleteTicket;
 public sealed class DeleteTicketHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IFileStorage _fileStorage;
     private readonly ITenantContext _tenantContext;
 
     public DeleteTicketHandler(
         IFlowDeskDbContext dbContext,
         IFileStorage fileStorage,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _fileStorage = fileStorage;
         _tenantContext = tenantContext;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(Guid ticketId, CancellationToken cancellationToken)
@@ -56,6 +61,17 @@ public sealed class DeleteTicketHandler
             .Where(attachment => attachment.TicketId == ticketId)
             .Select(attachment => attachment.StorageKey)
             .ToListAsync(cancellationToken);
+
+        /*
+          Recorded before the row goes. The event carries the number and subject
+          because after this they exist nowhere else — which is the whole reason
+          an activity event holds no foreign key to its subject (ADR-0036).
+        */
+        _activity.Record(
+            ActivityType.TicketDeleted,
+            ActivitySubject.Ticket,
+            ticket.Id,
+            new TicketActivityPayload(ticket.Number, ticket.Subject));
 
         // Comments and attachment rows go with it through the cascade
         // configured on the foreign keys.

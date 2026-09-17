@@ -43,6 +43,7 @@ app.MapTicketEndpoints();
 app.MapTaskEndpoints();
 app.MapDashboardEndpoints();
 app.MapNotificationEndpoints();
+app.MapActivityEndpoints();
 
 await app.RunAsync();
 

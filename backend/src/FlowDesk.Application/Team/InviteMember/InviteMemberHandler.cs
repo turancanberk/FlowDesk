@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tenancy;
@@ -26,6 +28,7 @@ public sealed class InviteMemberHandler
     public static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
 
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly ISecureTokenGenerator _tokenGenerator;
     private readonly IMessagePublisher _publisher;
@@ -38,7 +41,8 @@ public sealed class InviteMemberHandler
         ISecureTokenGenerator tokenGenerator,
         IMessagePublisher publisher,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
@@ -46,6 +50,7 @@ public sealed class InviteMemberHandler
         _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<CreatedInvitation>> HandleAsync(
@@ -131,6 +136,18 @@ public sealed class InviteMemberHandler
                 _tenantContext.UserId,
                 _tenantContext.Slug),
             cancellationToken);
+
+        /*
+          The token is deliberately absent. It travels in the message that sends
+          the e-mail, where it has to; an audit trail is read by more people and
+          kept for longer, and a usable invitation link sitting in it would be a
+          standing way in (docs/SECURITY.md).
+        */
+        _activity.Record(
+            ActivityType.MemberInvited,
+            ActivitySubject.Member,
+            invitation.Id,
+            new MemberInvitationActivityPayload(invitation.Email, invitation.Role));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
