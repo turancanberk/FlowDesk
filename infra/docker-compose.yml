@@ -2,10 +2,11 @@
 # FlowDesk — Yerel geliştirme altyapısı
 # ----------------------------------------------------------------------------
 # Kademeli altyapı ilkesi (ADR-0008): bir servis, onu gerçekten kullanan faz
-# gelmeden buraya eklenmez. Şu an yalnızca PostgreSQL vardır.
+# gelmeden buraya eklenmez.
 #
-# Sıradaki eklemeler: RabbitMQ (Faz 10), Mailpit (Faz 12), Azurite (Faz 13),
-# Redis (Faz 15), Prometheus ve Grafana (Faz 18).
+# Şu an PostgreSQL (Faz 01) ve RabbitMQ (Faz 10) vardır.
+# Sıradaki eklemeler: Mailpit (Faz 12), Azurite (Faz 13), Redis (Faz 15),
+# Prometheus ve Grafana (Faz 18).
 #
 # Kullanım (depo kökünden):
 #   cp .env.example .env
@@ -41,6 +42,35 @@ services:
       retries: 5
       start_period: 10s
 
+  rabbitmq:
+    # Yönetim eklentili imaj: kuyrukların ve mesajların gerçekten oluştuğunu
+    # tarayıcıdan görebilmek, geliştirme sırasında log okumaktan çok daha hızlı
+    # geri bildirim veriyor.
+    image: rabbitmq:4-management-alpine
+    container_name: flowdesk-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-flowdesk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD .env dosyasinda tanimlanmalidir}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      # check_port_connectivity yerine check_running: port açık olması broker'ın
+      # mesaj kabul etmeye hazır olduğu anlamına gelmiyor, ve bağımlı servisler
+      # tam olarak bunu bekliyor.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # RabbitMQ ilk açılışta Erlang dağıtımını kurar; bu süre bilerek uzun.
+      start_period: 40s
+
 volumes:
   postgres-data:
     name: flowdesk-postgres-data
+  rabbitmq-data:
+    name: flowdesk-rabbitmq-data
