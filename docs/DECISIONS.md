@@ -909,3 +909,94 @@ Okunamayan gövde yeniden kuyruğa **alınmıyor**: sonsuza dek aynı şekilde
 başarısız olur ve prefetch bir olduğu için arkasındaki her mesajı tıkardı.
 İşleyici hatası ise yeniden kuyruğa alınıyor, çünkü geçici olabilir. Dead-letter
 kuyruğu ve yeniden deneme politikası Faz 11'e ait.
+
+---
+
+## ADR-0033 — Outbox: mesaj ile değişiklik aynı transaction'da
+
+**Bağlam.** ADR-0032 bir boşluk bırakmıştı: yayınlama veritabanı
+transaction'ıyla atomik değil. İki başarısızlık da gerçek:
+
+- Transaction'ın **içinden** gönderilen mesaj, transaction geri alınırsa hiç
+  olmamış bir şeyi anlatır. Tüketici var olmayan bir talebe e-posta gönderir.
+- Commit **sonrasında** gönderilen mesaj, süreç arada ölürse kaybolur.
+  Değişiklik olmuş ama kimse haberdar edilmemiştir.
+
+İki fiili tek bir atomik işlemde birleştirmenin yolu yok, çünkü biri
+veritabanında biri broker'da.
+
+**Karar.**
+
+1. Use case mesajı **kuyruğa alır**: kendi transaction'ına bir `OutboxMessage`
+   satırı yazar. `IMessagePublisher` artık bunu yapıyor.
+2. Worker'daki bir işleyici satırları broker'a taşıyor. Bu iş
+   `IBrokerPublisher` üzerinden yapılıyor ve yalnızca işleyici çağırıyor.
+3. Tüketici tarafında `ProcessedMessage` tablosu, aynı mesajın iki kez etki
+   etmesini engelliyor.
+
+**Gerekçe.**
+
+Satır yazmak boşluğu kapatıyor çünkü satır ile değişiklik aynı transaction'da:
+ikisi birlikte iner ya da hiçbiri inmez. Broker'a ulaşmak artık ayrı bir adım
+ve başarısız olursa satır yerinde duruyor — kaybolmuyor, yeniden deneniyor.
+
+**İki ayrı sözleşme**, çünkü ikisi farklı şey söylüyor. `IMessagePublisher`
+"bunu kuyruğa al" demek ve Application'a ait; `IBrokerPublisher` "bunu şimdi
+gönder" demek ve Infrastructure'a ait. Çağrı yerinde ikisi de aynı göründüğü
+için — her ikisi de derleniyor — kayıtların doğruluğu testle sabitlendi.
+
+**Yönlendirme anahtarı satırda saklanıyor**, tipten türetilmiyor. Türetmek,
+adları tiplere geri eşleyen ve elle güncel tutulan bir kayıt defteri gerektirir;
+anahtar satırdayken işleyici tek bir mesaj tipini bilmek zorunda kalmadan
+yalnızca bayt taşıyor.
+
+**Partiyi alma ile zamanlama ayrı sınıflarda.** Bir turun kuralları var —
+satırlar nasıl kilitlenir, hata ne yapar, ne kadar beklenir; döngünün yalnızca
+temposu var. Ayırmak, bir turun tek tek koşturulabilmesini sağlıyor ve her
+doğrulamayı bir zamanlayıcıyla yarışa sokmaktan kurtarıyor.
+
+**`FOR UPDATE SKIP LOCKED`**, çünkü birden fazla worker aynı anda çalışabilmeli.
+Beklemek onları sıraya sokar ve ikincisini anlamsız kılardı; atlamak farklı
+satırlar almalarını sağlıyor.
+
+**Idempotency host'ta, tüketicide değil.** Her tüketicinin hatırlaması gereken
+bir kural, birinin er geç unutacağı kuraldır ve belirtisi kimsenin bir müşteri
+şikâyet edene kadar fark etmediği tekrarlanmış bir yan etkidir.
+
+`ProcessedMessages` anahtarı mesaj **ve** tüketici. İki tüketici aynı mesaja
+haklı olarak farklı tepki verebilir — biri e-posta gönderir, diğeri bildirim
+yazar — ve yalnızca mesaja konan bir anahtar, önce bitenin diğerini sessizce
+bastırmasına yol açardı.
+
+Okuma bir hızlandırma, garanti değil. Yarışan iki teslimat da boş bulabilir ve
+ikisi de çalışabilir; ikisinin birden etki etmesini engelleyen şey birincil
+anahtardır: ikinci kayıt takılır ve kendi transaction'ını tüketicinin
+yazdıklarıyla birlikte geri alır. Yani tam olarak bir tane veritabanı
+değişikliği commit edilir.
+
+**Sonuçlar.**
+
+Bu, **veritabanı** değişikliklerini koruyor. Veritabanı dışındaki etkiler —
+posta sunucusuna teslim edilmiş bir e-posta — geri alınamaz; dışa dönük yan
+etkisi olan bir tüketici bunu kendisi kaydetmek zorunda, transaction onun
+yerine yapamaz.
+
+`OutboxMessage` ve `ProcessedMessage` bilinçli olarak `ITenantOwned` **değil**.
+İşleyici ve tüketiciler istek dışında, kiracı bağlamı olmadan çalışıyor; global
+query filter'a dâhil olsalardı hiçbir şey bulamazlardı (ADR-0024). Kiracı
+kimliği mesajın gövdesinde taşınıyor.
+
+`FlowDeskDbContext` kaydı kiracı bağlamını isteğe bağlı çözüyor, böylece tek
+kayıt iki host'a birden hizmet ediyor: API'de filtreli, Worker'da etkisiz.
+Worker'da etkisiz olması güvenli, çünkü Worker hiçbir kullanıcı isteğine cevap
+vermiyor ve yazdığı her şey işlediği mesajın taşıdığı `TenantId` ile kapsanıyor.
+
+Bekleyen satırlar için **kısmi indeks** (`WHERE ProcessedAt IS NULL`). Tablo
+neredeyse tamamen işlenmiş geçmişten oluşuyor ve sorgu yalnızca baştaki birkaç
+satırı istiyor; tamamını kapsayan bir indeks sınırsız büyürdü.
+
+Dead-letter kuyruğu hâlâ yok. Okunamayan gövde yeniden kuyruğa alınmıyor ve
+sonsuza dek başarısız olan bir outbox satırı üst sınıra kadar geri çekilip
+orada kalıyor — `LastError` sütunuyla görünür hâlde. Otomatik bir çöp kutusu
+eklemek, henüz görülmemiş bir başarısızlık biçimine karşı politika yazmak
+olurdu.
