@@ -1,7 +1,10 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Common;
+using FlowDesk.Domain.Tasks;
 
 namespace FlowDesk.Application.Tasks.ChangeTaskStatus;
 
@@ -17,6 +20,7 @@ namespace FlowDesk.Application.Tasks.ChangeTaskStatus;
 public sealed class ChangeTaskStatusHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
@@ -25,12 +29,14 @@ public sealed class ChangeTaskStatusHandler
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<TaskDetail>> HandleAsync(
@@ -54,6 +60,7 @@ public sealed class ChangeTaskStatusHandler
         }
 
         var now = _clock.UtcNow;
+        var previousStatus = task.Status;
 
         try
         {
@@ -65,6 +72,20 @@ public sealed class ChangeTaskStatusHandler
             // allows through as an undefined value.
             return Result.Failure<TaskDetail>(
                 ApplicationError.Validation("task.invalid_status", "Geçerli bir durum seçin."));
+        }
+
+        /*
+          Only completion is recorded, not every status move. A task going back
+          and forth between Todo and InProgress is someone working; the moment
+          it is finished is the one anyone looks back for.
+        */
+        if (task.Status is TaskItemStatus.Done && previousStatus is not TaskItemStatus.Done)
+        {
+            _activity.Record(
+                ActivityType.TaskCompleted,
+                ActivitySubject.TaskItem,
+                task.Id,
+                new TaskActivityPayload(task.Title, task.Status));
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tickets;
@@ -12,6 +14,7 @@ public sealed class AddTicketCommentHandler
     private const int ExcerptLength = 160;
 
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly IMessagePublisher _publisher;
     private readonly ITenantContext _tenantContext;
@@ -22,13 +25,15 @@ public sealed class AddTicketCommentHandler
         IUserAccountStore accountStore,
         IMessagePublisher publisher,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _publisher = publisher;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<TicketCommentItem>> HandleAsync(
@@ -86,6 +91,18 @@ public sealed class AddTicketCommentHandler
                 Excerpt(comment.Body),
                 _tenantContext.Slug),
             cancellationToken);
+
+        /*
+          The comment's text is deliberately not recorded. The history says that
+          someone commented; what they wrote lives on the ticket, where it can
+          be edited or removed. Copying it here would make the audit trail a
+          second, unremovable copy of every remark anyone ever made.
+        */
+        _activity.Record(
+            ActivityType.TicketCommented,
+            ActivitySubject.Ticket,
+            ticketId,
+            new TicketActivityPayload(ticket.Number, ticket.Subject));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

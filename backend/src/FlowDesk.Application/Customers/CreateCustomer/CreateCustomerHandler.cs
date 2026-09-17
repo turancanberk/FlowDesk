@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Customers;
@@ -8,17 +10,20 @@ namespace FlowDesk.Application.Customers.CreateCustomer;
 public sealed class CreateCustomerHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
     public CreateCustomerHandler(
         IFlowDeskDbContext dbContext,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<CustomerDetail>> HandleAsync(
@@ -48,6 +53,14 @@ public sealed class CreateCustomerHandler
             _clock.UtcNow);
 
         _dbContext.Customers.Add(customer);
+        // Recorded in the same transaction as the change it describes
+        // (ADR-0036).
+        _activity.Record(
+            ActivityType.CustomerCreated,
+            ActivitySubject.Customer,
+            customer.Id,
+            new CustomerActivityPayload(customer.Name));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(CustomerMapper.ToDetail(customer));

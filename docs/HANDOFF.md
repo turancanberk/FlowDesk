@@ -17,7 +17,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 13 birleştirildi) |
+| Aktif dal | `main` (Faz 14 birleştirildi) |
 | Son commit | `3ee7a5c — Merge branch 'feat/attachments'` (Faz 13) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
@@ -38,14 +38,15 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 11 — Outbox
 - Faz 12 — E-posta ve Bildirimler
 - Faz 13 — Dosya Ekleri
+- Faz 14 — Denetim ve Etkinlik
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 14 — Denetim ve Etkinlik** (henüz başlanmadı)
+**Faz 15 — Redis Önbellek** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 14 kapsamında henüz iş yapılmadı.
+Faz 15 kapsamında henüz iş yapılmadı.
 
 ### Devam Eden İş
 
@@ -53,40 +54,37 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 14'ün tamamı:
+Faz 15'in tamamı:
 
-- `ActivityEvent` modeli ve migration (`docs/DATABASE.md` şeması hazır)
-- Önemli eylemlerin kaydı
-- `GET /api/workspaces/{slug}/activity` uç noktası
-- Türkçe etkinlik akışı arayüzü
-- Hassas veri sızdırmayan bağlam
+- Redis **bu fazda** `infra/docker-compose.yml`'a ekleniyor (ADR-0008)
+- Dashboard toplamları için kiracı farkındalıklı önbellek
+- Anahtar şeması, TTL, bayatlama ve geçersiz kılma davranışının belgelenmesi
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/activity` dalını aç. `FlowDesk.Domain/Activity/ActivityEvent.cs` varlığını
-`docs/DATABASE.md` şemasına göre yaz, `ITenantOwned` uygula, EF
-yapılandırmasını ver ve migration üret.
+`feat/caching` dalını aç. Önce `infra/docker-compose.yml`'a Redis'i ekle (host
+portu 6380; 6379 bu makinede dolu) ve `.env.example`'a karşılık gelen
+değişkenleri yaz.
 
-Bu faz **yeni altyapı eklemiyor**. Redis Faz 15'e, gözlemlenebilirlik Faz 18'e
-ait (ADR-0008).
+Ardından `FlowDesk.Application/Abstractions/ICache.cs` sözleşmesini yaz ve
+`FlowDesk.Infrastructure/Caching/` altında `StackExchange.Redis` uygulamasını
+ver. Paket henüz `Directory.Packages.props` içinde **yok**; sürümünü kurulum
+anında resmî registry'den doğrula (ADR-0016).
 
 Dikkat edilecekler:
 
-- **Kaydın nerede yazılacağı bir karar.** İki seçenek var: use case içinde
-  doğrudan (aynı transaction, senkron) ya da mevcut outbox üzerinden tüketiciyle
-  (asenkron). Denetim kaydının iş değişikliğiyle **birlikte** commit edilmesi
-  gerekiyorsa birincisi; kaydın kaybolması kabul edilebilir değilse yine
-  birincisi. Seçim ADR'ye gerekçesiyle yazılmalı.
-- **Hassas veri sızdırmama zorunluluğu.** `Payload` içine parola, token, e-posta
-  gövdesi veya davet token'ı girmemeli. Faz 12'de `MemberInvited` mesajı token
-  taşıyor; etkinlik kaydı **taşımamalı**.
-- **Kiracı kapsamı.** `ActivityEvent` `ITenantOwned` olmalı ve global query
-  filter'a kendiliğinden kaydolmalı (ADR-0024).
-- **Etkinlik akışı dashboard'da yer tutmuyor.** Faz 09 bilinçli olarak "son
-  hareket eden talepler" ve "yaklaşan görevler" gösteriyor; etkinlik akışı
-  eklendiğinde dashboard'un değişip değişmeyeceği ayrı bir karar (ADR-0031).
-- Aktör silinmiş olabilir: şema `ActorUserId`'yi nullable tutuyor (sistem
-  olayları için). Görünen ad tüketici/okuyucu tarafında çözülmeli.
+- **Yalnızca dashboard** (ADR-0015). Liste, talep ve görev sorguları
+  önbelleklenmeyecek; bayat bir liste, ekranda düzelttiğini sandığınız bir
+  kaydın geri gelmesi demektir.
+- **Anahtar kiracı içermeli**: `tenant:{tenantId}:dashboard`. Bunu unutmak, bir
+  kuruluşun rakamlarını diğerine göstermek demek — bu fazın tek gerçek riski.
+- **Geçersiz kılma davranışı kararlaştırılmalı.** Kısa TTL yeterli mi, yoksa
+  yazma sonrası geçersiz kılma da gerekli mi? İkincisi her yazma yoluna dokunur;
+  ölçmeden karmaşıklaştırma. Seçim ADR'ye yazılmalı.
+- **Redis düşerse dashboard çalışmaya devam etmeli.** Önbellek bir hızlandırma,
+  bağımlılık değil; `RabbitMqHealthCheck` gibi `Degraded` dönen bir sağlık
+  kontrolü deseni izlenebilir (ADR-0032).
+- `Testcontainers.Redis` paketi var; mevcut fixture deseni izlenebilir.
 
 ## Son Doğrulama Durumu
 
@@ -96,7 +94,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 |---|---|
 | `dotnet restore backend/FlowDesk.slnx` | Başarılı |
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 458/458 başarılı (225 birim + 233 entegrasyon) |
+| `dotnet test backend/FlowDesk.slnx` | 470/470 başarılı (225 birim + 245 entegrasyon) |
 | `npm --prefix frontend run lint` | Başarılı |
 | `npm --prefix frontend run typecheck` | Başarılı |
 | `npm --prefix frontend run format:check` | Başarılı |
@@ -130,6 +128,7 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | `docker compose ... up -d` (Faz 12) | `postgres`, `rabbitmq` ve `mailpit` healthy |
 | Worker (Faz 12) | Üç kuyruğu da dinledi; outbox işleyici çalıştı |
 | Mailpit üzerinden 8 adımlık akış (Faz 12) | Tamamı geçti — davet e-postası token'ı taşıdı, atama e-postası ve bildirimi ulaştı, kendine atama bildirim üretmedi, yorum bildirimi geldi ve e-posta gitmedi, okundu işaretleme çalıştı, başkasının bildirim kimliği hiçbir şeyi değiştirmedi |
+| 10 adımlık etkinlik akışı (Faz 14) | Tamamı geçti — sıra, davet kaydında token olmaması, katılımın doğru alana yazılması, silinen talebin kaydının kalması, izolasyon, rol değişimi, izleyici erişimi |
 | 13 adımlık dosya akışı (Faz 13) | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
 
 ## Mevcut Hatalar / Blokerler
@@ -254,11 +253,27 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Depolama anahtarı sunucuda üretilir ve yüklenen adı içermez; içerik tipi
   beyaz listeyle doğrulanır (SVG hariç); her indirme API'den geçer, imzalı
   bağlantı verilmez (ADR-0035)
+- Denetim kaydı senkron ve iş değişikliğiyle aynı transaction'da; ekleme-
+  yalnızca; özneye ve aktöre yabancı anahtar yok; yük hassas veri taşımaz
+  (ADR-0036)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 14'te eklenenler:
+
+- `backend/src/FlowDesk.Domain/Activity/` — `ActivityEvent`, `ActivityType`,
+  `ActivitySubject`
+- `backend/src/FlowDesk.Application/Activity/` — `IActivityRecorder`,
+  yükler, `ListActivityHandler`
+- `backend/src/FlowDesk.Infrastructure/Activity/ActivityRecorder.cs`
+- `backend/src/FlowDesk.Api/Endpoints/ActivityEndpoints.cs`
+- On altı use case'e `IActivityRecorder` eklendi
+- `backend/tests/.../Activity/ActivityTests.cs`
+- `frontend/src/features/activity/` — ekran, veri katmanı
+- `frontend/src/app/app/[workspaceSlug]/activity/page.tsx`
 
 Faz 13'te eklenenler:
 
@@ -446,9 +461,9 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddAttachments` |
+| Son migration | `AddActivityEvents` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
-| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments` |
+| Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments`, `ActivityEvents` |
 | Seed | Yok (Faz 21) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).

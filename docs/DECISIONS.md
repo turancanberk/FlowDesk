@@ -1155,3 +1155,75 @@ döndürdüğü şey hakkında yalan söyleyen bir rota.
 Virüs taraması **yok**. Gerçek bir ürün için gerekli olurdu; burada kapsam dışı
 ve `docs/ROADMAP.md` içinde belirtiliyor. Eksikliğin bilinerek bırakıldığını
 yazmak, unutulmuş gibi görünmesinden iyi.
+
+---
+
+## ADR-0036 — Denetim kaydı: senkron, ekleme-yalnızca, yabancı anahtarsız
+
+**Bağlam.** Etkinlik geçmişi hem ürün özelliği hem denetim izi. Üç soru
+gerekiyordu: kayıt nerede yazılır, yabancı anahtarlar nasıl kurulur, yükte ne
+durur.
+
+Faz 11 ve 12'den sonra outbox hazırdı ve tüketiciyle asenkron yazmak mümkündü.
+
+**Karar.**
+
+1. **Kayıt use case içinde, iş değişikliğiyle aynı transaction'da** yazılır.
+   Outbox kullanılmaz.
+2. `ActivityEvent` **ekleme-yalnızca**. Değiştiren veya silen bir metot yok.
+3. **Özneye ve aktöre yabancı anahtar yok.**
+4. Yük hiçbir **hassas veri** taşımaz ve gösterim için gereken minimumdur.
+5. Her üye, **İzleyici dâhil**, geçmişi okuyabilir.
+
+**Gerekçe.**
+
+**Senkron.** Denetim kaydı değişiklikle birlikte inmeli. Değişiklik commit
+edilip kayıt edilmezse geçmiş tam da önemli olan biçimde yanlış olur: hiçbir şey
+olmadığını söyler. Outbox bunu eventual yapardı ve "bunun silindiğine dair
+eninde sonunda bir kayıt olacak" bir denetim izi değil. Maliyeti, her yazma
+işlemine bir satır eklenmesi — indeksli bir insert, ölçülebilir bir yük değil.
+
+**Ekleme-yalnızca.** Düzenlenebilen bir geçmiş hiçbir soruya cevap vermez.
+Satırlar yalnızca çalışma alanının kendisi gittiğinde gidiyor.
+
+**Yabancı anahtarsız.** Özne silinebilir ve olay ondan uzun yaşamalı. Cascade
+olsaydı silmeyi kaydeden olayı kendi cascade'i silerdi — tam tersi. Aktör için
+de aynı: ayrılan bir kişinin ne yaptığını unutan iz, iz değildir. Bedeli, adın
+okuma anında çözülmesi ve eksik gelebilmesi; okuyucuya "Bilinmeyen kullanıcı"
+deniyor, isim uydurulmuyor.
+
+**Yük.** Denetim izi, tarif ettiği şeyden daha çok kişi tarafından ve daha uzun
+süre okunur. Davet kaydında token yok — token e-postayı gönderen mesajda,
+zorunlu olduğu için (ADR-0034); izde duran kullanılabilir bir davet bağlantısı
+kalıcı bir giriş yolu olurdu. Yorum metni de kaydedilmiyor: geçmiş birinin yorum
+yazdığını söylüyor, ne yazdığı talepte duruyor ve orada düzenlenebiliyor.
+Kopyalamak, herkesin her sözünün silinemez ikinci bir kopyasını üretirdi.
+
+**Herkes okur.** Akış ekibin ne yaptığını söylüyor; bir ekibin kendi geçmişini
+ekibin bir kısmından gizlemek, kaydı daha az güvenilir yapar ve hiçbir şeyi daha
+güvenli yapmaz — yük zaten üyenin kaydı açarak göremeyeceği hiçbir şey
+taşımıyor.
+
+**Sonuçlar.**
+
+Her yazma işlemi değil, **her karar** kaydediliyor. Bir açıklamanın her
+düzenlemesini kaydetmek, talebin el değiştirdiği anı gürültünün altına gömerdi
+ve kimsenin okumadığı bir akış hiçbir şey kaydetmez.
+
+Değişmeyen bir şey kayda girmiyor: aynı durumu tekrar seçmek, aynı rolü tekrar
+vermek. Alan modelinde no-op olan şey geçmişte de no-op.
+
+`IActivityRecorder.RecordOutsideWorkspace` sistemde bir tek yerde kullanılıyor:
+davet kabulü. Kişi o ana kadar üye değil, dolayısıyla çözülmüş bir alan yok.
+Ayrı bir metot olması bilinçli — sıradan metot çalışma alanı almıyor ve olayın
+yanlış alana yazılmasını imkânsız kılan şey bu; alanı açıkça yazmak çağrı
+yerinde **sıra dışı görünmeli**, çünkü öyle.
+
+Dashboard değişmedi. Faz 09 bilinçli olarak "son hareket eden talepler" ve
+"yaklaşan görevler" gösteriyor; ikisi de karar verdiren bilgi, etkinlik akışı
+ise geçmiş. Aynı ekrana koymak, dashboard'un cevapladığı soruyu bulanıklaştırırdı
+(ADR-0031).
+
+Saklama süresi (retention) politikası **yok**. Tablo sınırsız büyür. Gerçek bir
+dağıtımda bir kesme veya arşivleme politikası gerekirdi; burada kapsam dışı ve
+`docs/ROADMAP.md` içinde belirtiliyor.

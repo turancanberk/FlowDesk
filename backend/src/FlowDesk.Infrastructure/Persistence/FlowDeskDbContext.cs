@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Domain.Authentication;
+using FlowDesk.Domain.Activity;
 using FlowDesk.Domain.Customers;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Domain.Messaging;
@@ -79,6 +80,8 @@ public sealed class FlowDeskDbContext
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
 
     /// <summary>
     /// Runs <paramref name="work"/> inside a database transaction.

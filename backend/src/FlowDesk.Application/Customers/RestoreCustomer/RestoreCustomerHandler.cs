@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -9,17 +11,20 @@ namespace FlowDesk.Application.Customers.RestoreCustomer;
 public sealed class RestoreCustomerHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
     public RestoreCustomerHandler(
         IFlowDeskDbContext dbContext,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(Guid customerId, CancellationToken cancellationToken)
@@ -49,6 +54,12 @@ public sealed class RestoreCustomerHandler
         }
 
         customer.Restore(_clock.UtcNow);
+        _activity.Record(
+            ActivityType.CustomerRestored,
+            ActivitySubject.Customer,
+            customer.Id,
+            new CustomerActivityPayload(customer.Name));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

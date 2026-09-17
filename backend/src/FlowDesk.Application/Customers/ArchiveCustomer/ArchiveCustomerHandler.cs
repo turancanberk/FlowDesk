@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -16,17 +18,20 @@ namespace FlowDesk.Application.Customers.ArchiveCustomer;
 public sealed class ArchiveCustomerHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
 
     public ArchiveCustomerHandler(
         IFlowDeskDbContext dbContext,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(Guid customerId, CancellationToken cancellationToken)
@@ -45,6 +50,12 @@ public sealed class ArchiveCustomerHandler
         }
 
         customer.Archive(_clock.UtcNow);
+        _activity.Record(
+            ActivityType.CustomerArchived,
+            ActivitySubject.Customer,
+            customer.Id,
+            new CustomerActivityPayload(customer.Name));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

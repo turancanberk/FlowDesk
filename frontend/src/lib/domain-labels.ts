@@ -81,6 +81,67 @@ export const taskSortLabels: Record<
   TitleAscending: "Başlığa göre (A-Z)",
 };
 
+/*
+  Etkinlik satırlarının Türkçe kalıpları.
+
+  Özne `{0}` yer tutucusuna girer ve kalıbın kendisi cümlenin gerisini taşır.
+  Türkçede ek, sözcüğün son ünlüsüne göre değiştiği için "X eklendi" gibi
+  sonuna ek almayan biçimler seçildi: "TLP-1042'ye" demek, sayının okunuşuna
+  bağlı bir ek gerektirir ve makine bunu doğru üretemez.
+*/
+export const activityTypeLabels: Record<
+  | "CustomerCreated"
+  | "CustomerArchived"
+  | "CustomerRestored"
+  | "TicketCreated"
+  | "TicketStatusChanged"
+  | "TicketAssigned"
+  | "TicketUnassigned"
+  | "TicketCommented"
+  | "TicketDeleted"
+  | "TaskCreated"
+  | "TaskCompleted"
+  | "TaskDeleted"
+  | "MemberInvited"
+  | "MemberJoined"
+  | "MemberRoleChanged"
+  | "MemberRemoved"
+  | "AttachmentUploaded"
+  | "AttachmentDeleted",
+  string
+> = {
+  CustomerCreated: "müşteri kaydı oluşturdu",
+  CustomerArchived: "müşteri kaydını arşivledi",
+  CustomerRestored: "müşteri kaydını arşivden çıkardı",
+  TicketCreated: "talep açtı",
+  TicketStatusChanged: "talebin durumunu değiştirdi",
+  TicketAssigned: "talebi atadı",
+  TicketUnassigned: "talebin atamasını kaldırdı",
+  TicketCommented: "talebe yorum yazdı",
+  TicketDeleted: "talebi sildi",
+  TaskCreated: "görev oluşturdu",
+  TaskCompleted: "görevi tamamladı",
+  TaskDeleted: "görevi sildi",
+  MemberInvited: "ekibe davet gönderdi",
+  MemberJoined: "çalışma alanına katıldı",
+  MemberRoleChanged: "bir üyenin rolünü değiştirdi",
+  MemberRemoved: "bir üyeyi ekipten çıkardı",
+  AttachmentUploaded: "talebe dosya ekledi",
+  AttachmentDeleted: "talepten dosya sildi",
+};
+
+/** Etkinlik filtresindeki kayıt türü adları. */
+export const activitySubjectLabels: Record<
+  "Customer" | "Ticket" | "TaskItem" | "Member" | "Attachment",
+  string
+> = {
+  Customer: "Müşteri",
+  Ticket: "Talep",
+  TaskItem: "Görev",
+  Member: "Ekip",
+  Attachment: "Dosya",
+};
+
 export const membershipRoleLabels: Record<MembershipRole, DomainLabel> = {
   Owner: { label: "Sahip", tone: "accent" },
   Admin: { label: "Yönetici", tone: "info" },

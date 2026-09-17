@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -18,17 +20,20 @@ namespace FlowDesk.Application.Tickets.DeleteAttachment;
 public sealed class DeleteAttachmentHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IFileStorage _fileStorage;
     private readonly ITenantContext _tenantContext;
 
     public DeleteAttachmentHandler(
         IFlowDeskDbContext dbContext,
         IFileStorage fileStorage,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _fileStorage = fileStorage;
         _tenantContext = tenantContext;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(
@@ -52,6 +57,20 @@ public sealed class DeleteAttachmentHandler
         }
 
         var storageKey = attachment.StorageKey;
+
+        // Read for the history line. The ticket is still here — deleting a file
+        // does not delete what it was attached to.
+        var ticketNumber = await _dbContext.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.Id == ticketId)
+            .Select(ticket => ticket.Number)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        _activity.Record(
+            ActivityType.AttachmentDeleted,
+            ActivitySubject.Attachment,
+            attachment.Id,
+            new AttachmentActivityPayload(attachment.FileName, ticketId, ticketNumber));
 
         _dbContext.Attachments.Remove(attachment);
         await _dbContext.SaveChangesAsync(cancellationToken);

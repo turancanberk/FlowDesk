@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tasks;
@@ -8,6 +10,7 @@ namespace FlowDesk.Application.Tasks.CreateTask;
 public sealed class CreateTaskHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly ITenantContext _tenantContext;
     private readonly IClock _clock;
@@ -16,12 +19,14 @@ public sealed class CreateTaskHandler
         IFlowDeskDbContext dbContext,
         IUserAccountStore accountStore,
         ITenantContext tenantContext,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _tenantContext = tenantContext;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<TaskDetail>> HandleAsync(
@@ -66,6 +71,12 @@ public sealed class CreateTaskHandler
             now);
 
         _dbContext.Tasks.Add(task);
+        _activity.Record(
+            ActivityType.TaskCreated,
+            ActivitySubject.TaskItem,
+            task.Id,
+            new TaskActivityPayload(task.Title, task.Status));
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(

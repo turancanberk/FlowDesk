@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Common;
@@ -24,12 +26,14 @@ namespace FlowDesk.Application.Team.ChangeMemberRole;
 public sealed class ChangeMemberRoleHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
 
-    public ChangeMemberRoleHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext)
+    public ChangeMemberRoleHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext, IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(
@@ -75,6 +79,8 @@ public sealed class ChangeMemberRoleHandler
             membership,
             cancellationToken);
 
+        var previousRole = membership.Role;
+
         try
         {
             membership.ChangeRole(command.Role, isLastOwner);
@@ -82,6 +88,17 @@ public sealed class ChangeMemberRoleHandler
         catch (DomainRuleViolationException)
         {
             return Result.Failure(TeamErrors.LastOwner);
+        }
+
+        // Only a real change. Re-saving the same role, which the interface
+        // allows, is not a line in the history.
+        if (membership.Role != previousRole)
+        {
+            _activity.Record(
+                ActivityType.MemberRoleChanged,
+                ActivitySubject.Member,
+                membership.UserId,
+                new MemberActivityPayload(membership.UserId, previousRole, membership.Role));
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

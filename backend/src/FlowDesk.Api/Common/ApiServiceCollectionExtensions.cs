@@ -43,6 +43,7 @@ using FlowDesk.Application.Tasks.DeleteTask;
 using FlowDesk.Application.Tasks.GetTask;
 using FlowDesk.Application.Tasks.ListTasks;
 using FlowDesk.Application.Tasks.UpdateTask;
+using FlowDesk.Application.Activity.ListActivity;
 using FlowDesk.Application.Dashboard.GetDashboard;
 using FlowDesk.Application.Notifications.ListNotifications;
 using FlowDesk.Application.Notifications.MarkNotificationsRead;
@@ -115,6 +116,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddScoped<GetDashboardHandler>();
 
+        services.AddScoped<ListActivityHandler>();
         services.AddScoped<ListNotificationsHandler>();
         services.AddScoped<MarkNotificationsReadHandler>();
 

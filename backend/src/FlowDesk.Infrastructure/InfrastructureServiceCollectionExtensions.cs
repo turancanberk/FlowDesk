@@ -1,6 +1,8 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Authentication;
 using FlowDesk.Application.Tickets.UploadAttachment;
+using FlowDesk.Infrastructure.Activity;
 using FlowDesk.Infrastructure.Authentication;
 using FlowDesk.Infrastructure.Email;
 using FlowDesk.Infrastructure.HealthChecks;
@@ -121,6 +123,13 @@ public static class InfrastructureServiceCollectionExtensions
         // single instance per request, so both views share one change tracker.
         services.AddScoped<IFlowDeskDbContext>(provider =>
             provider.GetRequiredService<FlowDeskDbContext>());
+
+        /*
+          Scoped, because it writes through the request's own DbContext and
+          reads the workspace and actor from the request's tenant context. A
+          singleton could not know either (ADR-0036).
+        */
+        services.AddScoped<IActivityRecorder, ActivityRecorder>();
 
         return services;
     }

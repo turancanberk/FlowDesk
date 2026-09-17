@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 
@@ -15,12 +17,14 @@ namespace FlowDesk.Application.Tasks.DeleteTask;
 public sealed class DeleteTaskHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly ITenantContext _tenantContext;
 
-    public DeleteTaskHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext)
+    public DeleteTaskHandler(IFlowDeskDbContext dbContext, ITenantContext tenantContext, IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
+        _activity = activity;
     }
 
     public async Task<Result> HandleAsync(Guid taskId, CancellationToken cancellationToken)
@@ -36,6 +40,14 @@ public sealed class DeleteTaskHandler
         {
             return Result.Failure(TaskErrors.NotFound);
         }
+
+        // Recorded before the row goes; the title exists nowhere else
+        // afterwards.
+        _activity.Record(
+            ActivityType.TaskDeleted,
+            ActivitySubject.TaskItem,
+            task.Id,
+            new TaskActivityPayload(task.Title, task.Status));
 
         _dbContext.Tasks.Remove(task);
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Domain.Activity;
+using FlowDesk.Application.Activity;
 using FlowDesk.Application.Common;
 using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Common;
@@ -23,6 +25,7 @@ namespace FlowDesk.Application.Team.AcceptInvitation;
 public sealed class AcceptInvitationHandler
 {
     private readonly IFlowDeskDbContext _dbContext;
+    private readonly IActivityRecorder _activity;
     private readonly IUserAccountStore _accountStore;
     private readonly ISecureTokenGenerator _tokenGenerator;
     private readonly ICurrentUser _currentUser;
@@ -33,13 +36,15 @@ public sealed class AcceptInvitationHandler
         IUserAccountStore accountStore,
         ISecureTokenGenerator tokenGenerator,
         ICurrentUser currentUser,
-        IClock clock)
+        IClock clock,
+        IActivityRecorder activity)
     {
         _dbContext = dbContext;
         _accountStore = accountStore;
         _tokenGenerator = tokenGenerator;
         _currentUser = currentUser;
         _clock = clock;
+        _activity = activity;
     }
 
     public async Task<Result<AcceptedInvitation>> HandleAsync(
@@ -113,6 +118,19 @@ public sealed class AcceptInvitationHandler
                 invitation.Role,
                 now));
         }
+
+        /*
+          The one place a workspace is named explicitly. The person is not a
+          member until this moment, so there is no resolved workspace to read —
+          the invitation says which one (ADR-0036).
+        */
+        _activity.RecordOutsideWorkspace(
+            invitation.TenantId,
+            account.Id,
+            ActivityType.MemberJoined,
+            ActivitySubject.Member,
+            account.Id,
+            new MemberActivityPayload(account.Id, null, invitation.Role));
 
         // One save: the invitation is spent and the membership exists together,
         // or neither change lands. Otherwise a failure between them could burn
