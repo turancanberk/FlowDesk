@@ -91,12 +91,57 @@ public sealed class RefreshSessionHandler
             return Result.Failure<AuthenticatedSession>(AuthenticationErrors.AccountNotFound);
         }
 
-        storedToken.MarkUsed(now);
-        var session = _sessionIssuer.ContinueSession(account, storedToken.FamilyId);
+        var session = await _dbContext.ExecuteInTransactionAsync(
+            async transactionCancellation =>
+            {
+                /*
+                  Spending the token is a conditional update, not a read
+                  followed by a write. The checks above ran on a copy read
+                  without a lock, and two requests presenting the same token —
+                  two tabs waking at once, or a thief racing the owner — both
+                  pass them. Only one of them can move UsedAt from null; the
+                  other waits on the row, finds it already spent and updates
+                  nothing.
 
-        // One save: the old token is spent and the new one exists together, or
-        // neither change lands.
-        await _dbContext.SaveChangesAsync(cancellationToken);
+                  Without this, both requests went on to issue a successor, and
+                  one single-use token became two independent sessions that
+                  replay detection never sees (found in Phase 16).
+                */
+                var spent = await _dbContext.RefreshTokens
+                    .Where(token => token.Id == storedToken.Id
+                        && token.UsedAt == null
+                        && token.RevokedAt == null)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(token => token.UsedAt, now),
+                        transactionCancellation);
+
+                if (spent == 0)
+                {
+                    return null;
+                }
+
+                // Keeps the tracked copy in step with the row, and the domain
+                // rule in force for anything that reads it afterwards.
+                storedToken.MarkUsed(now);
+
+                var continued = _sessionIssuer.ContinueSession(account, storedToken.FamilyId);
+
+                // Same transaction: the old token is spent and the new one
+                // exists together, or neither change lands.
+                await _dbContext.SaveChangesAsync(transactionCancellation);
+
+                return continued;
+            },
+            cancellationToken);
+
+        if (session is null)
+        {
+            // Lost the race: by the time this request reached the row, the
+            // token had been exchanged. That is a spent token presented again,
+            // which is exactly what replay detection exists for.
+            await RevokeFamilyAsync(storedToken.FamilyId, now, cancellationToken);
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionRevoked);
+        }
 
         return Result.Success(session);
     }
