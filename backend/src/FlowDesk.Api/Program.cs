@@ -8,7 +8,7 @@ builder.Services.AddFlowDeskInfrastructure(builder.Configuration);
 builder.Services.AddFlowDeskApplication();
 builder.Services.AddFlowDeskApiServices(builder.Configuration);
 
-builder.Services.AddRateLimiter(RateLimitingPolicies.Configure);
+builder.Services.AddFlowDeskRateLimiting(builder.Configuration);
 builder.Services.AddOpenApi();
 
 // ProblemDetails is registered from the start so that every error leaving the
