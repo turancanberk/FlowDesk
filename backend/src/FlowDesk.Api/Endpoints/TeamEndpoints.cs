@@ -58,11 +58,17 @@ public static class TeamEndpoints
 
     private static async Task<IResult> ListMembersAsync(
         ListMembersHandler handler,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var members = await handler.HandleAsync(cancellationToken);
+        var result = await handler.HandleAsync(cancellationToken);
 
-        return Results.Ok(members.Select(member => new TeamMemberResponse(
+        if (result.IsFailure)
+        {
+            return result.Error.ToProblem(httpContext);
+        }
+
+        return Results.Ok(result.Value.Select(member => new TeamMemberResponse(
             member.UserId,
             member.Email,
             member.DisplayName,
