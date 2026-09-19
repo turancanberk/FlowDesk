@@ -112,6 +112,33 @@ public sealed class FlowDeskDbContext
     }
 
     /// <summary>
+    /// Takes the workspace row lock that serialises team changes.
+    /// </summary>
+    /// <remarks>
+    /// The workspace row stands in for the team: there is no single row that is
+    /// "the set of owners", and locking every membership would still miss one
+    /// added in the meantime.
+    ///
+    /// FOR NO KEY UPDATE rather than FOR UPDATE. Every insert that references
+    /// the workspace — a ticket, a customer — takes a key-share lock on this row
+    /// to check its foreign key, and FOR UPDATE would make all of them wait for
+    /// a role change to finish. This mode conflicts only with itself.
+    /// </remarks>
+    public async Task LockTeamAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (Database.CurrentTransaction is null)
+        {
+            // Outside a transaction the lock would be released the moment the
+            // statement finished, and the caller would believe it held one.
+            throw new InvalidOperationException("LockTeamAsync must run inside a transaction.");
+        }
+
+        await Database.ExecuteSqlAsync(
+            $"SELECT 1 FROM \"Tenants\" WHERE \"Id\" = {tenantId} FOR NO KEY UPDATE",
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Locks the workspace's counter row and returns the next ticket number.
     /// </summary>
     /// <remarks>

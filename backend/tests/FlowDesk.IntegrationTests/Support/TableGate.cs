@@ -69,6 +69,17 @@ internal sealed class TableGate : IAsyncDisposable
     /// </summary>
     public async Task OpenWhenQueuedAsync(int count, CancellationToken cancellationToken)
     {
+        await WaitUntilQueuedAsync(count, cancellationToken);
+        await _transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until <paramref name="count"/> sessions are blocked, leaving the
+    /// table shut — for tests that need one request held before the next is
+    /// sent, so the order they reach the database is the order intended.
+    /// </summary>
+    public async Task WaitUntilQueuedAsync(int count, CancellationToken cancellationToken)
+    {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
 
         // A second connection: the gate's own is busy holding the lock. Built
@@ -86,8 +97,6 @@ internal sealed class TableGate : IAsyncDisposable
 
             await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
         }
-
-        await _transaction.CommitAsync(cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
