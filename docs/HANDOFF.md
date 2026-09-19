@@ -11,14 +11,14 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-17 (UTC)
+2026-09-19 (UTC)
 
 ## Repository Durumu
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 15 birleştirildi) |
-| Son commit | `93013d9 — Merge branch 'feat/caching'` (Faz 15) |
+| Aktif dal | `main` (Faz 16 birleştirildi) |
+| Son commit | `Merge branch 'feat/hardened-tests'` (Faz 16) — hash birleştirme sonrası yazılır |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
@@ -40,14 +40,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 13 — Dosya Ekleri
 - Faz 14 — Denetim ve Etkinlik
 - Faz 15 — Redis Önbellek
+- Faz 16 — Gelişmiş Entegrasyon Testleri
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 16 — Gelişmiş Entegrasyon Testleri** (henüz başlanmadı)
+**Faz 17 — Playwright E2E** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 16 kapsamında henüz iş yapılmadı.
+Faz 17 kapsamında henüz iş yapılmadı. Faz 16'nın özeti `docs/PROGRESS.md`
+içinde; kararlar ADR-0038, ADR-0039 ve ADR-0040'ta.
 
 ### Devam Eden İş
 
@@ -55,43 +57,41 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 16'nın tamamı:
-
-- Kiracı izolasyonu ve rol yetkilendirme matrisi için kapsamlı senaryolar
-- Kimlik doğrulama yaşam döngüsünün uçtan uca kapsanması
-- Arka plan işlemenin (outbox + tüketici) birlikte doğrulanması
-- Boşlukların bulunup kapatılması
-
-Bu faz **yeni özellik eklemiyor**; mevcut davranışı daha sıkı doğruluyor.
+Faz 17'nin tamamı: deterministik tarayıcı yolculukları (ROADMAP). Depo
+yapısında yeri ayrılmış: kökte `e2e/` (ARCHITECTURE.md).
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/hardened-tests` dalını aç. Bu faz kod yazmaktan çok **boşluk aramakla**
-ilgili: mevcut 478 test neyi kapsamıyor, onu bul ve kapat.
+`feat/e2e` dalını aç. Playwright'ı kur (sürümü registry'den doğrula, stable),
+ilk yolculuğu yaz ve CI'a hazır tek komutla koşulabilir hâle getir.
 
 Başlanacak yerler:
 
-- **Kimlik doğrulama yaşam döngüsü.** Faz 03 rotasyon, replay ve iptali
-  kapsıyor; access token süresi dolduğunda sessiz yenilemenin gerçek bir istek
-  sırasında çalıştığı ayrıca doğrulanmalı.
-- **Rol matrisi uçtan uca.** Her rol × her yazma uç noktası için tablo testi.
-  Bugün modül modül kapsanıyor; tek bir tablo, yeni bir uç noktanın
-  unutulmasını imkânsız kılar.
-- **Arka plan zinciri bir arada.** Use case → outbox satırı → işleyici →
-  broker → tüketici → bildirim/e-posta, tek testte. Parçalar ayrı ayrı
-  kapsanıyor; zincirin tamamı değil.
-- **Eşzamanlılık.** Aynı talebe eşzamanlı iki atama, aynı çalışma alanına
-  eşzamanlı iki davet kabulü.
+- **Oturum yolculuğu.** Kayıt → çıkış → giriş → access token süresi dolunca
+  sessiz yenileme. Backend sözleşmesi Faz 16'da sabitlendi
+  (`SessionLifecycleTests`); tarayıcı tarafı henüz hiç otomatik
+  doğrulanmadı.
+- **Sekmeler arası yenileme** (teknik borç, ADR-0038). Aynı anda uyanan iki
+  sekmeden kaybeden `401 auth.session_superseded` alıp kendi başına çıkış
+  yapıyor. Önce Playwright ile iki sekmeli senaryoyu yaz, sonra `http-client.ts`
+  içinde bu koda tek yeniden deneme ekle.
+- **Çekirdek iş yolculuğu.** Çalışma alanı → müşteri → talep → atama →
+  atanan kişinin bildirimi. Worker'ın da ayakta olması gerekiyor; bildirimin
+  gelmesi, Faz 15–16 arasında bozuk kalan zincirin tarayıcıdan görünen ucu.
+- **Rol görünürlüğü.** İzleyici hiçbir yazma düğmesi görmüyor; Temsilci ek
+  yükleyebiliyor ama silemiyor (Faz 16'da değişti).
 
 Dikkat edilecekler:
 
-- **Test zayıflatılmaz.** Bir test yanlış davranışı yakalarsa üretim kodu
-  düzeltilir, test değil.
-- Kararsız bir düşüş görülürse çıktı saklanarak tekrarlanır (madde 6).
+- Playwright'ta `networkidle` kullanma (aşağıda madde 8).
+- Kayıt limiti IP başına 10 dakikada 5 (madde 5); test kullanıcılarını buna
+  göre planla.
+- Frontend `format:check` artık temiz; faz sonunda lint/typecheck/build ile
+  birlikte çalıştır.
 
 ## Son Doğrulama Durumu
 
-Faz 01 sonunda gerçekten çalıştırıldı:
+Fazların sonunda gerçekten çalıştırılanlar (en günceli en altta):
 
 | Komut | Sonuç |
 |---|---|
@@ -134,6 +134,9 @@ Faz 01 sonunda gerçekten çalıştırıldı:
 | 8 adımlık önbellek akışı (Faz 15) | Tamamı geçti — anahtarın çalışma alanı kimliğini taşıması, önbellek isabeti, TTL, yazma sonrası silinme, alanlar arası sızmama |
 | 10 adımlık etkinlik akışı (Faz 14) | Tamamı geçti — sıra, davet kaydında token olmaması, katılımın doğru alana yazılması, silinen talebin kaydının kalması, izolasyon, rol değişimi, izleyici erişimi |
 | 13 adımlık dosya akışı (Faz 13) | Tamamı geçti — bayt bayt indirme, SVG/HTML/boş/limit üstü reddi, yol taşıyan adın temizlenmesi, izolasyon `404`, başka talebin altından erişilememesi, rol matrisi, silme, talep silinince dosyaların gitmesi |
+| `dotnet test backend/FlowDesk.slnx` (Faz 16) | 501/501 başarılı (230 birim + 271 entegrasyon) |
+| `npm --prefix frontend run format:check / lint / typecheck / build` (Faz 16) | Başarılı |
+| Gerçek Worker, Development (Faz 16) | Üç kuyruk dinlendi, outbox turları hatasız (düzeltmeden önce başlamıyordu) |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -193,6 +196,20 @@ Bilinen blocker yok.
 8. **Playwright ve `networkidle`.** TanStack Query açık istekler tutabildiği
    için `waitUntil: "networkidle"` hiç sonuçlanmayabilir. Elle doğrulama
    betiklerinde `domcontentloaded` + açık seçici beklemesi kullanın.
+
+9. **Docker Desktop kapalı.** Oturum başında daemon çalışmıyorsa Compose ve
+   Testcontainers "Cannot connect to the Docker daemon" verir. `open -a Docker`
+   ile başlatıp `docker info` yanıt verene kadar bekleyin.
+
+10. **`dotnet test` filtreleri.** `--filter-class` ile `--filter-namespace`
+    birlikte verilince VE ile birleşir ve hiç test seçilmeyebilir ("0 test").
+    Aynı türden birden fazla filtre VEYA ile birleşir.
+
+11. **Yarış testleri.** Eşzamanlılık testleri istekleri yalnızca aynı anda
+    göndermez; `TableGate` ile handler'ın okuma ve yazma arasında dokunduğu
+    tabloyu kilitler. Gerçek zamanlamaya bırakılan bir yarış çoğu zaman hiç
+    oluşmaz ve test boşuna geçer. Yeni bir yarış testi yazarken önce
+    düzeltmesiz kodda düştüğünü görün.
 
 ## Önemli Mimari Kararlar
 
@@ -262,11 +279,48 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   (ADR-0036)
 - Önbellek bir hızlandırma, bağımlılık değil: hata yutulur, geçersiz kılma EF
   interceptor'ında, önbellek yokluğu desteklenen yapılandırma (ADR-0037)
+- Tek seferlik geçişler (refresh token, davet) koşullu güncellemeyle; ekip
+  değişiklikleri çalışma alanı satırında `FOR NO KEY UPDATE` kilidiyle ve
+  çağıranın taze rolüyle; eşzamanlı yenilemeyi kaybeden `401
+  auth.session_superseded` alır, aile iptal edilmez (ADR-0038)
+- İki hostun da kaydettiği servisler `ITenantContext`'i **isteğe bağlı** çözer;
+  Worker bileşimi tek çağrı (`AddFlowDeskWorker`) ve testle doğrulanır
+  (ADR-0039)
+- Çalışma alanına bağlı her uç nokta `EndpointCatalog`'da; yeni uç nokta
+  katalog kaydı ve en düşük rolüyle birlikte eklenir, yoksa kapsam testi düşer
+  (ADR-0040). Ek silme Admin'e ait
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 16'da eklenenler / değişenler:
+
+- `backend/tests/.../Hardening/` — `EndpointCatalog`, `EndpointProbe`,
+  `EndpointCoverageTests`, `RoleMatrixTests`, `TenantBoundaryTests`,
+  `ConcurrencyTests`
+- `backend/tests/.../Authentication/SessionLifecycleTests.cs`
+- `backend/tests/.../Messaging/BackgroundChainTests.cs`,
+  `WorkerCompositionTests.cs`
+- `backend/tests/.../Support/` — `TableGate`, `AdjustableClock`,
+  `MailpitContainerFixture`; `PostgresContainerFixture.CreateIsolatedDatabaseAsync`;
+  `FlowDeskApiFactory.Settings`
+- `backend/tests/FlowDesk.UnitTests/Architecture/PermissionEnforcementTests.cs`
+- `backend/src/FlowDesk.Infrastructure/WorkerServiceCollectionExtensions.cs`,
+  `Notifications/NotificationServiceCollectionExtensions.cs` — Worker bileşimi
+- `backend/src/FlowDesk.Worker/Program.cs` — tek çağrı
+- `backend/src/FlowDesk.Infrastructure/Caching/DashboardCacheInvalidator.cs`,
+  `Activity/ActivityRecorder.cs` — `ITenantContext` isteğe bağlı
+- `backend/src/FlowDesk.Application/Authentication/RefreshSession/RefreshSessionHandler.cs`
+- `backend/src/FlowDesk.Application/Team/AcceptInvitation/`,
+  `RemoveMember/`, `ChangeMemberRole/`, `ListMembers/`, `MembershipQueries.cs`
+- `backend/src/FlowDesk.Application/Abstractions/IFlowDeskDbContext.cs` —
+  `LockTeamAsync`
+- `backend/src/FlowDesk.Application/Tenancy/WorkspaceAction.cs` —
+  `DeleteAttachments`
+- `frontend/src/features/tickets/ticket-attachments.tsx` — silme yalnızca
+  Admin/Owner; 13 dosyada Prettier biçimi
 
 Faz 15'te eklenenler:
 
@@ -496,7 +550,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 |---|---|
 | PostgreSQL | **Aktif** — `flowdesk-postgres`, host portu 5433 |
 | RabbitMQ | **Aktif** — `flowdesk-rabbitmq`, host portları 5672 / 15672 (yönetim arayüzü) |
-| Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025 |
+| Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025. Faz 16'dan beri uçtan uca testte de container olarak koşuyor |
 | Azurite | **Aktif** — `flowdesk-azurite`, blob 10000 (yalnızca blob servisi) |
 | Redis | **Aktif** — `flowdesk-redis`, host portu 6380, kalıcılık kapalı |
 | Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |

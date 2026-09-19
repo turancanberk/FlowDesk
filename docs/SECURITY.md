@@ -59,8 +59,14 @@ Her oturum bir **token family** (aile) kimliği taşır. Refresh sırasında:
 3. Bulunan token daha önce kullanılmışsa bu bir **replay göstergesidir**:
    ailenin tamamı iptal edilir ve istek reddedilir. Çalınmış bir token'ın ikinci
    kullanımı oturumu düşürür.
-4. Geçerliyse eski token kullanılmış olarak işaretlenir, aynı aile içinde yeni
-   bir token üretilir ve çereze yazılır.
+4. Geçerliyse eski token **koşullu bir güncellemeyle** (`UsedAt IS NULL`)
+   kullanılmış olarak işaretlenir, aynı transaction'da aile içinde yeni bir
+   token üretilir ve çereze yazılır.
+5. Aynı token'la eşzamanlı gelen isteklerden yalnızca biri koşullu güncellemeyi
+   geçer. Diğerleri oturum almaz ve `401 auth.session_superseded` alır; bu bir
+   replay sayılmaz ve aile iptal edilmez — aynı anda uyanan iki sekme bunu
+   yapar. Kaybeden taraf harcanmış token'ı bir daha sunarsa 3. madde işler
+   (ADR-0038).
 
 `Logout` işlemi refresh token ailesini sunucu tarafında geçersizleştirir ve
 çerezi temizler.
@@ -129,9 +135,11 @@ tarayıcılar `http://localhost` için `Secure` çerezleri kabul eder.
 
 ## 5. Yetkilendirme ve izin matrisi
 
-Roller `Membership` üzerinde tutulur. İzin mantığı tek bir merkezde tanımlanır
-ve ASP.NET Core authorization policy'leri üzerinden uygulanır. Uç noktalarda
-dağınık `if (role == ...)` kontrolleri yazılmaz.
+Roller `Membership` üzerinde tutulur. İzin mantığı tek bir tabloda
+(`WorkspacePermissions`) tanımlanır ve her use case kendi eylemini bu tablodan
+denetler. Uç noktalarda dağınık `if (role == ...)` kontrolleri yazılmaz.
+Tablodaki her eylemin en az bir use case'te denetlendiği testle doğrulanır
+(ADR-0040).
 
 | İşlem | Owner | Admin | Agent | Viewer |
 |---|:---:|:---:|:---:|:---:|
@@ -155,11 +163,13 @@ dağınık `if (role == ...)` kontrolleri yazılmaz.
 | Talep sil | ✓ | ✓ | — | — |
 | Görev görüntüle | ✓ | ✓ | ✓ | ✓ |
 | Görev oluştur / düzenle | ✓ | ✓ | ✓ | — |
-| Görev sil | ✓ | ✓ | — | — |
+| Görev sil | ✓ | ✓ | ✓ | — |
 | Ek dosya yükle | ✓ | ✓ | ✓ | — |
 | Ek dosya indir | ✓ | ✓ | ✓ | ✓ |
 | Ek dosya sil | ✓ | ✓ | — | — |
 | Etkinlik geçmişini görüntüle | ✓ | ✓ | ✓ | ✓ |
+| Dashboard'u görüntüle | ✓ | ✓ | ✓ | ✓ |
+| Kendi bildirimlerini görüntüle / okundu işaretle | ✓ | ✓ | ✓ | ✓ |
 | Bekleyen davetleri görüntüle | ✓ | ✓ | ✓ | ✓ |
 | Daveti iptal et | ✓ | ✓ | — | — |
 | Çalışma alanından kendi ayrıl | ✓ | ✓ | ✓ | ✓ |
@@ -177,6 +187,13 @@ Kurallar:
 - Viewer hiçbir yazma işlemi yapamaz.
 - Ayrılmak başkasını çıkarmakla aynı eylem değildir; her üye katıldığı çalışma
   alanından ayrılabilir. Son sahip yine ayrılamaz.
+- Görev silme Temsilci'ye açıktır: görev iç iştir, talebin aksine dışarıdan
+  kimse ona atıfta bulunmaz (Faz 08). Ek silme ise Admin'e aittir: ek, müşteri
+  yazışmasının parçasıdır (ADR-0040).
+- Üye çıkarma ve rol değiştirme çalışma alanı kilidi altında yapılır ve
+  çağıranın rolü kilit altında yeniden okunur. Aynı anda ayrılan iki sahip
+  çalışma alanını sahipsiz bırakamaz; bu arada düşürülmüş bir sahip, istek
+  başındaki yetkisiyle yalnızca sahibe ait bir işlemi tamamlayamaz (ADR-0038).
 
 Üyelik silindiğinde erişim **anında** kesilir. Rol, access token'ın içinde
 taşınmaz; her istek üyeliği veritabanından okur. Aksi halde çıkarılan bir üye,
@@ -228,6 +245,15 @@ hiçbir koşulda silinmez, `Skip` edilmez veya assertion'ları zayıflatılmaz.
 - Tenant A, Tenant B üyelerini **listeleyemez**
 - Tenant A, kendi talebine Tenant B müşterisini **bağlayamaz**
 
+Faz 16'dan itibaren bu liste modül testleriyle sınırlı değil. Çalışma alanına
+bağlı **her** uç nokta `EndpointCatalog`'da listelenir ve katalog, çalışan
+uygulamanın uç noktalarıyla testte karşılaştırılır (ADR-0040). Katalogdan
+beslenen testler:
+
+- Her rol × her uç nokta; reddedilen bir yazmanın geçmişe iz bırakmaması dahil
+- Yabancı kullanıcı her uç noktada `404`, anonim çağıran `401`
+- İki alanın sahibi, bir alanın kaydına diğerinin adresinden erişemez
+
 ---
 
 ## 7. Davet güvenliği
@@ -236,7 +262,9 @@ hiçbir koşulda silinmez, `Skip` edilmez veya assertion'ları zayıflatılmaz.
 - Veritabanında **ham değer saklanmaz**, hash'i saklanır.
 - Davetin son kullanma tarihi vardır; süresi dolmuş davet kabul edilemez.
 - Davet **tek kullanımlıktır**; kabul edilmiş bir davet ikinci kez kabul
-  edilemez.
+  edilemez. Kabul koşullu bir güncellemedir (`AcceptedAt IS NULL`): çift
+  tıklamayla gelen eşzamanlı isteklerden yalnızca biri üyelik oluşturur,
+  diğerleri harcanmış her bağlantı gibi `404` alır (ADR-0038).
 - Davetin kabulü, davet edilen e-posta adresiyle eşleşme koşuluna bağlıdır.
 - Davet kabul uç noktası rate limiting kapsamındadır (10 dakikada 20 istek).
 - Başarısız her kabul **aynı** hatayı döndürür: bilinmeyen token, süresi

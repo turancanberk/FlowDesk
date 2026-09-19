@@ -33,6 +33,20 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0024 | Global query filter mekanizması ve Membership istisnası | Kabul edildi |
 | ADR-0025 | Türkçe arama için katlanmış SearchIndex sütunu | Kabul edildi |
 | ADR-0026 | TanStack Table v8 hattı (v9 değil) | Kabul edildi |
+| ADR-0027 | Durum ve atama, PATCH alanı değil kendi eylem rotaları | Kabul edildi |
+| ADR-0028 | Sürüm kontrolü yalnızca talep düzenlemesinde zorunlu | Kabul edildi |
+| ADR-0029 | `TaskItem` ve `TaskItemStatus` adlandırması | Kabul edildi |
+| ADR-0030 | Görevde durum makinesi ve iyimser eşzamanlılık yok | Kabul edildi |
+| ADR-0031 | Dashboard tek yanıt, önbelleksiz, grafiksiz | Kabul edildi; önbellek maddesi ADR-0037 ile güncellendi |
+| ADR-0032 | Mesajlaşma topolojisi ve tüketici barındırma | Kabul edildi |
+| ADR-0033 | Outbox: mesaj ile değişiklik aynı transaction'da | Kabul edildi |
+| ADR-0034 | Bildirim politikası ve dışa dönük yan etkinin sırası | Kabul edildi |
+| ADR-0035 | Dosya eki güvenliği: anahtar, tip, erişim ve sıra | Kabul edildi |
+| ADR-0036 | Denetim kaydı: senkron, ekleme-yalnızca, yabancı anahtarsız | Kabul edildi |
+| ADR-0037 | Önbellek bir hızlandırmadır, bağımlılık değil | Kabul edildi |
+| ADR-0038 | Tek seferlik geçişler koşullu güncellemeyle, ekip değişiklikleri kilitle | Kabul edildi |
+| ADR-0039 | İki host, tek bileşim: çalışma alanı bağlamı isteğe bağlı çözülür | Kabul edildi |
+| ADR-0040 | Uç nokta kataloğu yetki ve izolasyon testlerinin kaynağıdır | Kabul edildi |
 
 ---
 
@@ -1293,3 +1307,162 @@ döndürmek, olmayan bir sorunu raporlamak olurdu.
 Liste sorguları **önbelleklenmiyor**. Bayat bir liste, ekranda düzelttiğini
 sandığınız bir kaydın geri gelmesi demek — dashboard'un bir dakikalık
 bayatlığından bambaşka bir sorun.
+
+---
+
+## ADR-0038 — Tek seferlik geçişler koşullu güncellemeyle, ekip değişiklikleri kilitle
+
+**Bağlam.** Use case'ler okur, karar verir, sonra yazar. Tek tek çalıştığında
+doğru; aynı anda çalıştığında ikisi de aynı bayat okumaya göre karar verebilir.
+Faz 16, yarışları şansa bırakmayan testlerle (bkz. `TableGate`) üç gerçek hata
+buldu:
+
+- **Refresh token:** aynı token'la eşzamanlı 8 yenilemenin 8'i de başarılı
+  oldu. Tek kullanımlık token 8 bağımsız oturuma dönüştü ve replay tespiti,
+  yalnızca harcanmış token'ın yeniden sunulmasına baktığı için hiçbirini
+  görmedi.
+- **Davet kabulü:** çift tıklamada her istek daveti kullanılmamış gördü ve üyelik
+  eklemeye çalıştı; benzersiz indeks bütünlüğü korudu ama 6 istekten 5'i 500
+  aldı.
+- **Son sahip kuralı:** iki sahip aynı anda ayrıldığında ya da birbirini
+  düşürdüğünde ikisi de kilitsiz sayımda diğerini hâlâ sahip gördü ve çalışma
+  alanı sahipsiz kaldı.
+
+**Karar.**
+
+1. **Tek seferlik durum geçişleri koşullu güncellemeyle yapılır.** Refresh
+   token'ın harcanması ve davetin kabulü `UPDATE … WHERE UsedAt IS NULL`
+   (`AcceptedAt IS NULL`) biçiminde `ExecuteUpdateAsync` ile yapılır; etkilenen
+   satır sayısı 0 ise istek yarışı kaybetmiştir. Halef token / üyelik aynı
+   transaction'da yazılır.
+2. **Ekibin tamamına dair kurallar ekip kilidi altında denetlenir.** Üye çıkarma
+   ve rol değiştirme, çalışma alanı satırında `FOR NO KEY UPDATE` kilidi alır
+   (`IFlowDeskDbContext.LockTeamAsync`), sonra sayar ve karar verir.
+3. **Kilit altında çağıranın rolü yeniden okunur.** İstek başında çözülen rol,
+   ekip değişiklikleri için fazla erkendir.
+4. **Eşzamanlı yenilemeyi kaybeden istek replay sayılmaz.** Token okunduğunda
+   kullanılmamış olup koşullu güncelleme 0 satır bulursa istek oturum almaz,
+   `401 auth.session_superseded` alır ve aile **iptal edilmez**.
+
+**Gerekçe.**
+
+**Koşullu güncelleme, kilitten ucuz ve taşınabilir.** Bir satırın tek bir kez bir
+durumdan diğerine geçmesi gerekiyorsa, geçişi koşulun kendisine yazmak yeterli:
+veritabanı, ikinci isteği satır kilidinde bekletir, koşulu yeniden değerlendirir
+ve 0 satır döndürür. Sağlayıcıya özgü SQL gerekmez, dolayısıyla Application
+katmanında kalabilir (ADR-0021).
+
+**Ekip kuralı tek bir satırın değil kümenin kuralı.** "En az bir sahip kalır"
+cümlesinin kilitlenebilecek tek bir satırı yok; üyelik satırlarını kilitlemek,
+bu arada eklenen bir üyeyi kaçırır. Çalışma alanı satırı kümeyi temsil eder.
+`FOR UPDATE` yerine `FOR NO KEY UPDATE` seçildi: çalışma alanına referans veren
+her ekleme (talep, müşteri) yabancı anahtar denetimi için bu satırda
+`FOR KEY SHARE` alır. `FOR UPDATE` bunların hepsini bir rol değişikliğinin
+bitmesini beklemeye zorlardı; `FOR NO KEY UPDATE` yalnızca kendisiyle çakışır.
+
+**Rol yeniden okunur.** A, B'yi düşürürken B'nin uçuştaki "C'yi sahip yap"
+isteği, kilit olmadan da taze okuma olmadan da B'nin artık sahip olmadığı bir
+anda tamamlanırdı. Kilit sıralamayı, taze okuma yetkiyi garanti eder.
+
+**Kaybeden ≠ replay.** Aynı tarayıcıda iki sekme aynı anda uyandığında aynı
+çerezle iki yenileme gönderir. Kaybedeni replay saymak aileyi iptal eder ve iki
+sekmeyi de oturumdan düşürür. Hırsızlık tespiti zayıflamaz: yarışı kaybeden
+yalnızca harcanmış token'ı tutar ve onu bir sonraki sunuşunda okuma token'ı
+harcanmış bulur, aile iptal edilir. Yarışı kaybeden bir saldırgan da hiçbir şey
+kazanmaz.
+
+**Sonuçlar.**
+
+- Talep atamasında mevcut `xmin` tasarımı (ADR-0013) doğru çıktı: eşzamanlı
+  atamalardan biri yerleşiyor, diğerleri `409` alıyor ve geçmişe ya da outbox'a
+  iz bırakmıyor. Test bunu sabitliyor.
+- Yarışı kaybeden sekme bugün `401` görür ve kendi başına oturumu kapalı sayar;
+  diğer sekme çalışmaya devam eder, sayfa yenilenince çerezdeki halef token
+  kullanılır. Sekmeler arası koordinasyon (tek yeniden deneme ya da
+  `BroadcastChannel`) teknik borç olarak kaydedildi.
+- Başka use case'ler hâlâ istek başında çözülen rolle çalışıyor. Aradaki pencere
+  milisaniyeler; bilinçli olarak yalnızca yetkiyi değiştiren ekip işlemleri
+  sıkılaştırıldı.
+
+---
+
+## ADR-0039 — İki host, tek bileşim: çalışma alanı bağlamı isteğe bağlı çözülür
+
+**Bağlam.** `AddFlowDeskInfrastructure` hem API'de hem Worker'da çağrılıyor.
+`ITenantContext` yalnızca API'de kayıtlı; Worker bütün çalışma alanları adına
+iş yaptığı için kayıtlı olmamalı (ADR-0032). DbContext kaydı bunu biliyordu ve
+bağlamı isteğe bağlı çözüyordu. Faz 14'teki `ActivityRecorder` ve Faz 15'teki
+`DashboardCacheInvalidator` bilmiyordu:
+
+- Faz 15'ten beri Worker **hiçbir DbContext oluşturamadı**; her outbox turu
+  başarısız oldu. Hiçbir davet e-postası, atama e-postası ya da bildirim
+  üretilmedi.
+- Faz 14'ten beri Worker Development ortamında başlangıç doğrulamasını geçemedi.
+
+Hiçbir test Worker'ı, Worker'ın kendini kurduğu gibi kurmuyordu. API her
+entegrasyon testinde kurulduğu için onun kayıt hataları anında görünür; Worker'ın
+hataları Faz 16'nın uçtan uca testine kadar görünmedi.
+
+**Karar.**
+
+1. İki hostun da kaydettiği her servis `ITenantContext`'i **isteğe bağlı**
+   çözer (`GetService`). Çalışma alanı gerektiren bir işlem, bağlam yoksa açık
+   bir hata verir (`ActivityRecorder.Record`).
+2. Worker bileşimi tek bir çağrıdır: `AddFlowDeskWorker`. Worker'ın `Program`'ı
+   ve testler aynı çağrıyı kullanır; testte kopya bileşim yoktur.
+3. İki test bunu korur: `WorkerCompositionTests` (Development doğrulamasıyla
+   kurulum ve DbContext ile her tüketicinin gerçekten çözülmesi) ve
+   `BackgroundChainTests` (API → outbox → işleyici → RabbitMQ → tüketici →
+   bildirim ve gerçek SMTP).
+
+**Gerekçe.** Build-time doğrulama factory ile yapılan kayıtları atlar; DbContext
+ve interceptor tam olarak böyle kayıtlı. Bu yüzden bileşim testi servisleri
+yalnızca doğrulamakla kalmıyor, çözüyor. Kopya bileşim, Worker'dan bir tüketici
+düştüğünde geçmeye devam eden bir test demek.
+
+**Sonuçlar.** Uçtan uca test kendi veritabanını açıyor: Worker gördüğü her
+bekleyen outbox satırını işler ve paylaşılan test veritabanında önceki testlerin
+yüzlerce mesajı var. Mailpit yalnızca bu test sınıfı için başlatılıyor.
+
+---
+
+## ADR-0040 — Uç nokta kataloğu yetki ve izolasyon testlerinin kaynağıdır
+
+**Bağlam.** Faz 16'ya kadar her modül kendi yetki ve izolasyon testlerini yazdı.
+Bu, kontrolünü unutan bir handler'ı yakalıyordu; hiç test edilmemiş bir uç
+noktayı yakalamıyordu. Test eksikliği hiçbir şeyi düşürmez.
+
+**Karar.**
+
+1. Çalışma alanına bağlı her uç nokta test projesindeki `EndpointCatalog`'da
+   listelenir: yöntem, rota, en düşük rol, başarı kodu ve isteği hazırlayan
+   adım.
+2. `EndpointCoverageTests` kataloğu çalışan uygulamanın `EndpointDataSource`'u
+   ile karşılaştırır. Katalogda olmayan bir uç nokta ya da uygulamada olmayan
+   bir katalog kaydı testi düşürür. Çalışma alanına bağlı olmayan rotalar
+   gerekçeleriyle ayrı listelenir.
+3. Katalogdan beslenen testler: her rol × her uç nokta (reddedilen yazmanın
+   geçmişe iz bırakmadığı dahil), yabancı kullanıcıya her uç noktada `404`,
+   anonime `401`, ve iki alanın sahibinin bir alanın kaydına diğerinin
+   adresinden erişememesi.
+4. En düşük roller katalogda **elle** yazılır, `WorkspacePermissions`'tan
+   okunmaz. Test edilen koddan türetilen bir beklenti, koddaki her hatayla
+   aynı fikirde olurdu.
+5. Matristeki her eylemin en az bir use case'te denetlendiği kaynak üzerinden
+   doğrulanır (`PermissionEnforcementTests`).
+
+**Gerekçe.** Kapsam testi olmadan uzun bir tablo yalnızca uzundur; kapsam testiyle
+eksiksizdir. Yeni bir uç nokta, kimin çağırabileceğine karar verilmeden
+eklenemez.
+
+**Sonuçlar.**
+
+- `ViewMembers` matriste tanımlıydı ama hiçbir use case onu denetlemiyordu;
+  artık denetleniyor.
+- Belge ile kod iki yerde ayrışmıştı. **Görev silme** Faz 08'de bilinçli olarak
+  Temsilci'ye verilmişti, SECURITY.md güncellenmemişti; belge düzeltildi.
+  **Ek silme** ise talep düzenleme yetkisini yeniden kullandığı için Temsilci'ye
+  açıktı ve buna dair bir karar yoktu. Belgelenen kural korundu: ek, müşteri
+  yazışmasının parçası; talep silme gibi Admin'e ait (`DeleteAttachments`).
+- Yeni bir uç nokta eklenirken katalog kaydı ve en düşük rol aynı değişiklikte
+  yazılır.
