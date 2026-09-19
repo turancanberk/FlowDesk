@@ -97,6 +97,15 @@ public sealed class SessionLifecycleTests
         // same token and none of them picks up a rotated one.
         var clients = Enumerable.Range(0, contenders).Select(_ => factory.CreateClient()).ToList();
 
+        /*
+          Gated on the account lookup, which comes after the token is read and
+          before it is spent: when the gate opens, every contender has seen
+          the token as unused. Without the gate the requests overlap only
+          sometimes, and a race that does not happen passes.
+        */
+        await using var gate = await TableGate.CloseAsync(
+            _postgres.ConnectionString, "AspNetUsers", Cancellation);
+
         try
         {
             using var start = new SemaphoreSlim(0, contenders);
@@ -115,6 +124,7 @@ public sealed class SessionLifecycleTests
             }).ToList();
 
             start.Release(contenders);
+            await gate.OpenWhenQueuedAsync(contenders, Cancellation);
 
             var outcomes = await Task.WhenAll(attempts);
 

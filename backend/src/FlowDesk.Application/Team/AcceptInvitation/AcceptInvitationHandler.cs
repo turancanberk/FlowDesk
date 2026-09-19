@@ -103,39 +103,78 @@ public sealed class AcceptInvitationHandler
             return Result.Failure<AcceptedInvitation>(TeamErrors.InvitationNotUsable);
         }
 
-        var alreadyMember = await _dbContext.Memberships
-            .AsNoTracking()
-            .AnyAsync(
-                membership => membership.TenantId == invitation.TenantId
-                    && membership.UserId == account.Id,
-                cancellationToken);
+        var accepted = await _dbContext.ExecuteInTransactionAsync(
+            async transactionCancellation =>
+            {
+                /*
+                  Spending the invitation is a conditional update, for the same
+                  reason as spending a refresh token. The checks above ran on a
+                  copy read without a lock, and a double-clicked link sends two
+                  requests that both pass them. Only one can move AcceptedAt
+                  from null; the other waits on the row, finds it spent and goes
+                  no further.
 
-        if (!alreadyMember)
+                  Without this, both went on to add a membership and the second
+                  failed on the unique index with a server error (found in
+                  Phase 16).
+                */
+                var spent = await _dbContext.Invitations
+                    .IgnoreQueryFilters()
+                    .Where(candidate => candidate.Id == invitation.Id
+                        && candidate.AcceptedAt == null
+                        && candidate.RevokedAt == null)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(candidate => candidate.AcceptedAt, now),
+                        transactionCancellation);
+
+                if (spent == 0)
+                {
+                    return false;
+                }
+
+                var alreadyMember = await _dbContext.Memberships
+                    .AsNoTracking()
+                    .AnyAsync(
+                        membership => membership.TenantId == invitation.TenantId
+                            && membership.UserId == account.Id,
+                        transactionCancellation);
+
+                if (!alreadyMember)
+                {
+                    _dbContext.Memberships.Add(Membership.Create(
+                        account.Id,
+                        invitation.TenantId,
+                        invitation.Role,
+                        now));
+                }
+
+                /*
+                  The one place a workspace is named explicitly. The person is
+                  not a member until this moment, so there is no resolved
+                  workspace to read — the invitation says which one (ADR-0036).
+                */
+                _activity.RecordOutsideWorkspace(
+                    invitation.TenantId,
+                    account.Id,
+                    ActivityType.MemberJoined,
+                    ActivitySubject.Member,
+                    account.Id,
+                    new MemberActivityPayload(account.Id, null, invitation.Role));
+
+                // Same transaction: the invitation is spent and the membership
+                // exists together, or neither change lands. Otherwise a failure
+                // between them could burn the invitation without granting access.
+                await _dbContext.SaveChangesAsync(transactionCancellation);
+
+                return true;
+            },
+            cancellationToken);
+
+        if (!accepted)
         {
-            _dbContext.Memberships.Add(Membership.Create(
-                account.Id,
-                invitation.TenantId,
-                invitation.Role,
-                now));
+            // Someone else spent it first — the same answer as any spent link.
+            return Result.Failure<AcceptedInvitation>(TeamErrors.InvitationNotUsable);
         }
-
-        /*
-          The one place a workspace is named explicitly. The person is not a
-          member until this moment, so there is no resolved workspace to read —
-          the invitation says which one (ADR-0036).
-        */
-        _activity.RecordOutsideWorkspace(
-            invitation.TenantId,
-            account.Id,
-            ActivityType.MemberJoined,
-            ActivitySubject.Member,
-            account.Id,
-            new MemberActivityPayload(account.Id, null, invitation.Role));
-
-        // One save: the invitation is spent and the membership exists together,
-        // or neither change lands. Otherwise a failure between them could burn
-        // the invitation without granting access.
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AcceptedInvitation(tenant.Id, tenant.Slug, tenant.Name));
     }
