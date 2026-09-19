@@ -28,9 +28,15 @@ namespace FlowDesk.Infrastructure.Caching;
 public sealed class DashboardCacheInvalidator : SaveChangesInterceptor
 {
     private readonly ICache _cache;
-    private readonly ITenantContext _tenantContext;
+    private readonly ITenantContext? _tenantContext;
 
-    public DashboardCacheInvalidator(ICache cache, ITenantContext tenantContext)
+    /// <param name="tenantContext">
+    /// Null in the worker, which has no workspace context registered at all —
+    /// not merely an unresolved one. Required here, the worker could not build
+    /// a single DbContext, and from Phase 15 until Phase 16 it could not: every
+    /// outbox pass failed and no notice or mail was sent.
+    /// </param>
+    public DashboardCacheInvalidator(ICache cache, ITenantContext? tenantContext)
     {
         _cache = cache;
         _tenantContext = tenantContext;
@@ -46,10 +52,10 @@ public sealed class DashboardCacheInvalidator : SaveChangesInterceptor
           The worker saves with no workspace resolved, and a save that changed
           nothing has nothing to invalidate.
         */
-        if (result > 0 && _tenantContext.IsResolved)
+        if (result > 0 && _tenantContext is { IsResolved: true } tenantContext)
         {
             await _cache.RemoveAsync(
-                CacheKeys.Dashboard(_tenantContext.TenantId), cancellationToken);
+                CacheKeys.Dashboard(tenantContext.TenantId), cancellationToken);
         }
 
         return await base.SavedChangesAsync(eventData, result, cancellationToken);

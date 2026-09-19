@@ -67,13 +67,28 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
         _cacheConnectionString = cacheConnectionString ?? string.Empty;
     }
 
+    /// <summary>
+    /// The configuration the API runs with.
+    /// </summary>
+    /// <remarks>
+    /// Exposed so a worker started beside the API can run against the same
+    /// database, broker exchange and options — two hosts of one deployment,
+    /// not two unrelated ones.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string?> Settings => _settings ??= BuildSettings();
+
+    private Dictionary<string, string?>? _settings;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Development);
 
         builder.ConfigureAppConfiguration((_, configuration) =>
-        {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            configuration.AddInMemoryCollection(Settings));
+    }
+
+    private Dictionary<string, string?> BuildSettings() =>
+            new()
             {
                 ["Postgres:ConnectionString"] = _connectionString,
                 ["Postgres:HealthCheckTimeoutSeconds"] = "3",
@@ -124,9 +139,7 @@ public sealed class FlowDeskApiFactory : WebApplicationFactory<Program>
                 // Requests from the test client are same-origin, so no CORS
                 // policy is needed.
                 ["Cors:AllowedOrigins:0"] = "",
-            });
-        });
-    }
+            };
 
     /// <summary>
     /// Creates a client that keeps cookies, so refresh-token rotation can be
