@@ -70,7 +70,8 @@ public sealed class SessionLifecycleTests
     }
 
     /// <summary>
-    /// Two refreshes racing with one token end with at most one live session.
+    /// Refreshes racing with one token end with exactly one live session — and
+    /// that one keeps working.
     /// </summary>
     /// <remarks>
     /// Two browser tabs waking at once do exactly this. Refresh tokens are
@@ -120,7 +121,12 @@ public sealed class SessionLifecycleTests
 
                 using var response = await racer.SendAsync(request, Cancellation);
 
-                return response.StatusCode;
+                return (
+                    response.StatusCode,
+                    Successor: AuthTestClient.ReadRefreshCookie(response),
+                    Code: response.IsSuccessStatusCode
+                        ? null
+                        : await AuthTestClient.ReadProblemCodeAsync(response, Cancellation));
             }).ToList();
 
             start.Release(contenders);
@@ -128,10 +134,29 @@ public sealed class SessionLifecycleTests
 
             var outcomes = await Task.WhenAll(attempts);
 
-            Assert.Equal(1, outcomes.Count(status => status == HttpStatusCode.OK));
+            var winner = Assert.Single(outcomes, outcome => outcome.StatusCode == HttpStatusCode.OK);
+
+            // The others were told the session moved on — not that it was
+            // revoked, because it was not.
             Assert.All(
-                outcomes.Where(status => status != HttpStatusCode.OK),
-                status => Assert.Equal(HttpStatusCode.Unauthorized, status));
+                outcomes.Where(outcome => outcome.StatusCode != HttpStatusCode.OK),
+                outcome =>
+                {
+                    Assert.Equal(HttpStatusCode.Unauthorized, outcome.StatusCode);
+                    Assert.Equal("auth.session_superseded", outcome.Code);
+                });
+
+            // The winner's session survived the race: its successor token
+            // refreshes normally. Treating the losers as a replay would have
+            // revoked it and signed out every tab.
+            Assert.NotNull(winner.Successor);
+
+            using var continued = new HttpRequestMessage(
+                HttpMethod.Post, new Uri("/api/auth/refresh", UriKind.Relative));
+            continued.Headers.Add("Cookie", $"flowdesk_refresh_token={winner.Successor}");
+
+            using var continuedResponse = await clients[0].SendAsync(continued, Cancellation);
+            Assert.Equal(HttpStatusCode.OK, continuedResponse.StatusCode);
         }
         finally
         {
@@ -143,12 +168,12 @@ public sealed class SessionLifecycleTests
 
         await using var dbContext = _postgres.CreateDbContext();
 
-        // The original plus exactly one successor. More rows would mean the
-        // single-use token was exchanged more than once.
+        // The original, the race's one successor and the continuation. More
+        // rows would mean the single-use token was exchanged more than once.
         var issued = await dbContext.RefreshTokens.CountAsync(
             refreshToken => refreshToken.UserId == session.User.Id, Cancellation);
 
-        Assert.True(issued == 2, $"Tek kullanımlık token {issued - 1} kez takas edildi.");
+        Assert.True(issued == 3, $"Tek kullanımlık token {issued - 2} kez takas edildi.");
     }
 
     private static WebApplicationFactory<Program> WithClock(FlowDeskApiFactory factory, IClock clock) =>

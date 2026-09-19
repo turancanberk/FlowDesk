@@ -136,11 +136,18 @@ public sealed class RefreshSessionHandler
 
         if (session is null)
         {
-            // Lost the race: by the time this request reached the row, the
-            // token had been exchanged. That is a spent token presented again,
-            // which is exactly what replay detection exists for.
-            await RevokeFamilyAsync(storedToken.FamilyId, now, cancellationToken);
-            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionRevoked);
+            /*
+              Lost the race: the token was unused when this request read it and
+              spent by the time it reached the row. That is a concurrent
+              exchange, not a replay — two tabs waking together do exactly
+              this — so the family is left alone and this request simply gets
+              no session.
+
+              Theft detection does not suffer. Whoever lost the race still holds
+              only the spent token, and the next time they present it the read
+              above finds it spent and revokes the family.
+            */
+            return Result.Failure<AuthenticatedSession>(AuthenticationErrors.SessionSuperseded);
         }
 
         return Result.Success(session);
