@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 17 birleştirildi) |
-| Son commit | `Merge branch 'feat/e2e'` (Faz 17) — hash birleştirme sonrası yazılır |
+| Son commit | `b823290 — Merge branch 'feat/e2e'` (Faz 17) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
