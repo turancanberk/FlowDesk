@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (Faz 16 birleştirildi) |
-| Son commit | `Merge branch 'feat/hardened-tests'` (Faz 16) — hash birleştirme sonrası yazılır |
+| Son commit | `5d6db92 — Merge branch 'feat/hardened-tests'` (Faz 16) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
