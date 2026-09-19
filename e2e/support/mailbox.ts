@@ -47,7 +47,8 @@ export async function waitForMailTo(address: string): Promise<{ subject: string;
 
 /** The first link in a mail body that points at <paramref name="path"/>. */
 export function linkTo(html: string, path: string): string {
-  const match = new RegExp(`href="([^"]*${path}[^"]*)"`).exec(html);
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`href="([^"]*${escaped}[^"]*)"`).exec(html);
 
   if (match?.[1] === undefined) {
     throw new Error(`E-postada ${path} bağlantısı yok.`);
