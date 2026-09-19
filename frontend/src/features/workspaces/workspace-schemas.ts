@@ -8,11 +8,13 @@ import { z } from "zod";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const workspaceName = z
+  .string()
+  .min(1, "Çalışma alanı adı zorunludur.")
+  .max(120, "Çalışma alanı adı en fazla 120 karakter olabilir.");
+
 export const createWorkspaceSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Çalışma alanı adı zorunludur.")
-    .max(120, "Çalışma alanı adı en fazla 120 karakter olabilir."),
+  name: workspaceName,
   slug: z
     .string()
     .trim()
@@ -24,3 +26,8 @@ export const createWorkspaceSchema = z.object({
 });
 
 export type CreateWorkspaceFormValues = z.infer<typeof createWorkspaceSchema>;
+
+/** Mirrors FlowDesk.Application UpdateWorkspaceValidator: the name is all that changes. */
+export const updateWorkspaceSchema = z.object({ name: workspaceName });
+
+export type UpdateWorkspaceFormValues = z.infer<typeof updateWorkspaceSchema>;
