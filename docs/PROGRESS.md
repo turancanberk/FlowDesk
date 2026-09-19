@@ -868,9 +868,9 @@ Yok.
   eklenmeli (ADR-0038). Playwright ile doğrulanabileceği için Faz 17'ye aday.
 - **İmaj etiketleri sabit değil.** Compose'da ve testlerde `axllent/mailpit` ile
   Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli.
-- **`format:check` faz sonu komutlarında yok.** Faz 07'den beri biriken kayma bu
-  yüzden görülmedi. CLAUDE.md'deki listeye eklenmesi ve CI'da zorunlu olması
-  önerilir.
+- **`format:check` CI'da zorunlu değil.** Faz 07'den beri biriken kayma, komut
+  faz sonu listesinde olmadığı için görülmedi. Faz 16 sonrası CLAUDE.md'deki
+  listeye eklendi; Faz 20'de CI'da da zorunlu olmalı.
 
 ## Ertelenen özellikler
 
