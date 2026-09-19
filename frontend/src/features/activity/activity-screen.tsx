@@ -165,13 +165,7 @@ export function ActivityScreen({ workspace }: { workspace: Workspace }) {
   );
 }
 
-function ActivityRow({
-  workspaceSlug,
-  item,
-}: {
-  workspaceSlug: string;
-  item: ActivityItem;
-}) {
+function ActivityRow({ workspaceSlug, item }: { workspaceSlug: string; item: ActivityItem }) {
   const subject = describeSubject(item);
   const href = linkFor(workspaceSlug, item);
 
@@ -200,7 +194,13 @@ function ActivityRow({
 
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground text-sm">
-          {href === null ? line : <Link href={href} className="rounded-sm">{line}</Link>}
+          {href === null ? (
+            line
+          ) : (
+            <Link href={href} className="rounded-sm">
+              {line}
+            </Link>
+          )}
         </p>
         <time
           dateTime={item.occurredAt}
@@ -288,9 +288,7 @@ function linkFor(workspaceSlug: string, item: ActivityItem): string | null {
     case "AttachmentDeleted": {
       const payload = item.payload as { ticketId?: unknown };
 
-      return typeof payload?.ticketId === "string"
-        ? `${base}/tickets/${payload.ticketId}`
-        : null;
+      return typeof payload?.ticketId === "string" ? `${base}/tickets/${payload.ticketId}` : null;
     }
 
     default:

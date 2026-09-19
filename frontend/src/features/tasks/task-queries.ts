@@ -81,11 +81,7 @@ export function useDeleteTask(slug: string) {
   });
 }
 
-function writeBack(
-  queryClient: ReturnType<typeof useQueryClient>,
-  slug: string,
-  task: TaskDetail,
-) {
+function writeBack(queryClient: ReturnType<typeof useQueryClient>, slug: string, task: TaskDetail) {
   queryClient.setQueryData(taskKeys.detail(slug, task.id), task);
   void queryClient.invalidateQueries({ queryKey: taskKeys.all(slug) });
 }

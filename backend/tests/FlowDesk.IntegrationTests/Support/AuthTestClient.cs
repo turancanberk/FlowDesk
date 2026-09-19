@@ -96,7 +96,6 @@ internal static class AuthTestClient
         return string.IsNullOrEmpty(value) ? null : value;
     }
 
-    /// <summary>Reads the <c>code</c> extension that ProblemDetails responses carry.</summary>
     /// <summary>
     /// Registers a user and returns a client already carrying their bearer
     /// token, so a test can get to the thing it is actually asserting.
@@ -121,6 +120,7 @@ internal static class AuthTestClient
         return new SignedInUser(client, email, session.User.Id);
     }
 
+    /// <summary>Reads the <c>code</c> extension that ProblemDetails responses carry.</summary>
     public static async Task<string?> ReadProblemCodeAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

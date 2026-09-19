@@ -127,15 +127,16 @@ function DashboardContent({
           }
         >
           {summary.upcomingTasks.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Son tarihi olan bekleyen görev yok.
-            </p>
+            <p className="text-muted-foreground text-sm">Son tarihi olan bekleyen görev yok.</p>
           ) : (
             <ul className="divide-border -my-1 divide-y">
               {summary.upcomingTasks.map((task) => (
                 <li key={task.id} className="flex items-center gap-3 py-2">
                   {task.isOverdue ? (
-                    <AlertTriangleIcon className="text-danger size-3.5 shrink-0" aria-hidden="true" />
+                    <AlertTriangleIcon
+                      className="text-danger size-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <span className="size-3.5 shrink-0" />
                   )}

@@ -100,7 +100,7 @@ export function TaskList({
               ) : null}
             </div>
 
-            <span className="hidden w-32 shrink-0 truncate text-xs text-muted-foreground sm:block">
+            <span className="text-muted-foreground hidden w-32 shrink-0 truncate text-xs sm:block">
               {task.assignedUserDisplayName ?? "Atanmamış"}
             </span>
 

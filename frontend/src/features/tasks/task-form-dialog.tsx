@@ -271,7 +271,11 @@ function TaskForm({
         <Field invalid={errors.description !== undefined} className="sm:col-span-2">
           <FieldLabel>Açıklama</FieldLabel>
           <FieldControl>
-            <Textarea rows={4} placeholder="Ekibin bilmesi gerekenler" {...register("description")} />
+            <Textarea
+              rows={4}
+              placeholder="Ekibin bilmesi gerekenler"
+              {...register("description")}
+            />
           </FieldControl>
           <FieldError>{errors.description?.message}</FieldError>
         </Field>

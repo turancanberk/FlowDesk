@@ -368,10 +368,9 @@ function AssigneeControl({ workspace, ticket }: { workspace: Workspace; ticket: 
 
         mutation.mutate(next, {
           onSuccess: (saved) => {
-            toast.success(
-              saved.assignedUserId === null ? "Atama kaldırıldı" : "Talep atandı",
-              { description: saved.assignedUserDisplayName ?? undefined },
-            );
+            toast.success(saved.assignedUserId === null ? "Atama kaldırıldı" : "Talep atandı", {
+              description: saved.assignedUserDisplayName ?? undefined,
+            });
           },
           onError: (error) => {
             toast.error("Atama değiştirilemedi", {

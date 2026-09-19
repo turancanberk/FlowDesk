@@ -8,11 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime, formatFileSize, formatRelativeTime } from "@/lib/format";
 import { ApiError } from "@/lib/api/api-error";
 import { downloadAttachment } from "./ticket-api";
-import {
-  useDeleteAttachment,
-  useTicketAttachments,
-  useUploadAttachment,
-} from "./ticket-queries";
+import { useDeleteAttachment, useTicketAttachments, useUploadAttachment } from "./ticket-queries";
 import type { TicketAttachment } from "./ticket-types";
 
 /**
@@ -216,8 +212,7 @@ function AttachmentRow({
               },
               onError: (error) => {
                 toast.error("Dosya silinemedi", {
-                  description:
-                    error instanceof ApiError ? error.message : "Lütfen tekrar deneyin.",
+                  description: error instanceof ApiError ? error.message : "Lütfen tekrar deneyin.",
                 });
               },
             });

@@ -142,7 +142,5 @@ export function CustomerTicketsPanel({
 }
 
 function Surface({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="border-border bg-card overflow-hidden rounded-xl border">{children}</div>
-  );
+  return <div className="border-border bg-card overflow-hidden rounded-xl border">{children}</div>;
 }
