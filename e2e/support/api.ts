@@ -111,6 +111,36 @@ export function createTicket(
   );
 }
 
+/** The caller's own notification feed in one workspace. */
+export function listNotifications(
+  actor: Person,
+  slug: string,
+): Promise<{ items: { type: string; isRead: boolean }[]; unreadCount: number }> {
+  return send("GET", `/api/workspaces/${slug}/notifications`, undefined, actor);
+}
+
+/** Attaches a small text file to a ticket, the way the upload form does. */
+export async function uploadAttachment(
+  actor: Person,
+  workspace: Workspace,
+  ticketId: string,
+  fileName = "kurulum-notlari.txt",
+): Promise<{ id: string; fileName: string }> {
+  const form = new FormData();
+  form.append("file", new Blob(["Kurulum notları"], { type: "text/plain" }), fileName);
+
+  const response = await fetch(
+    `${API_URL}/api/workspaces/${workspace.slug}/tickets/${ticketId}/attachments`,
+    { method: "POST", headers: { Authorization: `Bearer ${actor.accessToken}` }, body: form },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Dosya yüklenemedi → ${response.status}: ${await response.text()}`);
+  }
+
+  return (await response.json()) as { id: string; fileName: string };
+}
+
 async function send<T = unknown>(
   method: string,
   path: string,
@@ -126,7 +156,7 @@ async function send<T = unknown>(
   const response = await fetch(`${API_URL}${path}`, {
     method,
     headers,
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!response.ok) {
