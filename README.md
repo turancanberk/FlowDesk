@@ -147,6 +147,7 @@ değiştirilebilir.
 |---|---|---|
 | Frontend | 3000 | 01 |
 | API | 5080 | 01 |
+| E2E frontend / API (suite kendisi başlatır) | 3100 / 5180 | 17 |
 | PostgreSQL | 5433 | 01 |
 | RabbitMQ / yönetim | 5672 / 15672 | 10 |
 | Mailpit SMTP / arayüz | 1025 / 8025 | 12 |
@@ -165,12 +166,16 @@ dotnet build backend/FlowDesk.slnx
 dotnet test  backend/FlowDesk.slnx
 
 # Frontend
+npm --prefix frontend run format:check
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
 
-# E2E
-npx playwright test --config e2e/playwright.config.ts
+# E2E — Compose servisleri ayakta olmalı; API, Worker ve frontend'i suite
+# kendisi, kendi portlarında başlatır
+npm --prefix e2e ci
+npx --prefix e2e playwright install chromium
+npm --prefix e2e test
 ```
 
 Entegrasyon testleri Testcontainers ile gerçek bir PostgreSQL örneği

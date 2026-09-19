@@ -67,6 +67,11 @@ Her oturum bir **token family** (aile) kimliği taşır. Refresh sırasında:
    replay sayılmaz ve aile iptal edilmez — aynı anda uyanan iki sekme bunu
    yapar. Kaybeden taraf harcanmış token'ı bir daha sunarsa 3. madde işler
    (ADR-0038).
+6. Aynı tarayıcının sekmeleri tek bir refresh çerezini paylaşır. İstemci,
+   yenilemeyi `navigator.locks` ile sekmeler arasında sıraya koyar: ikinci
+   sekmenin isteği, ilk yanıt yeni çerezi yazdıktan sonra çıkar. Aksi halde
+   sunucu ikinci isteği harcanmış token sunumu olarak görür ve aileyi iptal
+   eder (Faz 17).
 
 `Logout` işlemi refresh token ailesini sunucu tarafında geçersizleştirir ve
 çerezi temizler.
@@ -331,6 +336,12 @@ kullanıcı bunlara çarpmaz.
 
 Sıra tutulmaz (`QueueLimit = 0`): limiti aşan çağrıyı bekletmek, tam da
 savunulan yığılma anında bağlantıları meşgul ederdi.
+
+Limitler `RateLimiting` bölümünden okunur; varsayılanlar yukarıdaki üretim
+değerleridir ve dağıtımda hiçbir şey onları değiştirmez. Yapılandırılabilir
+olmalarının tek nedeni, her koşuda tek adresten birkaç hesap açan tarayıcı
+testleridir (ADR-0041). Aralık doğrulaması, korumayı kapatacak bir değeri
+(0) başlangıçta reddeder.
 
 Politikalar Faz 19'da yeniden gözden geçirilecek.
 

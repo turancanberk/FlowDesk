@@ -47,6 +47,7 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0038 | Tek seferlik geçişler koşullu güncellemeyle, ekip değişiklikleri kilitle | Kabul edildi |
 | ADR-0039 | İki host, tek bileşim: çalışma alanı bağlamı isteğe bağlı çözülür | Kabul edildi |
 | ADR-0040 | Uç nokta kataloğu yetki ve izolasyon testlerinin kaynağıdır | Kabul edildi |
+| ADR-0041 | Tarayıcı testleri gerçek uygulamayı kendi portlarında başlatır | Kabul edildi |
 
 ---
 
@@ -1376,10 +1377,12 @@ kazanmaz.
 - Talep atamasında mevcut `xmin` tasarımı (ADR-0013) doğru çıktı: eşzamanlı
   atamalardan biri yerleşiyor, diğerleri `409` alıyor ve geçmişe ya da outbox'a
   iz bırakmıyor. Test bunu sabitliyor.
-- Yarışı kaybeden sekme bugün `401` görür ve kendi başına oturumu kapalı sayar;
-  diğer sekme çalışmaya devam eder, sayfa yenilenince çerezdeki halef token
-  kullanılır. Sekmeler arası koordinasyon (tek yeniden deneme ya da
-  `BroadcastChannel`) teknik borç olarak kaydedildi.
+- **Faz 17 güncellemesi.** 4. madde veritabanı düzeyindeki eşzamanlılığı
+  kapsıyor, ama aynı anda uyanan iki sekmenin istekleri çoğu zaman sunucuda
+  sırayla işleniyor: ikinci istek harcanmış token sunmuş oluyor ve 3. madde
+  (replay) aileyi iptal ediyordu. Tarayıcı testi bunu gösterdi. Çözüm
+  istemcide: yenileme `navigator.locks` ile sekmeler arasında sıraya giriyor.
+  4. madde, kilidi olmayan istemciler için güvenlik ağı olarak kalıyor.
 - Başka use case'ler hâlâ istek başında çözülen rolle çalışıyor. Aradaki pencere
   milisaniyeler; bilinçli olarak yalnızca yetkiyi değiştiren ekip işlemleri
   sıkılaştırıldı.
@@ -1466,3 +1469,59 @@ eklenemez.
   yazışmasının parçası; talep silme gibi Admin'e ait (`DeleteAttachments`).
 - Yeni bir uç nokta eklenirken katalog kaydı ve en düşük rol aynı değişiklikte
   yazılır.
+
+---
+
+## ADR-0041 — Tarayıcı testleri gerçek uygulamayı kendi portlarında başlatır
+
+**Bağlam.** Faz 17, Playwright ile deterministik tarayıcı yolculukları
+ekledi. Üç soru vardı: testler neye karşı koşar, test verisi nasıl
+hazırlanır, zamana bağlı davranış (token ömrü, bildirim sorgusu, yarışlar)
+nasıl deterministik yapılır.
+
+**Karar.**
+
+1. **Gerçek uygulama, kendi portlarında.** Suite API'yi (5180), Worker'ı ve
+   frontend'in üretim derlemesini (3100) her koşuda kendisi başlatır; var olan
+   sunucuları yeniden kullanmaz. Altyapı Compose'dan, ayarlar kökteki
+   `.env`'den gelir. Hiçbir uç nokta taklit edilmez.
+2. **Hazırlık API'den, yolculuk tarayıcıdan.** Kişiler, çalışma alanları,
+   müşteriler ve talepler API ile kurulur; tarayıcı yalnızca test edilen
+   yolculuğu yürür. Oturum her testte gerçek giriş formundan açılır (access
+   token yalnızca bellekte, ADR-0006).
+3. **Rate limit değerleri yapılandırılabilir.** Varsayılanlar üretim
+   limitleridir; E2E ortamı daha yüksek değer verir. Aralık doğrulaması 0'ı
+   reddeder.
+4. **Zaman ve sıralama testte denetlenir, beklenmez.** Tarayıcı saati
+   `page.clock` ile ileri alınır (token süresi, dakikalık bildirim sorgusu);
+   sekmeler arası yarış, yenileme yanıtları geciktirilerek her koşuda oluşturulur.
+   Worker'a bağlı sonuçlar önce API'den beklenir, sonra ekranda doğrulanır.
+5. **Tek işçi, yeniden deneme yok.** Kararsız bir test düzeltilir, yeniden
+   denenerek geçirilmez.
+6. **Seçiciler erişilebilirlik ağacından.** Rol ve erişilebilir ad
+   kullanılır; test kimlikleri eklenmez. Bir seçicinin bulunamaması çoğu zaman
+   bir erişilebilirlik eksiğidir.
+
+**Gerekçe.** Taklit edilmiş bir API'ye karşı koşan tarayıcı testi, tarayıcının
+taklitle konuştuğunu kanıtlar. Var olan bir API'yi yeniden kullanmak, onun
+rate limit sayaçlarını ve belki eski bir frontend derlemesini teste katar.
+Zamanı beklemek hem yavaş hem kararsızdır; bu fazın ilk yarış denemesi
+gerçek zamanlamayla hiç yarış oluşturmamıştı (ADR-0038'deki `TableGate` ile
+aynı ders).
+
+Rate limit'i yapılandırılabilir yapmak bir güvenlik kontrolünü gevşetmek
+değildir: üretim değeri aynıdır ve limitlerin kendisi entegrasyon testlerinde
+doğrulanır.
+
+**Sonuçlar.**
+
+- Erişilebilirlik ağacından seçici yazmak, bu fazda bir dizi kusuru ortaya
+  çıkardı: kabukta `<main>` yoktu, diyalog kapatma düğmesi ve anlık mesaj
+  bölgesi İngilizce okunuyordu, bildirim paneli adsız bir diyalogdu, dosya
+  girdisi etiketsiz ikinci bir duraktı.
+- iCloud senkronize edilen bir dizinde her koşudaki üretim derlemesi `.next`
+  içinde kopya dosyalar üretip `next build`'i düşürüyordu. Yerel çözüm:
+  `.next`, senkronize edilmeyen `.next.nosync` klasörüne bağ.
+- Suite geliştirme veritabanını kullanır; her test benzersiz kişi ve alan
+  açtığı için birbirini etkilemez. Aynı anda çalışan bir geliştirme Worker'ı
+  aynı kuyrukları dinleyeceği için E2E sırasında kapatılmalıdır.

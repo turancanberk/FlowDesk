@@ -195,6 +195,7 @@ yapılandırılabilir.
 |---|---|---|---|
 | Next.js (dev) | 3000 | — | 01 |
 | FlowDesk.Api | 5080 / 5443 | — | 01 |
+| E2E: Next.js üretim derlemesi / FlowDesk.Api | 3100 / 5180 | — | 17 |
 | PostgreSQL | 5433 | 5432 | 01 |
 | RabbitMQ | 5672 | 5672 | 10 |
 | RabbitMQ yönetim | 15672 | 15672 | 10 |
@@ -204,6 +205,17 @@ yapılandırılabilir.
 | Redis | 6380 | 6379 | 15 |
 | Prometheus | 9090 | 9090 | 18 |
 | Grafana | 3001 | 3000 | 18 |
+
+## Tarayıcı testleri (E2E)
+
+`e2e/` bağımsız bir Playwright paketidir. Suite gerçek uygulamayı kendisi
+başlatır: API (5180), Worker ve frontend'in üretim derlemesi (3100). Portlar
+geliştiricinin açık sunucularından ayrıdır, çünkü daha önce başlatılmış bir
+API'nin rate limit sayaçları ve eski bir frontend derlemesi testin
+sonucunu değiştirir. Altyapı (PostgreSQL, RabbitMQ, Mailpit, Azurite, Redis)
+Compose'dan gelir ve ortam değişkenleri kökteki `.env`'den okunur. Hiçbir şey
+taklit edilmez; test verisi API üzerinden hazırlanır, tarayıcı yalnızca
+incelenen yolculuğa harcanır (ADR-0041).
 
 ## Asenkron işleme
 
