@@ -168,6 +168,7 @@ function TicketDetailContent({
                 workspaceSlug={workspace.slug}
                 ticketId={ticket.id}
                 canManage={canManage}
+                canDelete={canDelete}
               />
             </div>
           </Surface>

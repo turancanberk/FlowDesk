@@ -23,10 +23,14 @@ export function TicketAttachments({
   workspaceSlug,
   ticketId,
   canManage,
+  canDelete,
 }: {
   workspaceSlug: string;
   ticketId: string;
+  /** Upload: agents and above. */
   canManage: boolean;
+  /** Delete: admins and above, like deleting the ticket itself. */
+  canDelete: boolean;
 }) {
   const { data, isPending, isError, refetch } = useTicketAttachments(workspaceSlug, ticketId);
   const upload = useUploadAttachment(workspaceSlug, ticketId);
@@ -64,7 +68,7 @@ export function TicketAttachments({
                 workspaceSlug={workspaceSlug}
                 ticketId={ticketId}
                 attachment={attachment}
-                canManage={canManage}
+                canDelete={canDelete}
               />
             </li>
           ))}
@@ -130,12 +134,12 @@ function AttachmentRow({
   workspaceSlug,
   ticketId,
   attachment,
-  canManage,
+  canDelete,
 }: {
   workspaceSlug: string;
   ticketId: string;
   attachment: TicketAttachment;
-  canManage: boolean;
+  canDelete: boolean;
 }) {
   const [isDownloading, setIsDownloading] = React.useState(false);
   const remove = useDeleteAttachment(workspaceSlug, ticketId);
@@ -199,7 +203,7 @@ function AttachmentRow({
         <DownloadIcon />
       </Button>
 
-      {canManage ? (
+      {canDelete ? (
         <Button
           variant="ghost"
           size="icon-sm"

@@ -289,7 +289,7 @@ internal static class EndpointCatalog
 
                 return new ScopedRequest(HttpMethod.Get, $"/tickets/{ticketId}/attachments/{attachmentId}");
             }),
-        Case(HttpMethods.Delete, "/tickets/{ticketId}/attachments/{attachmentId}", MembershipRole.Agent,
+        Case(HttpMethods.Delete, "/tickets/{ticketId}/attachments/{attachmentId}", MembershipRole.Admin,
             HttpStatusCode.NoContent,
             async scene =>
             {
