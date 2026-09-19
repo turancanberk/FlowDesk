@@ -57,7 +57,7 @@ public sealed class AddTicketCommentHandler
         var ticket = await _dbContext.Tickets
             .AsNoTracking()
             .Where(candidate => candidate.Id == ticketId)
-            .Select(candidate => new { candidate.Number, candidate.Subject })
+            .Select(candidate => new { candidate.Number, candidate.Subject, candidate.AssignedUserId })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (ticket is null)
@@ -88,6 +88,7 @@ public sealed class AddTicketCommentHandler
                 ticket.Number,
                 ticket.Subject,
                 authorId,
+                ticket.AssignedUserId,
                 Excerpt(comment.Body),
                 _tenantContext.Slug),
             cancellationToken);

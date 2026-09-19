@@ -38,21 +38,29 @@ public sealed class TicketCommentedConsumer : IMessageConsumer<TicketCommented>
     {
         ArgumentNullException.ThrowIfNull(message);
 
+        // Nobody to tell, or the commenter is the person it belongs to. The
+        // recipient is who held the ticket when the comment was written, as
+        // the message records it — not whoever holds it now.
+        if (message.AssigneeUserId is not { } recipient || recipient == message.AuthorUserId)
+        {
+            return;
+        }
+
         /*
-          Read without the workspace filter, and scoped by hand instead. The
-          consumer has no workspace context, so the filter would find nothing at
-          all; the TenantId from the message is what keeps this to one
-          organisation's ticket (ADR-0033).
+          A ticket deleted before the message arrived leaves nothing to point
+          the notice at. Read without the workspace filter, and scoped by hand
+          instead: the consumer has no workspace context, and the TenantId from
+          the message is what keeps this to one organisation's ticket
+          (ADR-0033).
         */
-        var assignedUserId = await _dbContext.Tickets
+        var ticketStillExists = await _dbContext.Tickets
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(ticket => ticket.Id == message.TicketId && ticket.TenantId == message.TenantId)
-            .Select(ticket => ticket.AssignedUserId)
-            .FirstOrDefaultAsync(cancellationToken);
+            .AnyAsync(
+                ticket => ticket.Id == message.TicketId && ticket.TenantId == message.TenantId,
+                cancellationToken);
 
-        // Nobody to tell, or the commenter is the person it belongs to.
-        if (assignedUserId is not { } recipient || recipient == message.AuthorUserId)
+        if (!ticketStillExists)
         {
             return;
         }
