@@ -55,11 +55,36 @@ type SessionResponse = {
 let inFlightRefresh: Promise<boolean> | null = null;
 
 export async function refreshSession(): Promise<boolean> {
-  inFlightRefresh ??= performRefresh().finally(() => {
+  inFlightRefresh ??= performRefreshAcrossTabs().finally(() => {
     inFlightRefresh = null;
   });
 
   return inFlightRefresh;
+}
+
+/*
+  Single-flight across tabs, too.
+
+  The in-memory promise above covers one tab. Every tab of the site shares one
+  refresh cookie, though, and two tabs waking together (a laptop opening, a
+  browser restoring its session) would each send the same single-use token.
+  The server handles one first; the other then presents a spent token, which
+  is exactly what a stolen one looks like, and the whole session is revoked in
+  every tab (ADR-0038). Found by the browser tests in Phase 17.
+
+  A Web Lock makes the tabs take turns. The second tab's request leaves only
+  after the first tab's answer has set the new cookie, so it presents the
+  successor and gets its own token. Browsers without the API fall back to the
+  per-tab behaviour.
+*/
+const REFRESH_LOCK_NAME = "flowdesk-auth-refresh";
+
+function performRefreshAcrossTabs(): Promise<boolean> {
+  if (typeof navigator === "undefined" || navigator.locks === undefined) {
+    return performRefresh();
+  }
+
+  return navigator.locks.request(REFRESH_LOCK_NAME, performRefresh);
 }
 
 async function performRefresh(): Promise<boolean> {
