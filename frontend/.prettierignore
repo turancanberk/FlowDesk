@@ -1,4 +1,6 @@
 .next
+# Derleme çıktısı iCloud dışında tutulduğunda (HANDOFF, ortam sorunu 4).
+.next.nosync
 out
 node_modules
 next-env.d.ts

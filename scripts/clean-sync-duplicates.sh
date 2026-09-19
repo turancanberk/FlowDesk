@@ -15,7 +15,7 @@ duplicates=()
 while IFS= read -r file; do
   duplicates+=("$file")
 done < <(
-  find . \( -name "* [0-9].*" -o -name "*conflicted copy*" \) \
+  find . \( -name "* [0-9].*" -o -name "* [0-9]" -o -name "*conflicted copy*" \) \
     -not -path "*/node_modules/*" \
     -not -path "*/bin/*" \
     -not -path "*/obj/*" \
@@ -28,11 +28,26 @@ if [ ${#duplicates[@]} -eq 0 ]; then
   exit 0
 fi
 
-printf 'Silinecek %d dosya:\n' "${#duplicates[@]}"
+printf 'Bulunan %d kopya:\n' "${#duplicates[@]}"
 printf '  %s\n' "${duplicates[@]}"
 
-for file in "${duplicates[@]}"; do
-  rm -f "$file"
+# Senkronizasyon klasörleri de kopyalıyor ("app 2"). Boş olanlar silinir; dolu
+# bir klasör kendiliğinden silinmez, çünkü içinde henüz asıl yere taşınmamış
+# bir değişiklik olabilir.
+left_for_review=()
+
+for path in "${duplicates[@]}"; do
+  if [ -d "$path" ]; then
+    rmdir "$path" 2>/dev/null || left_for_review+=("$path")
+  else
+    rm -f "$path"
+  fi
 done
+
+if [ ${#left_for_review[@]} -gt 0 ]; then
+  echo "Boş olmayan kopya klasörler elle incelenmeli:"
+  printf '  %s\n' "${left_for_review[@]}"
+  exit 1
+fi
 
 echo "Temizlendi."

@@ -26,7 +26,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 14 — Denetim ve Etkinlik
 - [x] Faz 15 — Redis Önbellek
 - [x] Faz 16 — Gelişmiş Entegrasyon Testleri
-- [ ] Faz 17 — Playwright E2E
+- [x] Faz 17 — Playwright E2E
 - [ ] Faz 18 — Gözlemlenebilirlik
 - [ ] Faz 19 — Güvenlik Sertleştirme
 - [ ] Faz 20 — CI/CD
@@ -36,13 +36,68 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 17 — Playwright E2E**
+**Faz 18 — Gözlemlenebilirlik**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 17 — Playwright E2E · Tamamlandı
+
+`e2e/` bağımsız bir Playwright paketi (1.63.0). Suite gerçek uygulamayı her
+koşuda kendisi başlatıyor — API, Worker ve frontend'in üretim derlemesi,
+kendi portlarında (5180, 3100) — ve Compose servislerine karşı koşuyor.
+Hiçbir şey taklit edilmiyor. Kararlar ADR-0041'de.
+
+Yolculuklar (12 senaryo):
+
+- **Oturum:** kayıt, çıkış, yeniden giriş; depolamada token olmaması ve
+  refresh çerezinin bayrakları; yanlış parola; sayfa yenilemesinden sonra
+  oturum; süresi dolan access token'ın sessiz yenilenmesi (tarayıcı saati
+  ileri alınarak).
+- **Birden fazla sekme:** aynı anda yenilenen iki sekme oturumu kaybetmiyor.
+- **Çekirdek destek akışı:** çalışma alanı → müşteri → talep → yorum → durum →
+  atama → atanan kişinin bildirimi Worker üzerinden gelip panelden talebe
+  götürüyor.
+- **Roller:** izleyici değiştirme olanağı görmüyor; temsilci dosya ekliyor ama
+  silemiyor, sahip siliyor.
+- **Davet:** gerçek e-posta (Worker + Mailpit) → bağlantı → hesap açma →
+  kendiliğinden kabul → çalışma alanı; bağlantı ikinci kez kullanılamıyor.
+- **Ayarlar:** ad değiştirme ve adla onaylanan silme, role göre.
+
+**Bulunan ve düzeltilen hatalar.** Çoğu yalnızca tarayıcıda görünüyordu:
+
+1. **Çıkış yap hiçbir şey yapmıyordu.** `queryClient.clear()` ekrandaki
+   gözlemcileri bilgilendirmiyor; kullanıcı yenilemeye kadar oturumda görünüyordu.
+2. **İki sekme aynı anda yenileyince oturum iptal ediliyordu.** Faz 16'daki
+   sunucu tarafı ayrım yetmiyordu: istekler çoğu zaman sırayla işleniyor ve
+   ikincisi replay sayılıyordu. Yenileme artık `navigator.locks` ile sıraya
+   giriyor (ADR-0038 güncellemesi).
+3. **Yorum bildirimi yanlış kişiye gidebiliyordu.** Alıcı, yorum anında değil
+   mesaj işlendiğinde belirleniyordu; outbox gecikmesinde talep el
+   değiştirmişse bildirim muhatap olmayan kişiye gidiyordu. Mesaj artık yorum
+   anındaki atanan kişiyi taşıyor.
+4. **Ayarlar bağlantısı 404 veriyordu.** Sayfa hiç yapılmamıştı; yapıldı
+   (ad değiştirme Yönetici+, silme yalnız Sahip, adla onay).
+5. **Davet diyaloğu e-postanın gönderilmediğini söylüyordu** — Faz 05'ten kalan
+   metin.
+6. **Müşteri formunda durum ham kodla ("Active") görünüyordu** ve düzenlemede
+   seçim ekranda değişmiyordu.
+7. **Erişilebilirlik:** kabukta `<main>` yoktu; diyalog kapatma ve anlık mesaj
+   bölgesi İngilizce okunuyordu; bildirim paneli adsız diyalogdu; dosya
+   girdisi etiketsiz ikinci bir duraktı.
+
+Ayrıca: rate limit değerleri yapılandırılabilir oldu (varsayılanlar üretim
+değerleri); `lint` önce rota tiplerini üretiyor; iCloud'un derleme ve
+senkronizasyon kopyaları için `.next.nosync` bağı ve temizlik betiğinin
+klasörleri de ele alması; yanlışlıkla commit edilmiş `.prettierignore 2`
+kaldırıldı.
+
+Testler: backend 505/505 (230 birim + 275 entegrasyon), E2E 12/12.
+
+---
 
 ### Faz 16 — Gelişmiş Entegrasyon Testleri · Tamamlandı
 
@@ -861,11 +916,10 @@ Yok.
 
 ## Teknik borç
 
-- **Sekmeler arası yenileme koordinasyonu (frontend).** Aynı anda uyanan iki
-  sekmeden yarışı kaybeden `401 auth.session_superseded` alır ve kendi başına
-  oturumu kapalı sayar; diğer sekme çalışır, sayfa yenilenince devam edilir.
-  Bu kodda tek bir yeniden deneme ya da `BroadcastChannel` ile koordinasyon
-  eklenmeli (ADR-0038). Playwright ile doğrulanabileceği için Faz 17'ye aday.
+- **E2E geliştirme veritabanını kullanıyor.** Her test benzersiz kişi ve alan
+  açtığı için sorun çıkarmıyor, ama veri birikiyor ve açık bir geliştirme
+  Worker'ı aynı kuyrukları dinliyor. CI'da (Faz 20) E2E için ayrı, taze bir
+  veritabanı ve kuyruk öneki olmalı.
 - **İmaj etiketleri sabit değil.** Compose'da ve testlerde `axllent/mailpit` ile
   Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli.
 - **`format:check` CI'da zorunlu değil.** Faz 07'den beri biriken kayma, komut
@@ -1040,4 +1094,17 @@ Faz 16 sonunda:
 | `npm --prefix frontend run format:check` | Başarılı (13 dosyalık kayma düzeltildi) |
 | Gerçek Worker, yerel ortam, Development | Düzeltmeden önce başlangıç doğrulamasında düştü; Production'da her outbox turu `ITenantContext` hatası verdi. Düzeltmeden sonra üç kuyruk dinlendi, outbox turları hatasız |
 | Mutasyon kontrolleri | Her düzeltme geri alındığında ilgili test düştü: refresh (8/8 başarı), davet (5 × `500`), son sahip (iki senaryo), eski rol, Worker bileşimi ve zinciri, `ViewMembers`, ek silme yetkisi |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 17 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 505/505 başarılı (230 birim + 275 entegrasyon) |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck` | Başarılı |
+| `npm --prefix e2e test` | 12/12 başarılı; art arda koşularda kararlı |
+| Mutasyon kontrolleri | Çıkış, sekmeler arası kilit ve yorum alıcısı düzeltmeleri geri alındığında ilgili testler düştü |
+| `npm --prefix e2e audit` | 0 açık |
 | Migration | **Yok** — bu faz şema değiştirmiyor |

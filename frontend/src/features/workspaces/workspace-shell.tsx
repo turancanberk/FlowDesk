@@ -129,7 +129,8 @@ function WorkspaceShellContent({
         }
       />
 
-      <div className="bg-canvas flex min-w-0 flex-1 flex-col">{children(workspace)}</div>
+      {/* The page's own landmark: every screen outside the shell already has one. */}
+      <main className="bg-canvas flex min-w-0 flex-1 flex-col">{children(workspace)}</main>
     </div>
   );
 }

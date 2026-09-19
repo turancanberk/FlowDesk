@@ -1,5 +1,7 @@
 using System.Net;
 using FlowDesk.IntegrationTests.Support;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace FlowDesk.IntegrationTests.Authentication;
 
@@ -106,5 +108,49 @@ public sealed class RateLimitingTests
         }
 
         Assert.Equal(HttpStatusCode.TooManyRequests, lastStatus);
+    }
+
+    /// <summary>
+    /// A configured limit replaces the default; the browser tests rely on this
+    /// to create their accounts from one address.
+    /// </summary>
+    [Fact]
+    public async Task A_configured_limit_replaces_the_default()
+    {
+        await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
+        await using var host = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:RegistrationPermitLimit", "2"));
+        using var client = host.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            using var response = await AuthTestClient.RegisterAsync(
+                client, AuthTestClient.UniqueEmail(), Cancellation);
+
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.OK, HttpStatusCode.TooManyRequests], statuses);
+    }
+
+    /// <summary>
+    /// A limit of zero would not throttle harder — it would read as "no limit
+    /// configured" to whoever set it. The host refuses to start instead.
+    /// </summary>
+    [Fact]
+    public async Task A_limit_that_would_disable_protection_stops_the_host()
+    {
+        await using var factory = new FlowDeskApiFactory(_postgres.ConnectionString);
+        await using var host = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:LoginPermitLimit", "0"));
+
+        var failure = Assert.ThrowsAny<Exception>(() => host.CreateClient());
+
+        Assert.Contains(
+            "LoginPermitLimit",
+            (failure as OptionsValidationException)?.Message ?? failure.ToString(),
+            StringComparison.Ordinal);
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace FlowDesk.Api.Common;
 
@@ -28,9 +29,39 @@ public static class RateLimitingPolicies
     /// <summary>Invitation token guessing.</summary>
     public const string InvitationAcceptance = "invitation-accept";
 
-    public static void Configure(RateLimiterOptions options)
+    /// <summary>
+    /// Registers the policies with limits read from <c>RateLimiting</c>, whose
+    /// defaults are the production limits (<see cref="RateLimitingSettings"/>).
+    /// </summary>
+    public static IServiceCollection AddFlowDeskRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services
+            .AddOptions<RateLimitingSettings>()
+            .Bind(configuration.GetSection(RateLimitingSettings.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddRateLimiter(_ => { });
+
+        // Read when the limiter is first built, after every configuration
+        // source has been added — not at registration time.
+        services
+            .AddOptions<RateLimiterOptions>()
+            .Configure<IOptions<RateLimitingSettings>>(
+                (options, settings) => Configure(options, settings.Value));
+
+        return services;
+    }
+
+    public static void Configure(RateLimiterOptions options, RateLimitingSettings settings)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(settings);
 
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
@@ -57,14 +88,15 @@ public static class RateLimitingPolicies
                 cancellationToken);
         };
 
-        AddFixedWindow(options, Login, permitLimit: 10, window: TimeSpan.FromMinutes(1));
-        AddFixedWindow(options, Registration, permitLimit: 5, window: TimeSpan.FromMinutes(10));
-        AddFixedWindow(options, Refresh, permitLimit: 30, window: TimeSpan.FromMinutes(1));
+        AddFixedWindow(options, Login, settings.LoginPermitLimit, TimeSpan.FromMinutes(1));
+        AddFixedWindow(options, Registration, settings.RegistrationPermitLimit, TimeSpan.FromMinutes(10));
+        AddFixedWindow(options, Refresh, settings.RefreshPermitLimit, TimeSpan.FromMinutes(1));
 
         // An invitation token is 256 bits of randomness, so guessing is not a
         // realistic threat; the limit is there to stop the endpoint being used
         // as a probe, not to protect the token.
-        AddFixedWindow(options, InvitationAcceptance, permitLimit: 20, window: TimeSpan.FromMinutes(10));
+        AddFixedWindow(
+            options, InvitationAcceptance, settings.InvitationAcceptancePermitLimit, TimeSpan.FromMinutes(10));
     }
 
     private static void AddFixedWindow(

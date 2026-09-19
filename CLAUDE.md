@@ -98,6 +98,9 @@ npm --prefix frontend run format:check
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
+npm --prefix e2e run format:check
+npm --prefix e2e run typecheck
+npm --prefix e2e test        # Compose servisleri ayakta olmalı
 ```
 
 Ardından: PR review disiplininde öz-değerlendirme → `PROGRESS.md` ve

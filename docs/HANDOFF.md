@@ -17,8 +17,8 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 16 birleştirildi) |
-| Son commit | `5d6db92 — Merge branch 'feat/hardened-tests'` (Faz 16) |
+| Aktif dal | `main` (Faz 17 birleştirildi) |
+| Son commit | `Merge branch 'feat/e2e'` (Faz 17) — hash birleştirme sonrası yazılır |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
@@ -41,15 +41,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 14 — Denetim ve Etkinlik
 - Faz 15 — Redis Önbellek
 - Faz 16 — Gelişmiş Entegrasyon Testleri
+- Faz 17 — Playwright E2E
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 17 — Playwright E2E** (henüz başlanmadı)
+**Faz 18 — Gözlemlenebilirlik** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 17 kapsamında henüz iş yapılmadı. Faz 16'nın özeti `docs/PROGRESS.md`
-içinde; kararlar ADR-0038, ADR-0039 ve ADR-0040'ta.
+Faz 18 kapsamında henüz iş yapılmadı. Faz 17'nin özeti `docs/PROGRESS.md`
+içinde; kararı ADR-0041, sekmeler arası yenileme notu ADR-0038'de.
 
 ### Devam Eden İş
 
@@ -57,37 +58,29 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 17'nin tamamı: deterministik tarayıcı yolculukları (ROADMAP). Depo
-yapısında yeri ayrılmış: kökte `e2e/` (ARCHITECTURE.md).
+Faz 18'in tamamı (ROADMAP): Serilog, OpenTelemetry, Prometheus, Grafana.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/e2e` dalını aç. Playwright'ı kur (sürümü registry'den doğrula, stable),
-ilk yolculuğu yaz ve CI'a hazır tek komutla koşulabilir hâle getir.
+`feat/observability` dalını aç. Prometheus ve Grafana bu fazda Compose'a
+girer (ADR-0008); portlar ARCHITECTURE.md'de ayrılmış (9090, 3001).
 
 Başlanacak yerler:
 
-- **Oturum yolculuğu.** Kayıt → çıkış → giriş → access token süresi dolunca
-  sessiz yenileme. Backend sözleşmesi Faz 16'da sabitlendi
-  (`SessionLifecycleTests`); tarayıcı tarafı henüz hiç otomatik
-  doğrulanmadı.
-- **Sekmeler arası yenileme** (teknik borç, ADR-0038). Aynı anda uyanan iki
-  sekmeden kaybeden `401 auth.session_superseded` alıp kendi başına çıkış
-  yapıyor. Önce Playwright ile iki sekmeli senaryoyu yaz, sonra `http-client.ts`
-  içinde bu koda tek yeniden deneme ekle.
-- **Çekirdek iş yolculuğu.** Çalışma alanı → müşteri → talep → atama →
-  atanan kişinin bildirimi. Worker'ın da ayakta olması gerekiyor; bildirimin
-  gelmesi, Faz 15–16 arasında bozuk kalan zincirin tarayıcıdan görünen ucu.
-- **Rol görünürlüğü.** İzleyici hiçbir yazma düğmesi görmüyor; Temsilci ek
-  yükleyebiliyor ama silemiyor (Faz 16'da değişti).
+- **Yapılandırılmış log.** API ve Worker aynı biçimde loglamalı; bir isteğin
+  outbox → broker → tüketici zinciri tek bir korelasyon kimliğiyle
+  izlenebilmeli. Faz 15–16 arasında Worker'ın her outbox turu hata verdi ve
+  bunu kimse görmedi — bu fazın somut hedefi o hatanın görünür olması.
+- **Metrikler.** İstek süreleri, outbox'ta bekleyen ve yeniden denenen mesaj
+  sayısı, tüketici hataları, önbellek isabet oranı.
+- **Log hijyeni** (SECURITY.md §12): token, parola ve davet token'ı loglara
+  girmemeli; bunu doğrulayan bir test yaz.
 
 Dikkat edilecekler:
 
-- Playwright'ta `networkidle` kullanma (aşağıda madde 8).
-- Kayıt limiti IP başına 10 dakikada 5 (madde 5); test kullanıcılarını buna
-  göre planla.
-- Frontend `format:check` artık temiz; faz sonunda lint/typecheck/build ile
-  birlikte çalıştır.
+- Sürümleri kurulumda registry'den doğrula; yalnızca stable.
+- Faz sonu komutlarına artık E2E de dahil (CLAUDE.md). E2E sırasında açık bir
+  geliştirme Worker'ı varsa kapat: aynı kuyrukları dinler.
 
 ## Son Doğrulama Durumu
 
@@ -137,6 +130,9 @@ Fazların sonunda gerçekten çalıştırılanlar (en günceli en altta):
 | `dotnet test backend/FlowDesk.slnx` (Faz 16) | 501/501 başarılı (230 birim + 271 entegrasyon) |
 | `npm --prefix frontend run format:check / lint / typecheck / build` (Faz 16) | Başarılı |
 | Gerçek Worker, Development (Faz 16) | Üç kuyruk dinlendi, outbox turları hatasız (düzeltmeden önce başlamıyordu) |
+| `dotnet test backend/FlowDesk.slnx` (Faz 17) | 505/505 başarılı (230 birim + 275 entegrasyon) |
+| `npm --prefix e2e test` (Faz 17) | 12/12 başarılı; art arda koşularda kararlı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` (Faz 17) | Başarılı |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -210,6 +206,32 @@ Bilinen blocker yok.
     tabloyu kilitler. Gerçek zamanlamaya bırakılan bir yarış çoğu zaman hiç
     oluşmaz ve test boşuna geçer. Yeni bir yarış testi yazarken önce
     düzeltmesiz kodda düştüğünü görün.
+
+12. **iCloud ve `next build`.** Senkronizasyon, derleme sırasında `.next`
+    içinde "… 2" kopyaları üretiyor ve `next build` `ENOTEMPTY` ile düşüyor.
+    Bu makinede `frontend/.next`, senkronize edilmeyen `.next.nosync`
+    klasörüne bir bağ; `.gitignore`, ESLint ve Prettier ikisini de dışarıda
+    tutuyor. Temiz bir kopyada gerekirse:
+    ```bash
+    cd frontend && rm -rf .next && mkdir .next.nosync && ln -s .next.nosync .next
+    ```
+    `scripts/clean-sync-duplicates.sh` artık uzantısız dosyaları ve boş kopya
+    klasörleri de temizliyor.
+
+13. **E2E çalıştırma.** Compose ayakta olmalı; suite API'yi (5180), Worker'ı
+    ve frontend'in üretim derlemesini (3100) kendisi başlatır. İlk kurulum:
+    ```bash
+    npm --prefix e2e ci && npx --prefix e2e playwright install chromium
+    npm --prefix e2e test
+    ```
+    Suite frontend'i `NEXT_PUBLIC_API_BASE_URL=http://localhost:5180` ile
+    derler; ardından `npm --prefix frontend run build` çalıştırılırsa
+    varsayılan derleme geri gelir. Başarısız bir senaryonun izi
+    `e2e/test-results/` içindedir (`npx playwright show-trace …`).
+
+14. **Playwright seçicileri.** Seçiciler rol ve erişilebilir addan yazılır.
+    Bir ekranın gerçek ağacını görmek için `locator.ariaSnapshot()` dökümü en
+    hızlı yol; modal açıkken sayfanın geri kalanı ağaçtan gizlenir.
 
 ## Önemli Mimari Kararlar
 
@@ -289,11 +311,41 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
 - Çalışma alanına bağlı her uç nokta `EndpointCatalog`'da; yeni uç nokta
   katalog kaydı ve en düşük rolüyle birlikte eklenir, yoksa kapsam testi düşer
   (ADR-0040). Ek silme Admin'e ait
+- Tarayıcı testleri gerçek API, Worker ve üretim derlemesini kendi
+  portlarında başlatır; hazırlık API'den, zaman `page.clock` ile; rate limit
+  değerleri yapılandırılabilir, varsayılanlar üretim değerleri (ADR-0041)
+- Sekmeler arası yenileme `navigator.locks` ile sıraya girer (ADR-0038
+  güncellemesi)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 17'de eklenenler / değişenler:
+
+- `e2e/` — `playwright.config.ts`, `support/` (`environment`, `api`,
+  `session`, `mailbox`, `global-setup`), `tests/` (oturum, sekmeler, destek
+  yolculuğu, roller, davet, ayarlar)
+- `backend/src/FlowDesk.Api/Common/RateLimitingPolicies.cs`, `ApiOptions.cs`
+  — `RateLimitingSettings`
+- `backend/src/FlowDesk.Application/Tickets/TicketMessages.cs`,
+  `AddTicketComment/`, `Infrastructure/Notifications/TicketCommentedConsumer.cs`
+  — yorum anındaki atanan kişi
+- `frontend/src/lib/api/http-client.ts` — sekmeler arası yenileme kilidi
+- `frontend/src/features/auth/auth-queries.ts` — çıkış
+- `frontend/src/features/workspaces/workspace-settings-*.tsx`,
+  `app/app/[workspaceSlug]/settings/page.tsx` — Ayarlar sayfası
+- `frontend/src/features/workspaces/workspace-shell.tsx` — `<main>`
+- `frontend/src/components/ui/dialog.tsx`, `sonner.tsx`,
+  `features/notifications/notification-panel.tsx`,
+  `features/tickets/ticket-attachments.tsx`,
+  `features/customers/customer-form-dialog.tsx`,
+  `features/team/invite-member-dialog.tsx` — erişilebilirlik ve metin
+  düzeltmeleri
+- `frontend/package.json` — `lint` önce `next typegen`
+- `.gitignore`, `scripts/clean-sync-duplicates.sh`, `frontend/eslint.config.mjs`,
+  `frontend/.prettierignore` — senkronizasyon kopyaları ve `.next.nosync`
 
 Faz 16'da eklenenler / değişenler:
 
@@ -579,6 +631,7 @@ Kullanıcıdan beklenen harici işlem yok.
    dotnet test backend/FlowDesk.slnx
    npm --prefix frontend ci
    npm --prefix frontend run lint && npm --prefix frontend run typecheck
+   npm --prefix e2e ci && npm --prefix e2e test
    ```
 8. "Bir Sonraki Yapılacak İş" bölümünden devam et.
 9. Önceki tamamlanmış işi sebepsiz yere yeniden yazma.

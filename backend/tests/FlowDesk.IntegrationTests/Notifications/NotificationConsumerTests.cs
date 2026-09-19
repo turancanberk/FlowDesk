@@ -114,7 +114,7 @@ public sealed class NotificationConsumerTests
         await world.AssignTicketToAssigneeAsync(Cancellation);
 
         await world.TicketCommented.HandleAsync(
-            world.Comment(authorId: world.Assigner.Id), Cancellation);
+            world.Comment(authorId: world.Assigner.Id, assigneeId: world.Assignee.Id), Cancellation);
 
         var notice = await world.SingleNoticeForAsync(world.Assignee.Id, Cancellation);
 
@@ -130,7 +130,7 @@ public sealed class NotificationConsumerTests
         await world.AssignTicketToAssigneeAsync(Cancellation);
 
         await world.TicketCommented.HandleAsync(
-            world.Comment(authorId: world.Assignee.Id), Cancellation);
+            world.Comment(authorId: world.Assignee.Id, assigneeId: world.Assignee.Id), Cancellation);
 
         Assert.Empty(await world.NoticesForAsync(world.Assignee.Id, Cancellation));
     }
@@ -141,7 +141,49 @@ public sealed class NotificationConsumerTests
         await using var world = await ConsumerWorld.CreateAsync(_postgres, Cancellation);
 
         await world.TicketCommented.HandleAsync(
-            world.Comment(authorId: world.Assigner.Id), Cancellation);
+            world.Comment(authorId: world.Assigner.Id, assigneeId: null), Cancellation);
+
+        Assert.Empty(await world.NoticesForAsync(world.Assignee.Id, Cancellation));
+    }
+
+    /// <summary>
+    /// The person the ticket belonged to when the comment was written hears
+    /// about it, even if the ticket has changed hands by the time the message
+    /// is delivered.
+    /// </summary>
+    /// <remarks>
+    /// The outbox delivers seconds later, or minutes after a broker outage.
+    /// Looking the assignee up on delivery sent the notice to whoever held the
+    /// ticket then (found by the browser tests in Phase 17).
+    /// </remarks>
+    [Fact]
+    public async Task A_comment_notifies_whoever_held_the_ticket_when_it_was_written()
+    {
+        await using var world = await ConsumerWorld.CreateAsync(_postgres, Cancellation);
+
+        // The ticket is unassigned now; when the comment was written, it was
+        // the assignee's.
+        await world.TicketCommented.HandleAsync(
+            world.Comment(authorId: world.Assigner.Id, assigneeId: world.Assignee.Id), Cancellation);
+
+        var notice = await world.SingleNoticeForAsync(world.Assignee.Id, Cancellation);
+
+        Assert.Equal(NotificationType.TicketCommented, notice.Type);
+    }
+
+    /// <summary>
+    /// And the reverse: someone who took the ticket after the comment was
+    /// written is not told about a conversation that was not addressed to them.
+    /// </summary>
+    [Fact]
+    public async Task A_comment_does_not_notify_someone_assigned_after_it_was_written()
+    {
+        await using var world = await ConsumerWorld.CreateAsync(_postgres, Cancellation);
+
+        await world.AssignTicketToAssigneeAsync(Cancellation);
+
+        await world.TicketCommented.HandleAsync(
+            world.Comment(authorId: world.Assigner.Id, assigneeId: null), Cancellation);
 
         Assert.Empty(await world.NoticesForAsync(world.Assignee.Id, Cancellation));
     }
@@ -387,7 +429,8 @@ public sealed class NotificationConsumerTests
                 Assigner.Id,
                 WorkspaceSlug);
 
-        public TicketCommented Comment(Guid authorId) =>
+        /// <param name="assigneeId">Who held the ticket when the comment was written.</param>
+        public TicketCommented Comment(Guid authorId, Guid? assigneeId) =>
             new(
                 Guid.CreateVersion7(),
                 TenantId,
@@ -396,6 +439,7 @@ public sealed class NotificationConsumerTests
                 FlowDesk.Domain.Tickets.TicketNumber.FirstNumber,
                 "Fatura PDF'i indirilemiyor",
                 authorId,
+                assigneeId,
                 "Log kayıtları incelendi.",
                 WorkspaceSlug);
 

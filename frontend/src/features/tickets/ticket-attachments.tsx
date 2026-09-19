@@ -82,6 +82,14 @@ export function TicketAttachments({
             type="file"
             className="sr-only"
             /*
+              Out of the tab order and hidden from assistive technology: the
+              "Dosya ekle" button below is the control people use. Left in, the
+              input was a second, unlabelled stop that screen readers announced
+              in the browser's own language ("Choose File").
+            */
+            tabIndex={-1}
+            aria-hidden="true"
+            /*
               Accepts the same list the server enforces. It is a convenience in
               the file picker, not a check: the browser's filter can be turned
               off in the dialog, so the rule that matters is the one on the

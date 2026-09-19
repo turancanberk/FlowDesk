@@ -45,6 +45,10 @@ BenchmarkDotNet.Artifacts/
 # Node / Next.js
 node_modules/
 .next/
+# iCloud senkronize edilen dizinde derleme çıktısı ".next.nosync" klasörüne,
+# ".next" ise ona bağ olarak tutulabilir (HANDOFF, ortam sorunu 4).
+.next
+*.nosync/
 out/
 build/
 .turbo/
@@ -72,6 +76,8 @@ pnpm-debug.log*
 # senkronize edilen bir dizinde tutulduğunda "Program 2.cs" gibi kopyalar
 # oluşuyor ve derlemeyi bozuyor; commit edilmemeleri gerekir.
 * 2.*
+# Uzantısız dosyalar ve klasörler de kopyalanıyor (".prettierignore 2", "app 2").
+* 2
 *conflicted copy*
 Thumbs.db
 desktop.ini

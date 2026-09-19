@@ -45,6 +45,13 @@ public sealed record TicketAssigned(
 /// The opening of the comment, for the notification line. Stored rather than
 /// read back, because the comment may be gone by the time anyone looks.
 /// </param>
+/// <param name="AssigneeUserId">
+/// Who the ticket belonged to when the comment was written, or null if nobody.
+/// Carried rather than looked up on delivery: the outbox delivers seconds
+/// later, or minutes after a broker outage, and by then the ticket may have
+/// changed hands — the notice would go to someone the comment was never meant
+/// for, and miss the person it was (found in Phase 17).
+/// </param>
 public sealed record TicketCommented(
     Guid MessageId,
     Guid TenantId,
@@ -53,6 +60,7 @@ public sealed record TicketCommented(
     int TicketNumber,
     string Subject,
     Guid AuthorUserId,
+    Guid? AssigneeUserId,
     string Excerpt,
     string WorkspaceSlug) : IntegrationMessage(MessageId, TenantId, OccurredAt)
 {

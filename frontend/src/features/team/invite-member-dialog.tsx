@@ -208,16 +208,22 @@ function InvitationLink({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Davet bağlantısı hazır</DialogTitle>
+        <DialogTitle>Davet oluşturuldu</DialogTitle>
         <DialogDescription>
-          Bu bağlantı yalnızca bir kez gösterilir. {invitation.invitation.email} adresine iletin.
+          {invitation.invitation.email} adresine davet e-postası gönderiliyor.
         </DialogDescription>
       </DialogHeader>
 
       <div className="mt-4 flex flex-col gap-3">
-        <Alert variant="warning">
+        {/*
+          Until Phase 17 this said mail was not sent yet — true in Phase 05,
+          wrong since Phase 12. The link stays on screen as a fallback: mail is
+          sent by the worker, a moment later, and can still end up in spam.
+        */}
+        <Alert variant="info">
           <AlertDescription>
-            E-posta gönderimi henüz devrede değil. Bağlantıyı kendiniz iletmeniz gerekiyor.
+            E-posta ulaşmazsa bağlantıyı kendiniz iletebilirsiniz. Bağlantı yalnızca bir kez
+            gösterilir.
           </AlertDescription>
         </Alert>
 

@@ -22,6 +22,12 @@ function Toaster(props: ToasterProps) {
     <Sonner
       theme="light"
       position="bottom-right"
+      /*
+        The region's name is read out by screen readers; sonner's default is
+        English. Not "Bildirimler": that is the notification panel's button,
+        and two landmarks with one name cannot be told apart.
+      */
+      containerAriaLabel="Anlık mesajlar"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

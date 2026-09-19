@@ -58,10 +58,20 @@ export function useLogout() {
   return useMutation({
     mutationFn: logout,
     onSettled: () => {
-      // Drop the whole cache, not just the session. Anything fetched while
-      // signed in belonged to that user and must not be visible to the next
-      // one on this device.
-      queryClient.clear();
+      /*
+        The session is set to "none" rather than cleared with the rest.
+        clear() removes queries without telling the screens that are showing
+        them, so the page kept its signed-in user and nothing moved until a
+        reload (found in Phase 17). An explicit null is an answer the session
+        guard acts on: it sends the person to the sign-in page.
+      */
+      queryClient.setQueryData(currentUserQueryKey, null);
+
+      // Everything else goes. Anything fetched while signed in belonged to
+      // that user and must not be visible to the next one on this device.
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== currentUserQueryKey[0],
+      });
     },
   });
 }
