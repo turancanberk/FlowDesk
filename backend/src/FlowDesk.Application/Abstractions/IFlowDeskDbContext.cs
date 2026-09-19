@@ -113,5 +113,17 @@ public interface IFlowDeskDbContext
     /// </remarks>
     Task<int> TakeNextTicketNumberAsync(Guid tenantId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Locks a workspace's team against concurrent changes until the
+    /// surrounding transaction ends.
+    /// </summary>
+    /// <remarks>
+    /// The last-owner rule is a statement about the whole team, and checking it
+    /// on an unlocked read lets two owners who leave at the same moment both
+    /// see the other still there. Must be called inside
+    /// <see cref="ExecuteInTransactionAsync"/>, before the team is read.
+    /// </remarks>
+    Task LockTeamAsync(Guid tenantId, CancellationToken cancellationToken);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

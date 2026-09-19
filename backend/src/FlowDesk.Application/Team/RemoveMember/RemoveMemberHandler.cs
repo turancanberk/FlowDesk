@@ -42,6 +42,41 @@ public sealed class RemoveMemberHandler
 
         var tenantId = _tenantContext.TenantId;
 
+        return await _dbContext.ExecuteInTransactionAsync(
+            async transactionCancellation =>
+            {
+                // Everything below reads the team, so it reads it under the
+                // team lock: two owners leaving at once must not both see the
+                // other still there (found in Phase 16).
+                await _dbContext.LockTeamAsync(tenantId, transactionCancellation);
+
+                return await RemoveAsync(tenantId, userId, isSelf, transactionCancellation);
+            },
+            cancellationToken);
+    }
+
+    private async Task<Result> RemoveAsync(
+        Guid tenantId,
+        Guid userId,
+        bool isSelf,
+        CancellationToken cancellationToken)
+    {
+        var callerRole = await MembershipQueries.CurrentRoleAsync(
+            _dbContext, tenantId, _tenantContext.UserId, cancellationToken);
+
+        if (callerRole is not { } role)
+        {
+            // Removed while this request was on its way in.
+            return Result.Failure(TenancyErrors.WorkspaceNotFound);
+        }
+
+        // Checked again with the role as it stands now, not as it stood when
+        // the request began.
+        if (!isSelf && !WorkspacePermissions.IsGranted(role, WorkspaceAction.ManageMembers))
+        {
+            return Result.Failure(TenancyErrors.InsufficientRole("Üye çıkarmak"));
+        }
+
         var membership = await _dbContext.Memberships
             .FirstOrDefaultAsync(
                 candidate => candidate.TenantId == tenantId && candidate.UserId == userId,
@@ -54,7 +89,7 @@ public sealed class RemoveMemberHandler
 
         if (!isSelf
             && membership.Role is MembershipRole.Owner
-            && _tenantContext.Role is not MembershipRole.Owner)
+            && role is not MembershipRole.Owner)
         {
             return Result.Failure(TeamErrors.CannotManageOwner);
         }

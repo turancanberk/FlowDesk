@@ -3,7 +3,7 @@
 Bu dosya faz seviyesindeki ilerlemeyi takip eder. Her faz sonunda güncellenir.
 Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
-**Son güncelleme:** 2026-09-17
+**Son güncelleme:** 2026-09-19
 
 ---
 
@@ -25,7 +25,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 13 — Dosya Ekleri
 - [x] Faz 14 — Denetim ve Etkinlik
 - [x] Faz 15 — Redis Önbellek
-- [ ] Faz 16 — Gelişmiş Entegrasyon Testleri
+- [x] Faz 16 — Gelişmiş Entegrasyon Testleri
 - [ ] Faz 17 — Playwright E2E
 - [ ] Faz 18 — Gözlemlenebilirlik
 - [ ] Faz 19 — Güvenlik Sertleştirme
@@ -36,13 +36,74 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 16 — Gelişmiş Entegrasyon Testleri**
+**Faz 17 — Playwright E2E**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 16 — Gelişmiş Entegrasyon Testleri · Tamamlandı
+
+Bu faz yeni özellik eklemedi; mevcut davranışı daha sıkı doğruladı ve bulduğu
+boşlukları kapattı. Beş gerçek hata çıktı; ikisi üretimde kullanıcıyı doğrudan
+etkiliyordu.
+
+**Bulunan ve düzeltilen hatalar.**
+
+1. **Worker Faz 15'ten beri hiçbir mesajı yayınlayamıyordu.** Faz 15'teki
+   `DashboardCacheInvalidator` `ITenantContext`'i zorunlu istiyordu; bu servis
+   yalnızca API'de kayıtlı. Worker hiçbir DbContext oluşturamadı, her outbox
+   turu başarısız oldu: davet e-postası, atama e-postası ve bildirim
+   üretilmedi. Faz 14'teki `ActivityRecorder` da aynı nedenle Worker'ın
+   Development'ta başlamasını engelliyordu. Gerçek Worker'la yerel ortamda
+   doğrulandı ve düzeltildi (ADR-0039).
+2. **Tek kullanımlık refresh token eşzamanlı isteklerle çoğaltılabiliyordu.**
+   Aynı token'la 8 eşzamanlı yenilemenin 8'i de başarılı oldu; replay tespiti
+   bunu görmüyordu. Harcama artık koşullu güncelleme (ADR-0038).
+3. **İki sahip aynı anda ayrılınca ya da birbirini düşürünce çalışma alanı
+   sahipsiz kalıyordu.** Ekip değişiklikleri artık çalışma alanı kilidi altında;
+   çağıranın rolü kilit altında yeniden okunuyor.
+4. **Davetin çift tıklamayla kabulü sunucu hatası veriyordu** (6 istekten 5'i
+   `500`). Kabul artık koşullu güncelleme.
+5. **Ek dosya silme Temsilci'ye açıktı**; SECURITY.md kapalı diyordu ve kayıtlı
+   bir karar yoktu. Belgelenen kural korundu, yalnızca Admin ve üstü
+   (ADR-0040).
+
+Ayrıca: `ViewMembers` matriste tanımlıydı ama hiçbir use case onu
+denetlemiyordu; SECURITY.md'de görev silme satırı Faz 08 kararıyla çelişiyordu;
+ADR dizini ADR-0026'da kalmıştı; `format:check` Faz 07'den beri 13 dosyada
+başarısızdı. Hepsi düzeltildi.
+
+**Eklenen test altyapısı.**
+
+- **Uç nokta kataloğu** (ADR-0040). Çalışma alanına bağlı her uç nokta tek
+  tabloda; kapsam testi kataloğu çalışan uygulamanın uç noktalarıyla
+  karşılaştırıyor. Katalogdan beslenenler: her rol × her uç nokta (reddedilen
+  yazmanın geçmişe iz bırakmaması dahil), yabancıya `404`, anonime `401`,
+  iki alanın sahibi için adres değiştirerek erişimin reddi.
+- **`TableGate`.** Yarış testleri şansa bırakılmıyor: test, handler'ın okuma
+  ile yazma arasında dokunduğu tabloyu kilitliyor ve bütün istekler beklemeye
+  girince açıyor. İlk denemede gerçek zamanlamayla davet yarışı hiç
+  oluşmamış, test boşuna geçmişti; kapı bunu ortaya çıkardı.
+- **Uçtan uca arka plan zinciri.** API isteği → outbox → işleyici → RabbitMQ →
+  tüketici → bildirim (atanan kişi olarak API'den okunuyor) ve gerçek SMTP
+  (Mailpit test container'ı). Test kendi veritabanını kullanıyor.
+- **Worker bileşim testi**: Development doğrulamasıyla kurulum; DbContext ve
+  abone olunan her tüketici gerçekten çözülüyor.
+- **Oturum yaşam döngüsü**: süresi dolmuş access token sıradan bir istekte `401`
+  ve `Bearer invalid_token` meydan okuması alıyor, yenileme sonrası yeni token
+  bir sonraki istekte çalışıyor.
+- **Matris denetimi**: her `WorkspaceAction` en az bir use case'te denetleniyor
+  (kaynak üzerinden birim testi).
+
+Her düzeltme mutasyonla doğrulandı: düzeltme geri alındığında ilgili test
+düşüyor.
+
+Testler: 501/501 (230 birim + 271 entegrasyon).
+
+---
 
 ### Faz 15 — Redis Önbellek · Tamamlandı
 
@@ -800,7 +861,16 @@ Yok.
 
 ## Teknik borç
 
-Yok.
+- **Sekmeler arası yenileme koordinasyonu (frontend).** Aynı anda uyanan iki
+  sekmeden yarışı kaybeden `401 auth.session_superseded` alır ve kendi başına
+  oturumu kapalı sayar; diğer sekme çalışır, sayfa yenilenince devam edilir.
+  Bu kodda tek bir yeniden deneme ya da `BroadcastChannel` ile koordinasyon
+  eklenmeli (ADR-0038). Playwright ile doğrulanabileceği için Faz 17'ye aday.
+- **İmaj etiketleri sabit değil.** Compose'da ve testlerde `axllent/mailpit` ile
+  Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli.
+- **`format:check` faz sonu komutlarında yok.** Faz 07'den beri biriken kayma bu
+  yüzden görülmedi. CLAUDE.md'deki listeye eklenmesi ve CI'da zorunlu olması
+  önerilir.
 
 ## Ertelenen özellikler
 
@@ -959,3 +1029,15 @@ değil, çalışan API'ye karşı gerçek HTTP istekleriyle doğrulandı; bu otu
 tarayıcı otomasyonu mevcut değildi ve Playwright Faz 17'ye ait. Arayüz tarafında
 lint, tip kontrolü, üretim derlemesi ve rota render'ı doğrulandı. Tıklama
 seviyesindeki akış Faz 17'de Playwright ile kalıcı hâle gelecek.
+
+Faz 16 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 501/501 başarılı (230 birim + 271 entegrasyon); art arda koşularda kararlı |
+| `npm --prefix frontend run lint / typecheck / build` | Başarılı |
+| `npm --prefix frontend run format:check` | Başarılı (13 dosyalık kayma düzeltildi) |
+| Gerçek Worker, yerel ortam, Development | Düzeltmeden önce başlangıç doğrulamasında düştü; Production'da her outbox turu `ITenantContext` hatası verdi. Düzeltmeden sonra üç kuyruk dinlendi, outbox turları hatasız |
+| Mutasyon kontrolleri | Her düzeltme geri alındığında ilgili test düştü: refresh (8/8 başarı), davet (5 × `500`), son sahip (iki senaryo), eski rol, Worker bileşimi ve zinciri, `ViewMembers`, ek silme yetkisi |
+| Migration | **Yok** — bu faz şema değiştirmiyor |

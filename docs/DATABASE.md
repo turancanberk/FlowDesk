@@ -53,6 +53,12 @@ işi için).
 
 Kısıt: `Slug` **unique**.
 
+Satır, ekip değişikliklerinin (üye çıkarma, rol değiştirme) kilit noktasıdır:
+bu işlemler transaction içinde `SELECT … FOR NO KEY UPDATE` ile satırı kilitler,
+sonra sahipleri sayar. `FOR UPDATE` değil, çünkü çalışma alanına referans veren
+her ekleme yabancı anahtar denetimi için bu satırda `FOR KEY SHARE` alır ve
+`FOR UPDATE` onları bekletirdi (ADR-0038).
+
 ### Membership (Faz 04)
 
 | Sütun | Tip | Not |
@@ -135,6 +141,19 @@ müşteriler arşivlenir, kalıcı silinmez.
 Kiracı başına sıralı numara, `TenantCounters` tablosundaki satırın aynı
 transaction içinde kilitlenip artırılmasıyla üretilir. Böylece eşzamanlı talep
 oluşturma işlemlerinde numara çakışması oluşmaz.
+
+#### Tek seferlik geçişler
+
+Tek bir kez olması gereken durum geçişleri okuma-sonra-yazma ile değil,
+koşullu güncellemeyle yapılır (ADR-0038):
+
+| Geçiş | Koşul |
+|---|---|
+| Refresh token'ın harcanması | `UsedAt IS NULL AND RevokedAt IS NULL` |
+| Davetin kabulü | `AcceptedAt IS NULL AND RevokedAt IS NULL` |
+
+Etkilenen satır sayısı 0 ise istek yarışı kaybetmiştir. Halef token ya da
+üyelik aynı transaction'da yazılır.
 
 ### TicketComment (Faz 07)
 

@@ -16,12 +16,19 @@ import {
   updateTicket,
   uploadAttachment,
 } from "./ticket-api";
-import type { CreateTicketInput, TicketDetail, TicketFilters, UpdateTicketInput } from "./ticket-types";
+import type {
+  CreateTicketInput,
+  TicketDetail,
+  TicketFilters,
+  UpdateTicketInput,
+} from "./ticket-types";
 
 export const ticketKeys = {
   all: (slug: string) => ["tickets", slug] as const,
-  list: (slug: string, filters: TicketFilters) => [...ticketKeys.all(slug), "list", filters] as const,
-  detail: (slug: string, ticketId: string) => [...ticketKeys.all(slug), "detail", ticketId] as const,
+  list: (slug: string, filters: TicketFilters) =>
+    [...ticketKeys.all(slug), "list", filters] as const,
+  detail: (slug: string, ticketId: string) =>
+    [...ticketKeys.all(slug), "detail", ticketId] as const,
   comments: (slug: string, ticketId: string) =>
     [...ticketKeys.all(slug), "comments", ticketId] as const,
   attachments: (slug: string, ticketId: string) =>

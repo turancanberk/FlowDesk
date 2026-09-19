@@ -142,8 +142,14 @@ public static class InfrastructureServiceCollectionExtensions
           Scoped, because it writes through the request's own DbContext and
           reads the workspace and actor from the request's tenant context. A
           singleton could not know either (ADR-0036).
+
+          The workspace context is resolved optionally, as the DbContext's is:
+          the worker registers none.
         */
-        services.AddScoped<IActivityRecorder, ActivityRecorder>();
+        services.AddScoped<IActivityRecorder>(provider => new ActivityRecorder(
+            provider.GetRequiredService<IFlowDeskDbContext>(),
+            provider.GetService<ITenantContext>(),
+            provider.GetRequiredService<IClock>()));
 
         return services;
     }
@@ -311,7 +317,12 @@ public static class InfrastructureServiceCollectionExtensions
         // Scoped, because it reads the request's workspace. Registered whether
         // or not a cache is configured: with the null cache it does nothing,
         // which keeps the context's wiring the same either way.
-        services.AddScoped<DashboardCacheInvalidator>();
+        //
+        // The workspace context is resolved optionally, as the DbContext's is:
+        // the worker registers none (see the DbContext registration above).
+        services.AddScoped(provider => new DashboardCacheInvalidator(
+            provider.GetRequiredService<ICache>(),
+            provider.GetService<ITenantContext>()));
 
         /*
           The connection is opened lazily, and so is the decision about which

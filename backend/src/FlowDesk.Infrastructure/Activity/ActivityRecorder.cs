@@ -18,12 +18,18 @@ namespace FlowDesk.Infrastructure.Activity;
 public sealed class ActivityRecorder : IActivityRecorder
 {
     private readonly IFlowDeskDbContext _dbContext;
-    private readonly ITenantContext _tenantContext;
+    private readonly ITenantContext? _tenantContext;
     private readonly IClock _clock;
 
+    /// <param name="tenantContext">
+    /// Null in the worker, which registers no workspace context. Required
+    /// here, the worker failed its start-up validation from Phase 14 on;
+    /// optional, it can still build everything, and only <see cref="Record"/>
+    /// — which the worker never calls — needs a workspace.
+    /// </param>
     public ActivityRecorder(
         IFlowDeskDbContext dbContext,
-        ITenantContext tenantContext,
+        ITenantContext? tenantContext,
         IClock clock)
     {
         _dbContext = dbContext;
@@ -39,9 +45,17 @@ public sealed class ActivityRecorder : IActivityRecorder
     {
         ArgumentNullException.ThrowIfNull(payload);
 
+        if (_tenantContext is not { IsResolved: true } tenantContext)
+        {
+            // A wiring mistake, not a user's: say so rather than record an
+            // event against an empty workspace id.
+            throw new InvalidOperationException(
+                "Record needs a workspace in scope; use RecordOutsideWorkspace and name it.");
+        }
+
         _dbContext.ActivityEvents.Add(ActivityEvent.Record(
-            _tenantContext.TenantId,
-            _tenantContext.UserId,
+            tenantContext.TenantId,
+            tenantContext.UserId,
             type,
             subjectType,
             subjectId,

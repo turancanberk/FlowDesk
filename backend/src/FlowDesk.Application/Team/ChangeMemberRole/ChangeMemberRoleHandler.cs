@@ -49,6 +49,39 @@ public sealed class ChangeMemberRoleHandler
 
         var tenantId = _tenantContext.TenantId;
 
+        return await _dbContext.ExecuteInTransactionAsync(
+            async transactionCancellation =>
+            {
+                // Under the team lock, for the same reason as removal: two
+                // owners demoting each other at once must not both succeed.
+                await _dbContext.LockTeamAsync(tenantId, transactionCancellation);
+
+                return await ChangeAsync(tenantId, command, transactionCancellation);
+            },
+            cancellationToken);
+    }
+
+    private async Task<Result> ChangeAsync(
+        Guid tenantId,
+        ChangeMemberRoleCommand command,
+        CancellationToken cancellationToken)
+    {
+        var callerRole = await MembershipQueries.CurrentRoleAsync(
+            _dbContext, tenantId, _tenantContext.UserId, cancellationToken);
+
+        if (callerRole is not { } role)
+        {
+            // Removed while this request was on its way in.
+            return Result.Failure(TenancyErrors.WorkspaceNotFound);
+        }
+
+        // Checked again with the role as it stands now: an owner demoted a
+        // moment ago must not finish a change only an owner may make.
+        if (!WorkspacePermissions.IsGranted(role, WorkspaceAction.ManageMembers))
+        {
+            return Result.Failure(TenancyErrors.InsufficientRole("Üye rollerini değiştirmek"));
+        }
+
         var membership = await _dbContext.Memberships
             .FirstOrDefaultAsync(
                 candidate => candidate.TenantId == tenantId && candidate.UserId == command.UserId,
@@ -59,7 +92,7 @@ public sealed class ChangeMemberRoleHandler
             return Result.Failure(TeamErrors.MemberNotFound);
         }
 
-        var callerIsOwner = _tenantContext.Role is MembershipRole.Owner;
+        var callerIsOwner = role is MembershipRole.Owner;
 
         if (membership.Role is MembershipRole.Owner && !callerIsOwner)
         {

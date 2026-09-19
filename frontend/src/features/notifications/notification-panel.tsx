@@ -108,9 +108,7 @@ export function NotificationPanel({ workspaceSlug }: { workspaceSlug: string }) 
               </Button>
             </div>
           ) : data.items.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-center text-sm">
-              Henüz bildiriminiz yok.
-            </p>
+            <p className="text-muted-foreground p-6 text-center text-sm">Henüz bildiriminiz yok.</p>
           ) : (
             <ol className="divide-border divide-y">
               {data.items.map((item) => (

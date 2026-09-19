@@ -27,6 +27,7 @@ public enum WorkspaceAction
     ViewTickets,
     ManageTickets,
     DeleteTickets,
+    DeleteAttachments,
     CommentOnTickets,
     ViewTasks,
     ManageTasks,
@@ -69,6 +70,14 @@ public static class WorkspacePermissions
         [WorkspaceAction.CommentOnTickets] = MembershipRole.Agent,
         // Deleting destroys a customer conversation, so it stays with admins.
         [WorkspaceAction.DeleteTickets] = MembershipRole.Admin,
+        /*
+          The same reasoning one level down: an attachment is part of that
+          conversation, often the customer's own file. An agent uploads; only an
+          admin removes. Until Phase 16 this reused ManageTickets and so let
+          agents delete, contradicting docs/SECURITY.md; the documented rule
+          was kept.
+        */
+        [WorkspaceAction.DeleteAttachments] = MembershipRole.Admin,
         [WorkspaceAction.ViewTasks] = MembershipRole.Viewer,
         [WorkspaceAction.ManageTasks] = MembershipRole.Agent,
         /*

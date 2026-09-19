@@ -1,4 +1,6 @@
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Application.Common;
+using FlowDesk.Application.Tenancy;
 using FlowDesk.Domain.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,8 +31,19 @@ public sealed class ListMembersHandler
         _tenantContext = tenantContext;
     }
 
-    public async Task<IReadOnlyList<TeamMember>> HandleAsync(CancellationToken cancellationToken)
+    public async Task<Result<IReadOnlyList<TeamMember>>> HandleAsync(CancellationToken cancellationToken)
     {
+        /*
+          Every role holds this today, so the check changes nothing at runtime.
+          It is here so that the matrix entry means something: without it,
+          raising the entry would silently leave the team list open.
+        */
+        if (!WorkspacePermissions.IsGranted(_tenantContext.Role, WorkspaceAction.ViewMembers))
+        {
+            return Result.Failure<IReadOnlyList<TeamMember>>(
+                TenancyErrors.InsufficientRole("Ekibi görüntülemek"));
+        }
+
         var tenantId = _tenantContext.TenantId;
 
         var memberships = await _dbContext.Memberships
@@ -46,7 +59,7 @@ public sealed class ListMembersHandler
             memberships.Select(membership => membership.UserId).ToArray(),
             cancellationToken);
 
-        return memberships
+        var members = memberships
             .Select(membership =>
             {
                 var account = accounts.GetValueOrDefault(membership.UserId);
@@ -62,5 +75,7 @@ public sealed class ListMembersHandler
                     membership.Role is MembershipRole.Owner && ownerCount <= 1);
             })
             .ToList();
+
+        return Result.Success<IReadOnlyList<TeamMember>>(members);
     }
 }

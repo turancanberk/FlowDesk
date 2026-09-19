@@ -24,6 +24,7 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageTickets, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.CommentOnTickets, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteTickets, false)]
+    [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteAttachments, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.ViewTasks, true)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.ManageTasks, false)]
     [InlineData(MembershipRole.Viewer, WorkspaceAction.DeleteTasks, false)]
@@ -39,6 +40,8 @@ public sealed class WorkspacePermissionsTests
     // Deleting a ticket destroys a thread outright, so it stays with the
     // people who administer the workspace.
     [InlineData(MembershipRole.Agent, WorkspaceAction.DeleteTickets, false)]
+    // An attachment belongs to that same conversation.
+    [InlineData(MembershipRole.Agent, WorkspaceAction.DeleteAttachments, false)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.ViewTasks, true)]
     [InlineData(MembershipRole.Agent, WorkspaceAction.ManageTasks, true)]
     // Unlike a ticket, a task is internal housekeeping: nothing outside the
@@ -54,6 +57,7 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Admin, WorkspaceAction.ManageTickets, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.CommentOnTickets, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteTickets, true)]
+    [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteAttachments, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.ViewTasks, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.ManageTasks, true)]
     [InlineData(MembershipRole.Admin, WorkspaceAction.DeleteTasks, true)]
@@ -67,6 +71,7 @@ public sealed class WorkspacePermissionsTests
     [InlineData(MembershipRole.Owner, WorkspaceAction.ManageTickets, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.CommentOnTickets, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteTickets, true)]
+    [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteAttachments, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.ViewTasks, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.ManageTasks, true)]
     [InlineData(MembershipRole.Owner, WorkspaceAction.DeleteTasks, true)]

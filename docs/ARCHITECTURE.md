@@ -225,6 +225,13 @@ tablosu üzerinden idempotency uygulanır.
                               └──► başarı: kayıt işlendi olarak işaretlenir
 ```
 
+Worker'ın bütün bileşimi tek bir çağrıdır: `AddFlowDeskWorker`. Worker'ın
+`Program`'ı ve testler aynı çağrıyı kullanır. İki hostun da kaydettiği
+servisler `ITenantContext`'i isteğe bağlı çözer, çünkü Worker bu bağlamı hiç
+kaydetmez (ADR-0039). Zincirin tamamı — API isteği, outbox, işleyici, broker,
+tüketici, bildirim ve gerçek SMTP — `BackgroundChainTests` ile tek testte
+doğrulanır.
+
 ## Dağıtım hedefi
 
 Kubernetes kullanılmaz.

@@ -281,7 +281,10 @@ function TicketForm({
           <FieldControl>
             <Select
               items={Object.fromEntries(
-                TICKET_PRIORITIES.map((priority) => [priority, ticketPriorityLabels[priority].label]),
+                TICKET_PRIORITIES.map((priority) => [
+                  priority,
+                  ticketPriorityLabels[priority].label,
+                ]),
               )}
               value={selectedPriority}
               onValueChange={(value) => {

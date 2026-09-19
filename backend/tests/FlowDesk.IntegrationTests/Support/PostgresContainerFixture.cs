@@ -46,6 +46,46 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
+    /// <summary>
+    /// Creates a separate, migrated database in the same server and returns its
+    /// connection string.
+    /// </summary>
+    /// <remarks>
+    /// For tests that run a background worker. The worker drains every pending
+    /// outbox row it can see, and in the shared database that includes the
+    /// messages every earlier test left behind — hundreds of them, for tickets
+    /// and people that test knows nothing about.
+    /// </remarks>
+    public async Task<string> CreateIsolatedDatabaseAsync(CancellationToken cancellationToken)
+    {
+        var name = $"flowdesk_{Guid.CreateVersion7():N}";
+
+        await using (var admin = new Npgsql.NpgsqlConnection(ConnectionString))
+        {
+            await admin.OpenAsync(cancellationToken);
+
+            // The name is generated above, never input.
+#pragma warning disable CA2100
+            await using var create = new Npgsql.NpgsqlCommand($"CREATE DATABASE \"{name}\"", admin);
+#pragma warning restore CA2100
+            await create.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var connectionString = new Npgsql.NpgsqlConnectionStringBuilder(ConnectionString)
+        {
+            Database = name,
+        }.ConnectionString;
+
+        var options = new DbContextOptionsBuilder<FlowDeskDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+
+        await using var dbContext = new FlowDeskDbContext(options);
+        await dbContext.Database.MigrateAsync(cancellationToken);
+
+        return connectionString;
+    }
+
     /// <summary>Opens a context against the test database for arranging or asserting state.</summary>
     public FlowDeskDbContext CreateDbContext()
     {

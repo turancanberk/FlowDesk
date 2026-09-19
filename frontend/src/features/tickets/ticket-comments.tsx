@@ -105,13 +105,7 @@ export function TicketComments({
   );
 }
 
-function CommentComposer({
-  workspaceSlug,
-  ticketId,
-}: {
-  workspaceSlug: string;
-  ticketId: string;
-}) {
+function CommentComposer({ workspaceSlug, ticketId }: { workspaceSlug: string; ticketId: string }) {
   const mutation = useAddTicketComment(workspaceSlug, ticketId);
 
   const {

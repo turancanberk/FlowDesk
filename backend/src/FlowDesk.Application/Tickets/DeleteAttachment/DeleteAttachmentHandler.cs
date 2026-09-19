@@ -41,7 +41,7 @@ public sealed class DeleteAttachmentHandler
         Guid attachmentId,
         CancellationToken cancellationToken)
     {
-        if (!WorkspacePermissions.IsGranted(_tenantContext.Role, WorkspaceAction.ManageTickets))
+        if (!WorkspacePermissions.IsGranted(_tenantContext.Role, WorkspaceAction.DeleteAttachments))
         {
             return Result.Failure(TenancyErrors.InsufficientRole("Dosya silmek"));
         }
