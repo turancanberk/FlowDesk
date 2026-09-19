@@ -9,7 +9,7 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   {
-    ignores: [".next/**", "out/**", "node_modules/**", "next-env.d.ts"],
+    ignores: [".next/**", ".next.nosync/**", "out/**", "node_modules/**", "next-env.d.ts"],
   },
 
   // eslint-config-next 16 doğrudan flat config dizisi verir; FlatCompat

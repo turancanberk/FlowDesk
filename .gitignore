@@ -45,6 +45,10 @@ BenchmarkDotNet.Artifacts/
 # Node / Next.js
 node_modules/
 .next/
+# iCloud senkronize edilen dizinde derleme çıktısı ".next.nosync" klasörüne,
+# ".next" ise ona bağ olarak tutulabilir (HANDOFF, ortam sorunu 4).
+.next
+*.nosync/
 out/
 build/
 .turbo/
