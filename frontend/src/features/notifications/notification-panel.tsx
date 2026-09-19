@@ -60,7 +60,8 @@ export function NotificationPanel({ workspaceSlug }: { workspaceSlug: string }) 
         }
       />
 
-      <PopoverContent side="right" align="end" className="w-80 p-0">
+      {/* Named, because it opens as a dialog and an unnamed one is announced as just "dialog". */}
+      <PopoverContent side="right" align="end" className="w-80 p-0" aria-label="Bildirimler">
         <div className="border-border flex items-center justify-between border-b px-3 py-2">
           <span className="text-foreground text-sm font-semibold">Bildirimler</span>
 

@@ -178,7 +178,16 @@ function CustomerForm({
           <FieldLabel>Durum</FieldLabel>
           <FieldControl>
             <Select
-              value={customer?.status ?? undefined}
+              /*
+                The labels as items, so the trigger shows "Aktif" rather than
+                the domain code. Uncontrolled: a fixed value here pinned the
+                trigger to the saved status, and choosing another one while
+                editing changed the form but not what the person saw.
+              */
+              items={{
+                Active: customerStatusLabels.Active.label,
+                Inactive: customerStatusLabels.Inactive.label,
+              }}
               defaultValue={customer?.status ?? "Active"}
               onValueChange={(value) => {
                 setValue("status", value as CustomerStatus);
