@@ -4,6 +4,12 @@ using FlowDesk.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+/*
+  The server's own name is not news to a client and is a free hint to anyone
+  scanning for a version with a known hole (docs/SECURITY.md §14).
+*/
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.AddServerHeader = false);
+
 // First, so a failure while wiring anything else is already logged the way
 // everything else will be (ADR-0042).
 builder.AddFlowDeskApiObservability();
@@ -23,6 +29,22 @@ builder.Services.AddProblemDetails();
 var app = builder.Build();
 
 app.EnsureSecureCookiePolicyInProduction();
+
+/*
+  First in the pipeline, so even a response that never reaches an endpoint —
+  a 404, a rate-limited 429, an unhandled failure — carries them.
+*/
+app.UseFlowDeskSecurityHeaders();
+
+if (!app.Environment.IsDevelopment())
+{
+    /*
+      Only outside development. Sending it over plain http would be ignored by
+      browsers anyway, and on localhost a stray max-age would pin every other
+      project on this machine to https for as long as it lasted.
+    */
+    app.UseHsts();
+}
 
 if (app.Environment.IsDevelopment())
 {
