@@ -5,8 +5,12 @@
 # gelmeden buraya eklenmez.
 #
 # Şu an PostgreSQL (Faz 01), RabbitMQ (Faz 10), Mailpit (Faz 12),
-# Azurite (Faz 13) ve Redis (Faz 15) vardır.
-# Sıradaki ekleme: Prometheus ve Grafana (Faz 18).
+# Azurite (Faz 13), Redis (Faz 15), Prometheus ve Grafana (Faz 18) vardır.
+#
+# Prometheus ve Grafana "observability" profilinin arkasındadır: günlük
+# geliştirmede gerekmez, gerektiğinde açılır (ADR-0008).
+#
+#   docker compose -f infra/docker-compose.yml --profile observability up -d
 #
 # Kullanım (depo kökünden):
 #   cp .env.example .env
@@ -138,6 +142,64 @@ services:
       retries: 5
       start_period: 5s
 
+  # ==========================================================================
+  # Gözlemlenebilirlik (Faz 18) — yalnızca profil açıkken
+  # ==========================================================================
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: flowdesk-prometheus
+    restart: unless-stopped
+    profiles: ["observability"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      # Metrikleri uygulamalar gönderiyor; bu bayrak olmadan OTLP uç noktası
+      # kapalıdır (ADR-0042).
+      - "--web.enable-otlp-receiver"
+      - "--storage.tsdb.path=/prometheus"
+      # Yerel geliştirme için iki hafta fazlasıyla yeterli.
+      - "--storage.tsdb.retention.time=14d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    container_name: flowdesk-grafana
+    restart: unless-stopped
+    profiles: ["observability"]
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD .env dosyasinda tanimlanmalidir}
+      # Yerel kurulumda dışarı açılan bir şey yok; kayıt ve telemetri kapalı.
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      # Veri kaynağı ve pano depoda; Grafana'da elle kurulan hiçbir şey yok.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres-data:
     name: flowdesk-postgres-data
@@ -147,3 +209,7 @@ volumes:
     name: flowdesk-mailpit-data
   azurite-data:
     name: flowdesk-azurite-data
+  prometheus-data:
+    name: flowdesk-prometheus-data
+  grafana-data:
+    name: flowdesk-grafana-data

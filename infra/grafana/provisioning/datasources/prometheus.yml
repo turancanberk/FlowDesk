@@ -1,0 +1,13 @@
+# Grafana'nın veri kaynağı, elle kurulmaz: pano da veri kaynağı da depoda
+# durur, böylece profil her açıldığında aynı ekran gelir (Faz 18).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: flowdesk-prometheus
+    type: prometheus
+    access: proxy
+    # Konteyner ağı içinden; host portu burada geçerli değil.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
