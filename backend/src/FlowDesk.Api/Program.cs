@@ -4,6 +4,10 @@ using FlowDesk.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// First, so a failure while wiring anything else is already logged the way
+// everything else will be (ADR-0042).
+builder.AddFlowDeskApiObservability();
+
 builder.Services.AddFlowDeskInfrastructure(builder.Configuration);
 builder.Services.AddFlowDeskApplication();
 builder.Services.AddFlowDeskApiServices(builder.Configuration);
@@ -24,6 +28,10 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Before the handlers, so the one line it writes covers the whole request,
+// including a failure that never reaches an endpoint.
+app.UseFlowDeskRequestLogging();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

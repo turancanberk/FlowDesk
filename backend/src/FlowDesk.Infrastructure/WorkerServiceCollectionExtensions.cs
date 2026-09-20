@@ -1,4 +1,5 @@
 using FlowDesk.Infrastructure.Messaging;
+using FlowDesk.Infrastructure.Observability;
 using FlowDesk.Infrastructure.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,12 +17,26 @@ namespace FlowDesk.Infrastructure;
 /// </remarks>
 public static class WorkerServiceCollectionExtensions
 {
+    /// <summary>Names the worker in logs and metrics.</summary>
+    public const string ServiceName = "flowdesk-worker";
+
+    /// <param name="humanReadableLogs">
+    /// True in development, where a person reads the console (ADR-0042).
+    /// </param>
     public static IServiceCollection AddFlowDeskWorker(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool humanReadableLogs = false)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+
+        /*
+          Logging and metrics first, so everything that follows — including a
+          start-up failure — is written in the shape the rest of the system
+          reads.
+        */
+        services.AddFlowDeskObservability(configuration, ServiceName, humanReadableLogs);
 
         services.AddFlowDeskInfrastructure(configuration);
 
