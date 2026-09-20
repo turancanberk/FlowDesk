@@ -54,3 +54,24 @@ public sealed class RateLimitingSettings
     [Range(1, 1000)]
     public int InvitationAcceptancePermitLimit { get; init; } = 20;
 }
+
+/// <summary>Where the application sits on the network, bound from <c>Network</c>.</summary>
+public sealed class NetworkSettings
+{
+    public const string SectionName = "Network";
+
+    /// <summary>
+    /// Proxies whose <c>X-Forwarded-For</c> may be believed, as addresses or
+    /// CIDR ranges.
+    /// </summary>
+    /// <remarks>
+    /// Empty by default, and empty means the header is ignored entirely: a
+    /// caller reaching the API directly can set any header it likes, and
+    /// trusting it would let anyone pick their own rate-limit bucket.
+    ///
+    /// In production Caddy serves both the frontend and the API from one
+    /// origin, so without this every request would arrive from Caddy's address
+    /// and the whole internet would share one bucket (docs/SECURITY.md §10).
+    /// </remarks>
+    public IReadOnlyList<string> TrustedProxies { get; init; } = [];
+}

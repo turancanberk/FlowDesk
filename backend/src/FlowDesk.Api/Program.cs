@@ -18,6 +18,7 @@ builder.Services.AddFlowDeskInfrastructure(builder.Configuration);
 builder.Services.AddFlowDeskApplication();
 builder.Services.AddFlowDeskApiServices(builder.Configuration);
 
+builder.Services.AddFlowDeskForwardedHeaders(builder.Configuration);
 builder.Services.AddFlowDeskRateLimiting(builder.Configuration);
 builder.Services.AddOpenApi();
 
@@ -29,6 +30,13 @@ builder.Services.AddProblemDetails();
 var app = builder.Build();
 
 app.EnsureSecureCookiePolicyInProduction();
+
+/*
+  Before everything else: the rate limiter and the cookie policy both depend on
+  who the caller is and whether the connection was secure, and both would read
+  the proxy's answers instead.
+*/
+app.UseFlowDeskForwardedHeaders();
 
 /*
   First in the pipeline, so even a response that never reaches an endpoint —
