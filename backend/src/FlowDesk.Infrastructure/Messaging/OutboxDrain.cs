@@ -1,5 +1,11 @@
+using System.Diagnostics;
+
+// FlowDesk.Infrastructure.Activity (the audit recorder) shadows the type name
+// inside this namespace, so the tracing type is aliased rather than renamed.
+using TraceActivity = System.Diagnostics.Activity;
 using System.Text;
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Infrastructure.Observability;
 using FlowDesk.Domain.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -90,6 +96,17 @@ public sealed partial class OutboxDrain
 
                 await dbContext.SaveChangesAsync(token);
 
+                /*
+                  Counted after the batch, from the same transaction: how many
+                  rows are still waiting. A backlog that keeps growing is the
+                  first sign that the broker, or a consumer, has stopped
+                  keeping up.
+                */
+                var pending = await dbContext.OutboxMessages
+                    .CountAsync(candidate => candidate.ProcessedAt == null, token);
+
+                FlowDeskTelemetry.ReportOutboxBacklog(pending);
+
                 return claimed.Count;
             },
             cancellationToken);
@@ -101,6 +118,14 @@ public sealed partial class OutboxDrain
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        /*
+          A span per message, continuing the trace stored with the row. The
+          request that queued it finished long ago; this is what makes the
+          publish, the delivery and the consumer's work show up as its
+          consequences rather than as unrelated background noise (ADR-0042).
+        */
+        using var activity = StartPublishActivity(message);
+
         try
         {
             await broker.PublishAsync(
@@ -109,9 +134,12 @@ public sealed partial class OutboxDrain
                 message.RoutingKey,
                 message.OccurredAt,
                 Encoding.UTF8.GetBytes(message.Payload),
+                activity?.Id ?? message.TraceParent,
                 cancellationToken);
 
             message.MarkProcessed(now);
+
+            FlowDeskTelemetry.OutboxPublished.Add(1, new KeyValuePair<string, object?>("type", message.Type));
         }
 #pragma warning disable CA1031 // One message's failure must not abandon the rest
         // of the batch: the broker client raises several unrelated exception
@@ -124,8 +152,24 @@ public sealed partial class OutboxDrain
 
             message.MarkFailed(exception.Message, retryAfter, now);
 
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
+
+            FlowDeskTelemetry.OutboxPublishFailures.Add(
+                1, new KeyValuePair<string, object?>("type", message.Type));
+
             LogPublishFailed(_logger, message.Id, message.AttemptCount, retryAfter, exception);
         }
+    }
+
+    private static TraceActivity? StartPublishActivity(OutboxMessage message)
+    {
+        var name = $"outbox publish {message.Type}";
+
+        // Producer, and parented to the stored context when there is one; a
+        // message queued outside any trace simply starts its own.
+        return ActivityContext.TryParse(message.TraceParent, traceState: null, out var parent)
+            ? FlowDeskTelemetry.Source.StartActivity(name, ActivityKind.Producer, parent)
+            : FlowDeskTelemetry.Source.StartActivity(name, ActivityKind.Producer);
     }
 
     /// <summary>

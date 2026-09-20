@@ -370,6 +370,9 @@ public sealed class MessageConsumerTests
                 message.OccurredAt,
                 System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
                     message, message.GetType(), FlowDeskMessageJson.Options),
+                // The trace context the outbox would carry; these tests publish
+                // outside any trace.
+                traceParent: null,
                 cancellationToken);
 
         public static async Task<ConsumerHost> StartAsync(

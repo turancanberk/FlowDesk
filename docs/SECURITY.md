@@ -365,6 +365,17 @@ token'ı, çerez içeriği, `Authorization` başlığı, bağlantı dizesi.
 Yapılandırılmış log'da bağlam için kullanıcı kimliği ve tenant kimliği
 tutulabilir; e-posta ve kişisel veri gereksizce loglanmaz.
 
+Faz 18'de bu kurala iki aykırılık bulundu ve düzeltildi: e-posta gönderim
+kaydı alıcı adresini ve talep konusunu yazıyordu (artık yalnızca mesaj
+kimliği), Npgsql ise her sorguyu SQL metniyle Information seviyesinde
+logluyordu (artık Warning).
+
+Kural testle korunuyor: kayıt, giriş, yenileme, davet ve çıkış akışları
+çalıştırılıp hostun yazdığı **her satır** okunuyor ve parola, access token,
+refresh çerezi, davet token'ı ve e-posta adresi aranıyor
+(`LogHygieneTests`). İstek logu sorgu dizesini içermez; yalnızca yol, yöntem,
+durum, süre, kullanıcı ve çalışma alanı kimliği yazılır.
+
 ---
 
 ## 13. Gizli bilgi yönetimi

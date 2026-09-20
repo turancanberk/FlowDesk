@@ -82,7 +82,14 @@ public sealed partial class SmtpEmailSender : IEmailSender
         await client.SendAsync(mime, cancellationToken);
         await client.DisconnectAsync(quit: true, cancellationToken);
 
-        LogSent(_logger, message.ToAddress, message.Subject);
+        /*
+          The address and the subject stay out of the log: one is personal
+          data, the other is a ticket subject somebody typed
+          (docs/SECURITY.md §12). The message id is what ties this line to the
+          mail server's own log, and the trace id on the event ties it to the
+          request that caused it.
+        */
+        LogSent(_logger, mime.MessageId ?? "-");
     }
 
     // Source-generated so the arguments are not boxed when the level is off
@@ -90,6 +97,6 @@ public sealed partial class SmtpEmailSender : IEmailSender
     [LoggerMessage(
         EventId = 1,
         Level = LogLevel.Information,
-        Message = "E-posta gönderildi: {ToAddress} — {Subject}")]
-    private static partial void LogSent(ILogger logger, string toAddress, string subject);
+        Message = "E-posta gönderildi: {MessageId}")]
+    private static partial void LogSent(ILogger logger, string messageId);
 }

@@ -46,6 +46,9 @@ public static class MessagingServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Only this host reports the backlog (see EnableOutboxBacklogGauge).
+        Observability.FlowDeskTelemetry.EnableOutboxBacklogGauge();
+
         services.AddSingleton<OutboxDrain>();
         services.AddHostedService<OutboxProcessor>();
 

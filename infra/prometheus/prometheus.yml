@@ -1,0 +1,36 @@
+# ============================================================================
+# FlowDesk — Prometheus yapılandırması (Faz 18)
+# ----------------------------------------------------------------------------
+# Metrikler çekilmiyor, gönderiliyor: API ve Worker OTLP ile buraya yazıyor
+# (ADR-0042). Worker'ın HTTP portu yok, dolayısıyla çekme modeli onu hiç
+# göremezdi; ayrıca OpenTelemetry'nin Prometheus exporter'ı hâlâ beta ve
+# sürüm politikası stable dışını kabul etmiyor.
+#
+# OTLP alıcısı `--web.enable-otlp-receiver` bayrağıyla açılır; bkz.
+# docker-compose.yml.
+# ============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+otlp:
+  # service.name, gelen metriklerde `job` etiketine dönüşür; iki host böylece
+  # panolarda ayrı ayrı görünür.
+  promote_resource_attributes:
+    - service.name
+    - service.version
+
+storage:
+  tsdb:
+    # Gönderim aralığı 15 saniye ve bir host yeniden başladığında biraz geriden
+    # gelen örnekler olabiliyor. Dar bir pencere, bunların sessizce düşmesini
+    # engelliyor.
+    out_of_order_time_window: 5m
+
+scrape_configs:
+  # Prometheus'un kendisi: alıcının ayakta olduğunu ve ne kadar veri aldığını
+  # gösteren tek kaynak.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

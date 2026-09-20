@@ -12,11 +12,16 @@ namespace FlowDesk.Infrastructure.Messaging;
 /// </remarks>
 public interface IBrokerPublisher
 {
+    /// <param name="traceParent">
+    /// W3C trace context to travel with the message, so the consumer's work
+    /// continues the trace of the request that caused it (ADR-0042).
+    /// </param>
     Task PublishAsync(
         Guid messageId,
         string messageType,
         string routingKey,
         DateTimeOffset occurredAt,
         ReadOnlyMemory<byte> payload,
+        string? traceParent,
         CancellationToken cancellationToken);
 }

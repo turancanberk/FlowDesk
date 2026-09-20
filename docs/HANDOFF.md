@@ -11,14 +11,14 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-19 (UTC)
+2026-09-20 (UTC)
 
 ## Repository Durumu
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 17 birleştirildi) |
-| Son commit | `b823290 — Merge branch 'feat/e2e'` (Faz 17) |
+| Aktif dal | `main` (Faz 18 birleştirildi) |
+| Son commit | `Merge branch 'feat/observability'` (Faz 18) — hash birleştirme sonrası yazılır |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
@@ -42,15 +42,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 15 — Redis Önbellek
 - Faz 16 — Gelişmiş Entegrasyon Testleri
 - Faz 17 — Playwright E2E
+- Faz 18 — Gözlemlenebilirlik
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 18 — Gözlemlenebilirlik** (henüz başlanmadı)
+**Faz 19 — Güvenlik Sertleştirme** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 18 kapsamında henüz iş yapılmadı. Faz 17'nin özeti `docs/PROGRESS.md`
-içinde; kararı ADR-0041, sekmeler arası yenileme notu ADR-0038'de.
+Faz 19 kapsamında henüz iş yapılmadı. Faz 18'in özeti `docs/PROGRESS.md`
+içinde; kararlar ADR-0042'de.
 
 ### Devam Eden İş
 
@@ -58,29 +59,31 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 18'in tamamı (ROADMAP): Serilog, OpenTelemetry, Prometheus, Grafana.
+Faz 19'un tamamı (ROADMAP): güvenlik başlıkları, rate limiting politikalarının
+gözden geçirilmesi, bağımlılık taraması.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/observability` dalını aç. Prometheus ve Grafana bu fazda Compose'a
-girer (ADR-0008); portlar ARCHITECTURE.md'de ayrılmış (9090, 3001).
+`feat/security-hardening` dalını aç.
 
 Başlanacak yerler:
 
-- **Yapılandırılmış log.** API ve Worker aynı biçimde loglamalı; bir isteğin
-  outbox → broker → tüketici zinciri tek bir korelasyon kimliğiyle
-  izlenebilmeli. Faz 15–16 arasında Worker'ın her outbox turu hata verdi ve
-  bunu kimse görmedi — bu fazın somut hedefi o hatanın görünür olması.
-- **Metrikler.** İstek süreleri, outbox'ta bekleyen ve yeniden denenen mesaj
-  sayısı, tüketici hataları, önbellek isabet oranı.
-- **Log hijyeni** (SECURITY.md §12): token, parola ve davet token'ı loglara
-  girmemeli; bunu doğrulayan bir test yaz.
+- **Güvenlik başlıkları.** CSP, `X-Content-Type-Options`, `Referrer-Policy`,
+  `X-Frame-Options`/`frame-ancestors`, HSTS. Üretimde Caddy ile API arasında
+  kimin yazacağına karar ver (ARCHITECTURE: aynı origin, Caddy önde).
+- **Rate limiting.** SECURITY.md §10 politikaların Faz 19'da yeniden gözden
+  geçirileceğini söylüyor. Limitler Faz 17'de yapılandırılabilir oldu;
+  varsayılanlar üretim değerleri (ADR-0041).
+- **Bağımlılık taraması.** `dotnet list package --vulnerable` ve
+  `npm audit` her fazda elle çalıştırılıyor; Faz 20'de CI adımı olacak.
+  Bu fazda taramanın kapsamını ve kırılma eşiğini belirle.
+- **Faz 18'in bıraktığı görünürlüğü kullan:** başlıkların gerçekten gittiğini
+  ve rate limit'e takılan isteğin loglandığını testle sabitle.
 
 Dikkat edilecekler:
 
-- Sürümleri kurulumda registry'den doğrula; yalnızca stable.
-- Faz sonu komutlarına artık E2E de dahil (CLAUDE.md). E2E sırasında açık bir
-  geliştirme Worker'ı varsa kapat: aynı kuyrukları dinler.
+- Faz sonu komutları artık E2E'yi de içeriyor (CLAUDE.md).
+- Gözlemlenebilirlik yığını isteğe bağlı: `--profile observability`.
 
 ## Son Doğrulama Durumu
 
@@ -133,6 +136,9 @@ Fazların sonunda gerçekten çalıştırılanlar (en günceli en altta):
 | `dotnet test backend/FlowDesk.slnx` (Faz 17) | 505/505 başarılı (230 birim + 275 entegrasyon) |
 | `npm --prefix e2e test` (Faz 17) | 12/12 başarılı; art arda koşularda kararlı |
 | `npm --prefix frontend run format:check / lint / typecheck / build` (Faz 17) | Başarılı |
+| `dotnet test backend/FlowDesk.slnx` (Faz 18) | 506/506 başarılı (230 birim + 276 entegrasyon) |
+| Gerçek API + Worker, yerel ortam (Faz 18) | Atama isteğinin izleme kimliği Worker'ın e-posta kaydında göründü |
+| Prometheus / Grafana (Faz 18) | Metrikler OTLP ile ulaştı; panodaki sekiz sorgu da veri döndürdü |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -229,7 +235,15 @@ Bilinen blocker yok.
     varsayılan derleme geri gelir. Başarısız bir senaryonun izi
     `e2e/test-results/` içindedir (`npx playwright show-trace …`).
 
-14. **Playwright seçicileri.** Seçiciler rol ve erişilebilir addan yazılır.
+14. **Gözlemlenebilirlik yığını.** Günlük geliştirmede gerekmez:
+    ```bash
+    docker compose --env-file .env -f infra/docker-compose.yml --profile observability up -d
+    ```
+    Grafana `http://localhost:3001` (kullanıcı/parola `.env` içinde), Prometheus
+    `http://localhost:9090`. Yığın kapalıyken uygulama aynı şekilde çalışır;
+    metrikler yalnızca gönderilmez.
+
+15. **Playwright seçicileri.** Seçiciler rol ve erişilebilir addan yazılır.
     Bir ekranın gerçek ağacını görmek için `locator.ariaSnapshot()` dökümü en
     hızlı yol; modal açıkken sayfanın geri kalanı ağaçtan gizlenir.
 
@@ -316,11 +330,34 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   değerleri yapılandırılabilir, varsayılanlar üretim değerleri (ADR-0041)
 - Sekmeler arası yenileme `navigator.locks` ile sıraya girer (ADR-0038
   güncellemesi)
+- Log iki hostta aynı biçimde; isteğin izi outbox satırında taşınır ve
+  tüketiciye kadar sürer; metrikler OTLP ile Prometheus'a gönderilir; iz
+  deposu yok (ADR-0042)
 
 Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türkçe, kaynak
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 18'de eklenenler / değişenler:
+
+- `backend/src/FlowDesk.Infrastructure/Observability/` — `FlowDeskTelemetry`,
+  `ObservabilityOptions`, `ObservabilityServiceCollectionExtensions`
+- `backend/src/FlowDesk.Api/Common/ApiObservabilityExtensions.cs` — istek logu
+  ve HTTP metrikleri
+- `backend/src/FlowDesk.Domain/Messaging/OutboxMessage.cs` — `TraceParent`;
+  migration `AddOutboxTraceParent`
+- `backend/src/FlowDesk.Infrastructure/Messaging/` — `OutboxDrain`,
+  `IBrokerPublisher`, `RabbitMqBrokerPublisher`, `MessageConsumerService`:
+  iz taşıma ve sayaçlar
+- `backend/src/FlowDesk.Infrastructure/Caching/RedisCache.cs` — okuma sayaçları
+- `backend/src/FlowDesk.Infrastructure/Email/SmtpEmailSender.cs` — adres
+  loglanmıyor
+- `infra/docker-compose.yml`, `infra/prometheus/`, `infra/grafana/` —
+  observability profili, veri kaynağı ve pano
+- `backend/tests/.../Observability/LogHygieneTests.cs`,
+  `Support/CapturedLogs.cs`, `Support/MeterProbe.cs`
+- `e2e/support/environment.ts` — E2E'de metrik gönderimi kapalı
 
 Faz 17'de eklenenler / değişenler:
 
@@ -586,7 +623,7 @@ Faz 01'de eklenenler:
 
 | Alan | Durum |
 |---|---|
-| Son migration | `AddActivityEvents` |
+| Son migration | `AddOutboxTraceParent` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
 | Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments`, `ActivityEvents` |
 | Seed | Yok (Faz 21) |
@@ -605,7 +642,8 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 | Mailpit | **Aktif** — `flowdesk-mailpit`, SMTP 1025, arayüz 8025. Faz 16'dan beri uçtan uca testte de container olarak koşuyor |
 | Azurite | **Aktif** — `flowdesk-azurite`, blob 10000 (yalnızca blob servisi) |
 | Redis | **Aktif** — `flowdesk-redis`, host portu 6380, kalıcılık kapalı |
-| Prometheus / Grafana | Henüz projeye eklenmedi (Faz 18) |
+| Prometheus | **Profilde** — `flowdesk-prometheus`, host portu 9090, OTLP alıcısı açık |
+| Grafana | **Profilde** — `flowdesk-grafana`, host portu 3001, veri kaynağı ve pano sağlanıyor |
 
 Bu makinede host portları `5432`, `6379` ve `5000` başka süreçlerce kullanılıyor.
 Tam port haritası `docs/ARCHITECTURE.md` içindedir.

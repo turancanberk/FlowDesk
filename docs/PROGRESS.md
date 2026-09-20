@@ -3,7 +3,7 @@
 Bu dosya faz seviyesindeki ilerlemeyi takip eder. Her faz sonunda güncellenir.
 Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
-**Son güncelleme:** 2026-09-19
+**Son güncelleme:** 2026-09-20
 
 ---
 
@@ -27,7 +27,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 15 — Redis Önbellek
 - [x] Faz 16 — Gelişmiş Entegrasyon Testleri
 - [x] Faz 17 — Playwright E2E
-- [ ] Faz 18 — Gözlemlenebilirlik
+- [x] Faz 18 — Gözlemlenebilirlik
 - [ ] Faz 19 — Güvenlik Sertleştirme
 - [ ] Faz 20 — CI/CD
 - [ ] Faz 21 — Demo Verisi
@@ -36,13 +36,61 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 18 — Gözlemlenebilirlik**
+**Faz 19 — Güvenlik Sertleştirme**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 18 — Gözlemlenebilirlik · Tamamlandı
+
+Prometheus ve Grafana bu fazda Compose'a eklendi (ADR-0008), kendi
+profillerinde: günlük geliştirmede kapalı. İmaj etiketleri baştan sabit sürüm.
+
+Fazın çıkış noktası Faz 16'da bulunan hataydı: Worker Faz 15'ten beri her
+outbox turunda düşüyordu ve kimse görmedi. Kararlar ADR-0042'de:
+
+- **Tek log kurulumu, iki host.** Geliştirmede okunabilir satır, diğer
+  ortamlarda JSON. Her kayıt servis adını ve izleme kimliğini taşıyor; API
+  istek başına tek satır yazıyor.
+- **İzleme bağlamı outbox satırında.** İstek → outbox → broker → tüketici
+  zinciri tek bir izleme kimliğiyle takip edilebiliyor: dakikalar sonra
+  gönderilen e-posta, onu tetikleyen isteğin izini taşıyor.
+- **Metrikler OTLP ile gönderiliyor.** Prometheus exporter'ı hâlâ beta
+  (sürüm politikası stable istiyor) ve Worker'ın HTTP portu yok; Prometheus
+  3'ün OTLP alıcısı ikisini de çözüyor.
+- **İz deposu yok.** Span'ler üretiliyor ve taşınıyor; Jaeger/Tempo bugün
+  kimsenin bakmayacağı bir servis olurdu, kod değişmeden sonra eklenebilir.
+
+Ölçülenler: istek süresi ve sayısı, çalışma zamanı sayaçları, outbox'ta
+bekleyen/yayınlanan/başarısız mesajlar, tüketici sonuçları (handled,
+duplicate, unreadable, failed) ve önbellek okumaları (hit, miss, error).
+Bekleyen sayısını yalnızca Worker bildiriyor: outbox'ı işlemeyen API'nin
+"0 bekliyor" demesi panoda yanlış bir rakam olurdu.
+
+**Bu fazda yakalanan gerçek hatalar.**
+
+1. **Serilog statik loggerı ele geçiriyordu.** Varsayılan davranışı `Log.Logger`
+   atamak; aynı süreçte iki host çalıştığında (uçtan uca testler) sonradan
+   kurulan, diğerinin log çıktısını alıyordu. Worker'ın yazdığı satırlar API'nin
+   biçimiyle görünüyordu.
+2. **İstek logu hiçbir yere yazmıyordu.** Serilog'un ara katmanı da statik
+   loggera yazıyor; statik logger korunduğunda istek satırları sessizce
+   kayboldu. Hostun kendi loggerına bağlandı.
+3. **Npgsql her sorguyu SQL metniyle Information'da logluyordu.**
+4. **E-posta logu alıcı adresini ve talep konusunu taşıyordu** (SECURITY §12).
+
+Doğrulama tarayıcıda değil, çalışan sistemde yapıldı: API ve Worker yerel
+ortamda başlatıldı, gerçek bir atama akışı üretildi ve isteğin izleme kimliğinin
+Worker'ın e-posta kaydında göründüğü, metriklerin Prometheus'a ulaştığı,
+Grafana'nın panoyu ve veri kaynağını yüklediği sorgularla doğrulandı. Panodaki
+sekiz sorgunun tamamı veri döndürdü.
+
+Testler: backend 506/506 (230 birim + 276 entegrasyon), E2E 12/12.
+
+---
 
 ### Faz 17 — Playwright E2E · Tamamlandı
 
@@ -921,7 +969,8 @@ Yok.
   Worker'ı aynı kuyrukları dinliyor. CI'da (Faz 20) E2E için ayrı, taze bir
   veritabanı ve kuyruk öneki olmalı.
 - **İmaj etiketleri sabit değil.** Compose'da ve testlerde `axllent/mailpit` ile
-  Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli.
+  Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli. Faz 18'de
+  eklenen Prometheus ve Grafana sabit sürümle geldi.
 - **`format:check` CI'da zorunlu değil.** Faz 07'den beri biriken kayma, komut
   faz sonu listesinde olmadığı için görülmedi. Faz 16 sonrası CLAUDE.md'deki
   listeye eklendi; Faz 20'de CI'da da zorunlu olmalı.
@@ -1108,3 +1157,18 @@ Faz 17 sonunda:
 | Mutasyon kontrolleri | Çıkış, sekmeler arası kilit ve yorum alıcısı düzeltmeleri geri alındığında ilgili testler düştü |
 | `npm --prefix e2e audit` | 0 açık |
 | Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 18 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 506/506 başarılı (230 birim + 276 entegrasyon) |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 12/12 |
+| `dotnet list ... package --vulnerable --include-transitive` | Açık yok |
+| `docker compose ... --profile observability up -d` | `prometheus` ve `grafana` healthy |
+| Gerçek API + Worker, yerel ortam | Atama akışının izleme kimliği Worker'ın e-posta kaydında göründü |
+| Prometheus sorguları | FlowDesk, HTTP ve çalışma zamanı metrikleri ulaştı; panodaki sekiz sorgu da veri döndürdü |
+| Grafana | Veri kaynağı ve "FlowDesk — Genel Bakış" panosu sağlamayla yüklendi |
+| Migration | `AddOutboxTraceParent` uygulandı |

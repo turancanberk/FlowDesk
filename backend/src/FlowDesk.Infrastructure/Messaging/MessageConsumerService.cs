@@ -1,4 +1,10 @@
+using System.Diagnostics;
+
+// FlowDesk.Infrastructure.Activity (the audit recorder) shadows the type name
+// inside this namespace, so the tracing type is aliased rather than renamed.
+using TraceActivity = System.Diagnostics.Activity;
 using FlowDesk.Application.Abstractions;
+using FlowDesk.Infrastructure.Observability;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -154,6 +160,14 @@ public sealed partial class MessageConsumerService : BackgroundService
         BasicDeliverEventArgs delivery,
         CancellationToken cancellationToken)
     {
+        /*
+          The trace the message was queued in, continued here. Everything this
+          consumer writes — the notice, the mail, a failure — then belongs to
+          the request a person made, in another process, minutes earlier
+          (ADR-0042).
+        */
+        using var activity = StartConsumeActivity(subscription, delivery);
+
         // A scope per message, so a DbContext is never shared between two
         // deliveries and its change tracker cannot carry one message's entities
         // into the next.
@@ -201,6 +215,10 @@ public sealed partial class MessageConsumerService : BackgroundService
                 LogAlreadyHandled(_logger, subscription.QueueName, messageId);
             }
 
+            CountConsumed(
+                subscription,
+                handled ? FlowDeskTelemetry.Outcomes.Handled : FlowDeskTelemetry.Outcomes.Duplicate);
+
             await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken);
         }
         catch (MessageFormatException exception)
@@ -212,6 +230,9 @@ public sealed partial class MessageConsumerService : BackgroundService
               retry policy.
             */
             LogUnreadable(_logger, subscription.QueueName, exception);
+
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
+            CountConsumed(subscription, FlowDeskTelemetry.Outcomes.Unreadable);
 
             await channel.BasicNackAsync(
                 delivery.DeliveryTag, multiple: false, requeue: false, cancellationToken);
@@ -230,10 +251,54 @@ public sealed partial class MessageConsumerService : BackgroundService
             */
             LogHandlerFailed(_logger, subscription.QueueName, exception);
 
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
+            CountConsumed(subscription, FlowDeskTelemetry.Outcomes.Failed);
+
             await channel.BasicNackAsync(
                 delivery.DeliveryTag, multiple: false, requeue: true, cancellationToken);
         }
     }
+
+    private static TraceActivity? StartConsumeActivity(
+        IMessageSubscription subscription,
+        BasicDeliverEventArgs delivery)
+    {
+        var name = $"consume {subscription.QueueName}";
+        var traceParent = ReadTraceParent(delivery);
+
+        return ActivityContext.TryParse(traceParent, traceState: null, out var parent)
+            ? FlowDeskTelemetry.Source.StartActivity(name, ActivityKind.Consumer, parent)
+            : FlowDeskTelemetry.Source.StartActivity(name, ActivityKind.Consumer);
+    }
+
+    /// <summary>
+    /// The W3C trace context the publisher put on the message, if any.
+    /// </summary>
+    /// <remarks>
+    /// A missing or unreadable header is not a failure: a message published
+    /// before this existed, or by something else on the same broker, is still
+    /// a perfectly good message.
+    /// </remarks>
+    private static string? ReadTraceParent(BasicDeliverEventArgs delivery)
+    {
+        if (delivery.BasicProperties.Headers?.TryGetValue("traceparent", out var header) != true)
+        {
+            return null;
+        }
+
+        return header switch
+        {
+            byte[] utf8 => System.Text.Encoding.UTF8.GetString(utf8),
+            string text => text,
+            _ => null,
+        };
+    }
+
+    private static void CountConsumed(IMessageSubscription subscription, string outcome) =>
+        FlowDeskTelemetry.MessagesConsumed.Add(
+            1,
+            new KeyValuePair<string, object?>("consumer", subscription.ConsumerName),
+            new KeyValuePair<string, object?>("outcome", outcome));
 
     /// <summary>
     /// Reads the id the publisher stamped on the message.

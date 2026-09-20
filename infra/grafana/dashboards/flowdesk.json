@@ -1,0 +1,164 @@
+{
+  "uid": "flowdesk-overview",
+  "title": "FlowDesk — Genel Bakış",
+  "description": "İstek trafiği, arka plan işleme ve önbellek. Sorgular Faz 18'de çalışan sisteme karşı doğrulandı.",
+  "tags": ["flowdesk"],
+  "timezone": "browser",
+  "editable": false,
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "İstek hızı (istek/sn)",
+      "description": "Duruma göre ayrılmış; 5xx'in yükselmesi tek başına anlamlıdır.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{job=\"flowdesk-api\"}[5m]))",
+          "legendFormat": "{{http_response_status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "İstek süresi (p95, sn)",
+      "description": "Rotaya göre en yavaş beş uç nokta.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(5, histogram_quantile(0.95, sum by (http_route, le) (rate(http_server_request_duration_seconds_bucket{job=\"flowdesk-api\"}[5m]))))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outbox'ta bekleyen mesaj",
+      "description": "Sürekli artıyorsa broker ya da bir tüketici ayak uyduramıyor demektir.",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(flowdesk_outbox_pending{job=\"flowdesk-worker\"})",
+          "legendFormat": "bekleyen"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Outbox yayını (mesaj/sn)",
+      "description": "Başarısız denemeler ayrı çizilir; sıfırdan farklı her değer incelenmelidir.",
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "cps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (rate(flowdesk_outbox_published_total[5m]))",
+          "legendFormat": "yayınlandı — {{type}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (type) (rate(flowdesk_outbox_publish_failures_total[5m]))",
+          "legendFormat": "başarısız — {{type}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Tüketici sonuçları (mesaj/sn)",
+      "description": "handled beklenen sonuç; duplicate at-least-once teslimatın normali; failed ve unreadable değildir.",
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "cps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(flowdesk_messages_consumed_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Dashboard önbellek isabet oranı",
+      "description": "Önbellek bir hızlandırma, bağımlılık değil (ADR-0037): düşük oran yavaşlık demektir, arıza değil.",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(flowdesk_cache_reads_total{result=\"hit\"}[15m])) / clamp_min(sum(rate(flowdesk_cache_reads_total[15m])), 0.0001)",
+          "legendFormat": "isabet"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Önbellek okumaları (okuma/sn)",
+      "description": "Hata, ıskalamadan ayrı sayılır: ıskalama normal, hata Redis'in sorunudur.",
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "cps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(flowdesk_cache_reads_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Süreç sağlığı",
+      "description": "İki hostun çalışma zamanı: istisna hızı ve yönetilen bellek.",
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "flowdesk-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job) (rate(dotnet_exceptions_total[5m]))",
+          "legendFormat": "istisna/sn — {{job}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (job) (dotnet_process_memory_working_set_bytes) / 1048576",
+          "legendFormat": "bellek MB — {{job}}"
+        }
+      ]
+    }
+  ]
+}

@@ -261,6 +261,7 @@ public sealed class OutboxTests
             string routingKey,
             DateTimeOffset occurredAt,
             ReadOnlyMemory<byte> payload,
+            string? traceParent,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("broker düştü");
     }

@@ -120,6 +120,7 @@ cp .env.example .env
 # .env içindeki örnek parolaları kendi yerel değerlerinizle değiştirin
 
 # 2. Altyapıyı başlat
+#    Gözlemlenebilirlik için: --profile observability ekleyin
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 
 # 3. Veritabanını oluştur
@@ -148,6 +149,8 @@ değiştirilebilir.
 | Frontend | 3000 | 01 |
 | API | 5080 | 01 |
 | E2E frontend / API (suite kendisi başlatır) | 3100 / 5180 | 17 |
+| Prometheus (observability profili) | 9090 | 18 |
+| Grafana (observability profili) | 3001 | 18 |
 | PostgreSQL | 5433 | 01 |
 | RabbitMQ / yönetim | 5672 / 15672 | 10 |
 | Mailpit SMTP / arayüz | 1025 / 8025 | 12 |

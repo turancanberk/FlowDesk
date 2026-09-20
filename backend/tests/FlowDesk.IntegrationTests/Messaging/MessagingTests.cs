@@ -242,6 +242,7 @@ public sealed class MessagingTests
                 message.OccurredAt,
                 JsonSerializer.SerializeToUtf8Bytes(
                     message, message.GetType(), FlowDeskMessageJson.Options),
+                traceParent: null,
                 cancellationToken);
 
         /// <summary>Declares a queue bound to the given pattern and returns its name.</summary>

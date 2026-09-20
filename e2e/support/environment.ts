@@ -90,6 +90,12 @@ export function backendEnvironment(): Record<string, string> {
     // The shortest interval allowed, so a notification test waits on the
     // chain rather than on the clock.
     Outbox__PollIntervalSeconds: "1",
+    /*
+      No metrics export. The suite's hosts are short-lived and their numbers
+      would land in whatever Prometheus happens to be running, beside the
+      developer's own (ADR-0042). The instruments still record; nothing ships.
+    */
+    Observability__MetricsOtlpEndpoint: "",
   };
 }
 
