@@ -171,6 +171,25 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
                 $"Worker, isteğin izi altında hiçbir şey yazmadı. Yazdığı izler: "
                 + string.Join(", ", workerLogs.TraceIds));
 
+            /*
+              What the worker wrote while doing it (docs/SECURITY.md §12). The
+              API's log hygiene test cannot reach here: mail is sent by a
+              consumer, in the worker, and that is exactly where the address
+              used to be logged.
+            */
+            Assert.False(
+                workerLogs.Mentions(agent.Email),
+                "Worker logunda alıcının e-posta adresi var.");
+            Assert.False(
+                workerLogs.Mentions(invitation.Token),
+                "Worker logunda davet token'ı var.");
+
+            // Npgsql logs every statement, with its SQL, unless its level is
+            // lowered. Query text in a log nobody asked for is noise at best.
+            Assert.DoesNotContain(
+                workerLogs.Rendered,
+                line => line.Contains("SELECT ", StringComparison.Ordinal));
+
             // And it measured what it did.
             meters.CollectObservable();
 

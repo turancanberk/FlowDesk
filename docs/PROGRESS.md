@@ -82,6 +82,12 @@ Bekleyen sayısını yalnızca Worker bildiriyor: outbox'ı işlemeyen API'nin
 3. **Npgsql her sorguyu SQL metniyle Information'da logluyordu.**
 4. **E-posta logu alıcı adresini ve talep konusunu taşıyordu** (SECURITY §12).
 
+Dördü de testle korunuyor. İlk ikisi zaten düzeltilirken düşen testlerle
+sabitlendi; son ikisi için uçtan uca zincir testine Worker loglarının
+doğrulaması eklendi (adres, davet token'ı ve SQL metni aranıyor). API'nin log
+hijyeni testi buraya ulaşamıyor: e-postayı gönderen tüketici Worker'da
+çalışıyor. Her dördü de mutasyonla doğrulandı.
+
 Doğrulama tarayıcıda değil, çalışan sistemde yapıldı: API ve Worker yerel
 ortamda başlatıldı, gerçek bir atama akışı üretildi ve isteğin izleme kimliğinin
 Worker'ın e-posta kaydında göründüğü, metriklerin Prometheus'a ulaştığı,
