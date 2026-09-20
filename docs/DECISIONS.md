@@ -49,6 +49,7 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0040 | Uç nokta kataloğu yetki ve izolasyon testlerinin kaynağıdır | Kabul edildi |
 | ADR-0041 | Tarayıcı testleri gerçek uygulamayı kendi portlarında başlatır | Kabul edildi |
 | ADR-0042 | Gözlemlenebilirlik: JSON log, iz zinciri ve OTLP ile metrik | Kabul edildi |
+| ADR-0043 | Güvenlik başlıkları uygulamada; CSP nonce'lu; istemci adresi güvenilen proxy'den | Kabul edildi |
 
 ---
 
@@ -1597,3 +1598,65 @@ panoda gerçek sayının yanında duran yanlış bir rakam olurdu.
   bu şekilde koşar.
 - `OutboxMessage` bir sütun büyüdü. Eski satırlarda değer null; bağlamsız mesaj
   kendi izini başlatır.
+
+---
+
+## ADR-0043 — Güvenlik başlıkları uygulamada, CSP nonce'lu, istemci adresi güvenilen proxy'den
+
+**Bağlam.** Faz 19 güvenlik sertleştirmesi. Üretimde Caddy hem frontend'i hem
+API'yi aynı origin altında sunacak (Faz 20). Üç soru vardı: başlıkları kim
+gönderir, Next'in satır içi betikleriyle CSP nasıl yazılır, ve proxy arkasında
+rate limiting kimi sayar.
+
+**Karar.**
+
+1. **Başlıkları uygulama gönderir.** Hem API hem frontend kendi yanıtlarına
+   koyar; Caddy'ye bırakılmaz.
+2. **CSP nonce'ludur**, `'unsafe-inline'` değil. Nonce belge başına üretilir ve
+   Next'in kendi betiklerine işlenir. Bunun bedeli belgelerin istek anında
+   render edilmesidir.
+3. **Stil tarafında `'unsafe-inline'` kalır.**
+4. **HSTS yalnızca geliştirme dışında.**
+5. **İstemci adresi, yalnızca yapılandırmada sayılan proxy'lerden gelen
+   `X-Forwarded-For`'dan okunur**; liste boşken başlık tamamen yok sayılır.
+6. **Rate limit değerleri değişmedi** (SECURITY §10 gözden geçirmesi).
+
+**Gerekçe.**
+
+**Neden uygulamada.** Proxy'de duran bir başlık, yerel geliştirmede, entegrasyon
+testlerinde ve tarayıcı testlerinde yok demektir; bir proxy kuralını unutan
+dağıtımda da yok demektir. Uygulamanın sahip olduğu başlık onunla birlikte
+gider. Caddy ayrıca gönderirse zarar da yok.
+
+**Neden nonce.** Next her sayfaya satır içi başlangıç betiği koyuyor.
+`'unsafe-inline'`, politikayı var olma sebebi olan saldırı karşısında sessiz
+bırakırdı. Ölçtüm: önceden üretilmiş HTML'de 18 betiğin hiçbiri nonce
+almıyordu, çünkü önceden üretilen sayfanın isteği yok. Kök layout isteğin
+başlıklarını okuyunca belgeler istek anında render ediliyor ve 18'inin de
+nonce'u oluyor. Kayıp küçük: sayfalar zaten kimlik doğrulamalı kabuklar ve
+verilerini tarayıcıda çekiyor (ADR-0009).
+
+**Neden stilde nonce değil.** Base UI menü, diyalog ve açılır listeleri stil
+özniteliğiyle konumlandırıyor. Yasaklamak betik enjeksiyonunu zorlaştırmadan
+arayüzü bozardı; katı olmanın bedelini kullanıcı ödemiş olurdu.
+
+**Neden güvenilen proxy listesi.** İki uç da yanlış. `X-Forwarded-For`'a
+herkesten inanmak, çağıranın her istekte kendi rate limit kovasını seçmesi
+demek — limit diye bir şey kalmaz. Proxy arkasında başlığı yok saymak ise
+bütün trafiğin tek adresten geldiğini sanmak: dakikada on giriş denemesi
+sisteme toplam on olur. Doğru olan, yalnızca önündeki proxy'ye inanmak; ve
+"önündeki proxy" ancak yapılandırmada söylenebilir.
+
+**Sonuçlar.**
+
+- Sayfalar artık önceden üretilmiyor. Bir sayfa gerçekten statik olmalıysa
+  (pazarlama sayfası gibi) bu kararın yeniden düşünülmesi gerekir.
+- `Network:TrustedProxies` boşken üretime çıkmak, herkesi tek kovaya koyar.
+  Faz 20'de Caddy eklenirken bu değerin doldurulması gerekiyor; `.env.example`
+  bunu yorumla söylüyor.
+- Testler: başlıklar uç noktaya ulaşmayan yanıtlarda da denetleniyor; CSP'nin
+  arayüzü kırmadığı tarayıcıda sürülerek doğrulanıyor; proxy kuralının iki
+  yönü de (başlığın yok sayılması ve sayılması) ayrı testlerle sabit.
+- Bağımlılık taraması tek betiğe toplandı ve bulgu varsa sıfırdan farklı kodla
+  çıkıyor. İlk hâli sessizce hiçbir şey yapmıyordu: `dotnet list` bulgu
+  bulduğunda da `0` ile çıkıyor ve metin çıktısı yerelleştirilmiş. JSON okunuyor.

@@ -28,7 +28,7 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 16 — Gelişmiş Entegrasyon Testleri
 - [x] Faz 17 — Playwright E2E
 - [x] Faz 18 — Gözlemlenebilirlik
-- [ ] Faz 19 — Güvenlik Sertleştirme
+- [x] Faz 19 — Güvenlik Sertleştirme
 - [ ] Faz 20 — CI/CD
 - [ ] Faz 21 — Demo Verisi
 - [ ] Faz 22 — README ve Portfolyo Cilası
@@ -36,13 +36,50 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
 ## Aktif faz
 
-**Faz 19 — Güvenlik Sertleştirme**
+**Faz 20 — CI/CD**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 19 — Güvenlik Sertleştirme · Tamamlandı
+
+Üç başlık: güvenlik başlıkları, rate limiting gözden geçirmesi ve bağımlılık
+taraması. Kararlar ADR-0043'te.
+
+**Güvenlik başlıkları uygulamada, proxy'de değil.** API her yanıtında —
+uç noktaya hiç ulaşmayan 404, 401 ve 429 dâhil — nosniff, no-referrer, DENY,
+API'ye uygun bir CSP, Permissions-Policy ve no-store gönderiyor. Kestrel'in
+`Server` başlığı kapatıldı; HSTS yalnızca geliştirme dışında. Frontend
+belgeleri aynı ailenin başlıklarını ve belge başına üretilen nonce'lu bir CSP
+taşıyor.
+
+**CSP'de nonce, `'unsafe-inline'` değil.** Ölçüm bu kararı belirledi: önceden
+üretilmiş HTML'de 18 betiğin hiçbiri nonce almıyordu, çünkü önceden üretilen
+sayfanın isteği yok. Kök layout isteğin başlıklarını okuyunca belgeler istek
+anında render ediliyor ve 18'inin de nonce'u oluyor. Stil tarafında
+`'unsafe-inline'` kaldı: menü ve diyaloglar konumlarını stil özniteliğiyle
+alıyor.
+
+**Rate limiting: asıl sorun limit değerleri değil, kimin sayıldığıydı.**
+Limitler istemci IP'sine göre bölümleniyor, ama üretimde API'nin önünde Caddy
+olacak ve bütün istekler onun adresinden gelmiş görünecekti — yani dakikada
+on giriş denemesi *tüm sistem için* on olacaktı. Artık `X-Forwarded-For`
+yalnızca yapılandırmada sayılan proxy'lerden geldiğinde dikkate alınıyor;
+liste boşken başlık tamamen yok sayılıyor. Limit değerleri değişmedi;
+gerekçesi SECURITY.md §10'da.
+
+**Bağımlılık taraması tek betiğe toplandı** (`scripts/security-scan.sh`),
+bulgu varsa sıfırdan farklı kodla çıkıyor. İlk hâli sessizce hiçbir şey
+yapmıyordu; `dotnet list package --vulnerable` bulgu bulduğunda da `0` ile
+çıktığı ve metin çıktısı yerelleştirilmiş olduğu için JSON okunuyor.
+Ayrıştırıcı hem gerçek hem sahte bulguyla sınandı.
+
+Testler: backend 511/511 (230 birim + 281 entegrasyon), E2E 14/14.
+
+---
 
 ### Faz 18 — Gözlemlenebilirlik · Tamamlandı
 
@@ -1178,3 +1215,16 @@ Faz 18 sonunda:
 | Prometheus sorguları | FlowDesk, HTTP ve çalışma zamanı metrikleri ulaştı; panodaki sekiz sorgu da veri döndürdü |
 | Grafana | Veri kaynağı ve "FlowDesk — Genel Bakış" panosu sağlamayla yüklendi |
 | Migration | `AddOutboxTraceParent` uygulandı |
+
+Faz 19 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 511/511 başarılı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
+| `./scripts/security-scan.sh` | Açık yok; ayrıştırıcı sahte bulguyla da sınandı (çıkış 1) |
+| Sunulan HTML ölçümü | Statik sayfada 18 betiğin 0'ı, istek anında render'da 18'i nonce taşıyor |
+| Mutasyon kontrolü | Nonce mekanizması bozulduğunda tarayıcı testi düşüyor |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
