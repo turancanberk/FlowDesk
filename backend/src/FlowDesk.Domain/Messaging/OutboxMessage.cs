@@ -36,8 +36,10 @@ public sealed class OutboxMessage
         string type,
         string routingKey,
         string payload,
-        DateTimeOffset occurredAt)
+        DateTimeOffset occurredAt,
+        string? traceParent)
     {
+        TraceParent = traceParent;
         Id = id;
         Type = type;
         RoutingKey = routingKey;
@@ -45,6 +47,16 @@ public sealed class OutboxMessage
         OccurredAt = occurredAt;
         NextAttemptAt = occurredAt;
     }
+
+    /// <summary>W3C <c>traceparent</c> of the work that queued this message.</summary>
+    /// <remarks>
+    /// Null for a message queued outside any trace — a background job, or a
+    /// deployment where tracing is off. Format is fixed at 55 characters, so
+    /// the column is bounded.
+    /// </remarks>
+    public string? TraceParent { get; private set; }
+
+    public const int TraceParentLength = 55;
 
     /// <summary>
     /// Also the id the message carries to the broker.
@@ -97,12 +109,20 @@ public sealed class OutboxMessage
     /// </remarks>
     public DateTimeOffset? NextAttemptAt { get; private set; }
 
+    /// <param name="traceParent">
+    /// The W3C trace context of whatever caused this message, or null when
+    /// nothing was being traced. Carried so the worker's publish, the broker
+    /// delivery and the consumer's work all belong to the request a person
+    /// made, rather than appearing as unrelated background activity
+    /// (ADR-0042).
+    /// </param>
     public static OutboxMessage Create(
         Guid id,
         string type,
         string routingKey,
         string payload,
-        DateTimeOffset occurredAt)
+        DateTimeOffset occurredAt,
+        string? traceParent = null)
     {
         if (id == Guid.Empty)
         {
@@ -113,7 +133,7 @@ public sealed class OutboxMessage
         Require(routingKey, nameof(routingKey));
         Require(payload, nameof(payload));
 
-        return new OutboxMessage(id, type, routingKey, payload, occurredAt);
+        return new OutboxMessage(id, type, routingKey, payload, occurredAt, traceParent);
     }
 
     /// <summary>Records that the broker accepted the message.</summary>

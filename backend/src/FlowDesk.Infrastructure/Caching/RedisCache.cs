@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FlowDesk.Application.Abstractions;
 using FlowDesk.Infrastructure.Messaging;
+using FlowDesk.Infrastructure.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -40,8 +41,12 @@ public sealed partial class RedisCache : ICache
 
             if (value.IsNullOrEmpty)
             {
+                CountRead(FlowDeskTelemetry.Outcomes.Miss);
+
                 return null;
             }
+
+            CountRead(FlowDeskTelemetry.Outcomes.Hit);
 
             // Cast to string: RedisValue converts implicitly to several types, and
             // the overload set is ambiguous without one.
@@ -53,6 +58,13 @@ public sealed partial class RedisCache : ICache
         catch (Exception exception)
 #pragma warning restore CA1031
         {
+            /*
+              Counted apart from a miss. To the caller they are the same thing
+              (ADR-0037), but to whoever is watching they are not: misses are
+              normal, errors mean Redis is unwell.
+            */
+            CountRead(FlowDeskTelemetry.Outcomes.Error);
+
             LogReadFailed(_logger, key, exception);
 
             return null;
@@ -100,6 +112,9 @@ public sealed partial class RedisCache : ICache
         Level = LogLevel.Warning,
         Message = "Önbellekten okunamadı: {Key}. İstek önbelleksiz sürdürülüyor.")]
     private static partial void LogReadFailed(ILogger logger, string key, Exception exception);
+
+    private static void CountRead(string result) =>
+        FlowDeskTelemetry.CacheReads.Add(1, new KeyValuePair<string, object?>("result", result));
 
     [LoggerMessage(
         EventId = 2,

@@ -31,6 +31,8 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
 
         builder.Property(message => message.LastError).HasMaxLength(OutboxMessage.MaximumErrorLength);
 
+        builder.Property(message => message.TraceParent).HasMaxLength(OutboxMessage.TraceParentLength);
+
         /*
           A partial index: only rows still waiting. The table is append-heavy and
           almost entirely processed history, so an index over everything would

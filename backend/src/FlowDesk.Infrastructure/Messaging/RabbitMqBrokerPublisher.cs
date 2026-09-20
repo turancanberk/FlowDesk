@@ -35,6 +35,7 @@ public sealed partial class RabbitMqBrokerPublisher : IBrokerPublisher
         string routingKey,
         DateTimeOffset occurredAt,
         ReadOnlyMemory<byte> payload,
+        string? traceParent,
         CancellationToken cancellationToken)
     {
         /*
@@ -65,6 +66,16 @@ public sealed partial class RabbitMqBrokerPublisher : IBrokerPublisher
             */
             Type = messageType,
         };
+
+        if (traceParent is not null)
+        {
+            // The header name is the W3C one, so anything else on this broker
+            // — another service, a tool — reads it without knowing FlowDesk.
+            properties.Headers = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["traceparent"] = traceParent,
+            };
+        }
 
         await channel.BasicPublishAsync(
             exchange: _options.ExchangeName,

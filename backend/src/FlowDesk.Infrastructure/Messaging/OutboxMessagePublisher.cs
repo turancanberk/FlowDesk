@@ -35,12 +35,19 @@ public sealed class OutboxMessagePublisher : IMessagePublisher
         var payload = JsonSerializer.Serialize(
             message, message.GetType(), FlowDeskMessageJson.Options);
 
+        /*
+          The trace of the request being served, stored with the row. The
+          worker picks it up minutes later in another process, and without it
+          the notice and the e-mail it produces would look like work nobody
+          asked for (ADR-0042).
+        */
         _dbContext.OutboxMessages.Add(OutboxMessage.Create(
             message.MessageId,
             message.GetType().Name,
             message.RoutingKey,
             payload,
-            message.OccurredAt));
+            message.OccurredAt,
+            System.Diagnostics.Activity.Current?.Id));
 
         return Task.CompletedTask;
     }
