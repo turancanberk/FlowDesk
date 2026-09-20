@@ -4,9 +4,11 @@ using FlowDesk.Api.Contracts;
 using FlowDesk.Domain.Notifications;
 using FlowDesk.Domain.Tenancy;
 using FlowDesk.Infrastructure;
+using FlowDesk.Infrastructure.Observability;
 using FlowDesk.IntegrationTests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace FlowDesk.IntegrationTests.Messaging;
@@ -48,12 +50,16 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
     [Fact]
     public async Task An_invitation_and_an_assignment_arrive_as_mail_and_a_notice()
     {
+        // What the worker writes and measures while the chain runs.
+        var workerLogs = new CapturedLogs();
+        using var meters = new MeterProbe(FlowDeskTelemetry.MeterName);
+
         // A database of its own: the worker drains every pending outbox row
         // it can see, and the shared one holds every earlier test's messages.
         var connectionString = await _postgres.CreateIsolatedDatabaseAsync(Cancellation);
 
         await using var api = new FlowDeskApiFactory(connectionString, _broker.Host, _broker.Port);
-        using var worker = await StartWorkerAsync(api.Settings);
+        using var worker = await StartWorkerAsync(api.Settings, workerLogs);
 
         try
         {
@@ -82,9 +88,28 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
                 workspace.Client, workspace.Slug, workspace.CustomerId, Cancellation,
                 subject: "Mobil uygulamada giriş hatası");
 
-            using (var assigned = await TicketTestClient.AssignAsync(
-                workspace.Client, workspace.Slug, ticket.Id, agent.Id, Cancellation))
+            /*
+              A trace of the test's own making, so the assertions below can
+              follow this one request all the way into the worker. A browser
+              or a gateway sends the same header; the API continues whatever
+              trace it is given.
+            */
+            var traceId = System.Diagnostics.ActivityTraceId.CreateRandom().ToHexString();
+
+            using (var assignment = new HttpRequestMessage(
+                HttpMethod.Post,
+                new Uri(
+                    $"/api/workspaces/{workspace.Slug}/tickets/{ticket.Id}/assignment",
+                    UriKind.Relative)))
             {
+                assignment.Headers.Add(
+                    "traceparent",
+                    $"00-{traceId}-{System.Diagnostics.ActivitySpanId.CreateRandom().ToHexString()}-01");
+                assignment.Content = JsonContent.Create(
+                    new { assignedUserId = agent.Id }, options: FlowDeskJson.Options);
+
+                using var assigned = await workspace.Client.SendAsync(assignment, Cancellation);
+
                 Assert.Equal(HttpStatusCode.OK, assigned.StatusCode);
             }
 
@@ -127,6 +152,31 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
 
             // The invitation mail and the assignment mail — nothing twice.
             Assert.Equal(2, (await _mail.MessagesToAsync(agent.Email, Cancellation)).Count);
+
+            /*
+              The request's trace reached the worker. The row carried it out of
+              the API, the broker carried it to the consumer, and the consumer
+              wrote its work under it — which is what makes a notice sent
+              minutes later traceable to the click that caused it (ADR-0042).
+            */
+            var assignmentRow = await dbContext.OutboxMessages
+                .Where(message => message.Type == "TicketAssigned")
+                .Select(message => message.TraceParent)
+                .SingleAsync(Cancellation);
+
+            Assert.NotNull(assignmentRow);
+            Assert.Contains(traceId, assignmentRow, StringComparison.Ordinal);
+            Assert.True(
+                workerLogs.TraceIds.Contains(traceId, StringComparer.Ordinal),
+                $"Worker, isteğin izi altında hiçbir şey yazmadı. Yazdığı izler: "
+                + string.Join(", ", workerLogs.TraceIds));
+
+            // And it measured what it did.
+            meters.CollectObservable();
+
+            Assert.True(meters.Total("flowdesk.outbox.published") >= 2);
+            Assert.Equal(0, meters.Total("flowdesk.outbox.publish_failures"));
+            Assert.True(meters.Total("flowdesk.messages.consumed", "outcome=handled") >= 2);
         }
         finally
         {
@@ -138,7 +188,9 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
     /// Starts the worker's services the way the Worker host does, pointed at
     /// the API's database and exchange and at the test's SMTP server.
     /// </summary>
-    private async Task<IHost> StartWorkerAsync(IReadOnlyDictionary<string, string?> apiSettings)
+    private async Task<IHost> StartWorkerAsync(
+        IReadOnlyDictionary<string, string?> apiSettings,
+        CapturedLogs logs)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
@@ -160,6 +212,9 @@ public sealed class BackgroundChainTests : IClassFixture<MailpitContainerFixture
 
         // The Worker's own composition, not a copy of it.
         builder.Services.AddFlowDeskWorker(builder.Configuration);
+
+        // Read back through the worker's own logging pipeline.
+        builder.Services.AddSingleton<Serilog.Core.ILogEventSink>(logs);
 
         var host = builder.Build();
         await host.StartAsync(Cancellation);
