@@ -328,6 +328,12 @@ Uygulanan politikalar (sabit pencere, istemci IP adresine göre bölümlenmiş):
 | `POST /api/auth/refresh` | 30 istek | 1 dakika |
 | `POST /api/invitations/accept` | 20 istek | 10 dakika |
 
+İstemci adresi, önünde proxy varsa `X-Forwarded-For`'dan okunur — ama yalnızca
+`Network:TrustedProxies` içinde sayılan adreslerden gelen isteklerde. Liste
+boşken başlık tamamen yok sayılır. İkisi de gerekli: başlığa herkesten
+inanmak, çağıranın kendi kovasını seçmesine izin verirdi; proxy arkasında
+başlığı yok saymak ise bütün interneti tek kovaya koyardı (ADR-0043).
+
 IP adresi kaba bir anahtardır — paylaşılan bir ofis çıkışı tek istemci sayılır
 — ancak çağıran kimlik doğrulamadan önce elde olan tek tanımlayıcıdır ve bu uç
 noktaların korunması gereken an tam olarak o andır. Limitler normal insan
@@ -343,7 +349,13 @@ olmalarının tek nedeni, her koşuda tek adresten birkaç hesap açan tarayıc�
 testleridir (ADR-0041). Aralık doğrulaması, korumayı kapatacak bir değeri
 (0) başlangıçta reddeder.
 
-Politikalar Faz 19'da yeniden gözden geçirilecek.
+**Faz 19 gözden geçirmesi.** Limit değerleri değiştirilmedi: kapsanan dört uç
+nokta, kimlik doğrulamadan önce ulaşılabilen ve tekrarlanarak kötüye
+kullanılabilen uç noktaların tamamı. Kimlik doğrulaması gereken yazma uç
+noktaları (davet oluşturma, dosya yükleme) ayrıca sınırlanmadı: her biri
+zaten bir role ve çalışma alanı üyeliğine bağlı, yükleme ayrıca boyutla
+sınırlı. Gözden geçirmenin bulduğu gerçek sorun limitlerin kendisi değil,
+kimin sayıldığıydı — yukarıdaki güvenilen proxy kuralı bu fazda eklendi.
 
 ---
 
@@ -400,17 +412,51 @@ Her push öncesi `git diff` ve staged/untracked dosyalar bu açıdan denetlenir.
 
 ## 14. Güvenlik başlıkları
 
-Faz 19'da uygulanacaklar: `Content-Security-Policy`,
-`Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
-`Referrer-Policy`, `X-Frame-Options` / `frame-ancestors`, `Permissions-Policy`.
+Başlıkları uygulama gönderir, önündeki proxy değil. Caddy de gönderebilirdi;
+o zaman yerel geliştirme, entegrasyon testleri ve tarayıcı testleri
+başlıksız çalışırdı — bir proxy kuralını unutan dağıtım da öyle.
+
+**API** (her yanıtta, uç noktaya hiç ulaşmayan 404/401/429 dâhil):
+
+| Başlık | Değer |
+|---|---|
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `no-referrer` |
+| `X-Frame-Options` | `DENY` |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` |
+| `Permissions-Policy` | Kullanılmayan tüm özellikler kapalı |
+| `Cache-Control` | `no-store` |
+
+API belge döndürmez; politikası da bunu söyler. Kestrel'in `Server` başlığı
+kapalıdır. `Strict-Transport-Security` yalnızca geliştirme dışında gönderilir:
+`localhost` üzerinden gönderilen bir `max-age`, makinedeki diğer projeleri de
+https'e sabitlerdi.
+
+**Frontend** (her belgede): `X-Content-Type-Options`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` ve
+belge başına üretilen bir nonce taşıyan `Content-Security-Policy`.
+
+`'unsafe-inline'` yerine nonce: Next her sayfaya satır içi başlangıç betiği
+koyuyor ve satır içi betiğe izin veren bir politika, var olma sebebi olan
+saldırı hakkında hiçbir şey söylemez. Bedeli, belgelerin istek anında render
+edilmesi (ADR-0043). Stil tarafında `'unsafe-inline'` duruyor: menü, diyalog
+ve açılır listeler konumlarını stil özniteliğiyle alıyor ve bunu yasaklamak
+betik enjeksiyonunu zorlaştırmadan arayüzü bozardı.
+
+Politikanın arayüzü kırmadığı tarayıcı testiyle doğrulanır: gerçek bir
+yolculuk sürülür ve tarayıcının reddettiği hiçbir şey olmadığı denetlenir.
 
 ## 15. Bağımlılık güvenliği
 
 Her güvenlik incelemesinde çalıştırılır:
 
 ```bash
-dotnet list backend/FlowDesk.slnx package --vulnerable --include-transitive
-npm --prefix frontend audit
+./scripts/security-scan.sh
 ```
+
+Betik üç paket ağacını da tarar (backend, frontend, e2e) ve bulgu varsa
+sıfırdan farklı kodla çıkar; Faz 20'de CI adımı olacak. NuGet tarafında JSON
+çıktısı okunur: `dotnet list package --vulnerable` bulgu bulduğunda da `0` ile
+çıkıyor ve insan okunur çıktısı yerelleştirilmiş.
 
 Bilinen ciddi açığı olan sürümler kullanılmaz.

@@ -17,8 +17,8 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 18 birleştirildi) |
-| Son commit | `87baae2 — Merge branch 'feat/observability'` (Faz 18) |
+| Aktif dal | `main` (Faz 19 birleştirildi) |
+| Son commit | `Merge branch 'feat/security-hardening'` (Faz 19) — hash birleştirme sonrası yazılır |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
@@ -43,15 +43,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 16 — Gelişmiş Entegrasyon Testleri
 - Faz 17 — Playwright E2E
 - Faz 18 — Gözlemlenebilirlik
+- Faz 19 — Güvenlik Sertleştirme
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 19 — Güvenlik Sertleştirme** (henüz başlanmadı)
+**Faz 20 — CI/CD** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 19 kapsamında henüz iş yapılmadı. Faz 18'in özeti `docs/PROGRESS.md`
-içinde; kararlar ADR-0042'de.
+Faz 20 kapsamında henüz iş yapılmadı. Faz 19'un özeti `docs/PROGRESS.md`
+içinde; kararlar ADR-0043'te.
 
 ### Devam Eden İş
 
@@ -59,31 +60,32 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 19'un tamamı (ROADMAP): güvenlik başlıkları, rate limiting politikalarının
-gözden geçirilmesi, bağımlılık taraması.
+Faz 20'nin tamamı (ROADMAP): GitHub Actions, üretim Dockerfile'ları, Caddy.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/security-hardening` dalını aç.
+`feat/ci-cd` dalını aç.
 
 Başlanacak yerler:
 
-- **Güvenlik başlıkları.** CSP, `X-Content-Type-Options`, `Referrer-Policy`,
-  `X-Frame-Options`/`frame-ancestors`, HSTS. Üretimde Caddy ile API arasında
-  kimin yazacağına karar ver (ARCHITECTURE: aynı origin, Caddy önde).
-- **Rate limiting.** SECURITY.md §10 politikaların Faz 19'da yeniden gözden
-  geçirileceğini söylüyor. Limitler Faz 17'de yapılandırılabilir oldu;
-  varsayılanlar üretim değerleri (ADR-0041).
-- **Bağımlılık taraması.** `dotnet list package --vulnerable` ve
-  `npm audit` her fazda elle çalıştırılıyor; Faz 20'de CI adımı olacak.
-  Bu fazda taramanın kapsamını ve kırılma eşiğini belirle.
-- **Faz 18'in bıraktığı görünürlüğü kullan:** başlıkların gerçekten gittiğini
-  ve rate limit'e takılan isteğin loglandığını testle sabitle.
+- **GitHub Actions.** Faz sonu komutlarının tamamı (CLAUDE.md) ve
+  `./scripts/security-scan.sh` adım olsun. E2E için Compose servisleri
+  gerekiyor.
+- **Üretim Dockerfile'ları** (Api, Worker, frontend) ve **Caddy**: frontend ile
+  API aynı origin altında (ARCHITECTURE).
+- **Caddy eklenirken `Network__TrustedProxies` doldurulmalı.** Boş kalırsa
+  bütün istekler proxy'nin adresinden gelmiş görünür ve herkes aynı rate limit
+  kovasını paylaşır (ADR-0043). Frontend tarafında `FLOWDESK_ENABLE_HSTS=true`
+  ile HSTS açılır.
 
-Dikkat edilecekler:
+**Bu fazda kapatılacak üç teknik borç** (PROGRESS "Teknik borç"):
 
-- Faz sonu komutları artık E2E'yi de içeriyor (CLAUDE.md).
-- Gözlemlenebilirlik yığını isteğe bağlı: `--profile observability`.
+1. E2E kendi veritabanını ve kuyruk önekini kullanmalı; şu an geliştirme
+   veritabanını kullanıyor ve açık bir geliştirme Worker'ı aynı kuyrukları
+   dinliyor.
+2. `axllent/mailpit` ve Azurite imaj etiketleri `latest`; sabitlenmeli.
+   (Prometheus ve Grafana Faz 18'de sabit sürümle geldi.)
+3. `format:check` CI'da zorunlu adım olmalı.
 
 ## Son Doğrulama Durumu
 
@@ -139,6 +141,8 @@ Fazların sonunda gerçekten çalıştırılanlar (en günceli en altta):
 | `dotnet test backend/FlowDesk.slnx` (Faz 18) | 506/506 başarılı (230 birim + 276 entegrasyon) |
 | Gerçek API + Worker, yerel ortam (Faz 18) | Atama isteğinin izleme kimliği Worker'ın e-posta kaydında göründü |
 | Prometheus / Grafana (Faz 18) | Metrikler OTLP ile ulaştı; panodaki sekiz sorgu da veri döndürdü |
+| `./scripts/security-scan.sh` (Faz 19) | Açık yok; ayrıştırıcı sahte bulguyla da sınandı |
+| Sunulan HTML ölçümü (Faz 19) | İstek anında render'da 18 betiğin 18'i CSP nonce'u taşıyor |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -330,6 +334,9 @@ Ayrıntı `docs/DECISIONS.md` içindedir; burada yalnızca hatırlatma:
   değerleri yapılandırılabilir, varsayılanlar üretim değerleri (ADR-0041)
 - Sekmeler arası yenileme `navigator.locks` ile sıraya girer (ADR-0038
   güncellemesi)
+- Güvenlik başlıkları uygulamada gönderilir; CSP belge başına nonce taşır ve
+  belgeler istek anında render edilir; `X-Forwarded-For` yalnızca
+  yapılandırmada sayılan proxy'lerden dikkate alınır (ADR-0043)
 - Log iki hostta aynı biçimde; isteğin izi outbox satırında taşınır ve
   tüketiciye kadar sürer; metrikler OTLP ile Prometheus'a gönderilir; iz
   deposu yok (ADR-0042)
@@ -338,6 +345,18 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 19'da eklenenler / değişenler:
+
+- `backend/src/FlowDesk.Api/Common/SecurityHeaderExtensions.cs`,
+  `ForwardedHeaderExtensions.cs`, `ApiOptions.cs` (`NetworkSettings`),
+  `Program.cs`
+- `frontend/src/middleware.ts` (nonce'lu CSP), `frontend/next.config.ts`
+  (başlıklar), `frontend/src/app/layout.tsx` (belgeler istek anında)
+- `backend/tests/.../Security/SecurityHeaderTests.cs`, `TrustedProxyTests.cs`
+- `e2e/tests/security.spec.ts`
+- `scripts/security-scan.sh`, `scripts/report-vulnerable-packages.py`
+- `.env.example` — `Network__TrustedProxies` notu
 
 Faz 18'de eklenenler / değişenler:
 
