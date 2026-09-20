@@ -182,8 +182,8 @@ bileşenin somut bir varlık sebebi olmasını sağlamaktır.
 | Redis | Faz 15 | Dashboard toplamlarının önbelleklenmesi |
 | Prometheus + Grafana | Faz 18 | Metrik toplama ve görselleştirme |
 
-Gözlemlenebilirlik yığını Faz 18'de Compose profile (`--profile observability`)
-arkasına konur; günlük geliştirmede isteğe bağlı kalır.
+Gözlemlenebilirlik yığını Compose profile (`--profile observability`) arkasındadır;
+günlük geliştirmede isteğe bağlıdır.
 
 ### Port haritası
 
@@ -216,6 +216,28 @@ sonucunu değiştirir. Altyapı (PostgreSQL, RabbitMQ, Mailpit, Azurite, Redis)
 Compose'dan gelir ve ortam değişkenleri kökteki `.env`'den okunur. Hiçbir şey
 taklit edilmez; test verisi API üzerinden hazırlanır, tarayıcı yalnızca
 incelenen yolculuğa harcanır (ADR-0041).
+
+## Gözlemlenebilirlik
+
+Her iki host da aynı log kurulumunu kullanır: geliştirmede okunabilir satır,
+diğer ortamlarda satır başına bir JSON nesnesi. Her kayıt servis adını ve varsa
+izleme kimliğini taşır; API ayrıca istek başına tek bir satır yazar.
+
+Bir isteğin arka plandaki sonuçları izlenebilir: isteğin izleme bağlamı outbox
+satırında saklanır, işleyici onu sürdürerek yayınlar, broker mesajı
+`traceparent` başlığıyla taşır, tüketici oradan devam eder. Dakikalar sonra
+gönderilen bir e-posta, kendisini tetikleyen istekle aynı izleme kimliğini
+taşır.
+
+Metrikler çekilmez, OTLP ile Prometheus'a gönderilir: Worker'ın HTTP portu yok
+ve OpenTelemetry'nin Prometheus exporter'ı hâlâ beta (ADR-0042). Çerçeveden
+gelen istek ve çalışma zamanı metriklerinin üstüne FlowDesk'in kendi arka plan
+görünürlüğü ölçülür — outbox'ta bekleyen, yayınlanan ve başarısız olan
+mesajlar, tüketici sonuçları, önbellek okumaları. Grafana panosu ve veri
+kaynağı depoda sağlanır (`infra/grafana`).
+
+Metrik adresi boş bırakıldığında uygulama ölçmeye devam eder, hiçbir şey
+göndermez — yığın kapalıyken çalışmayı değiştirmeyen bir yapılandırmadır.
 
 ## Asenkron işleme
 

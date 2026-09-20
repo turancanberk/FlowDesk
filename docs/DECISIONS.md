@@ -48,6 +48,7 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0039 | İki host, tek bileşim: çalışma alanı bağlamı isteğe bağlı çözülür | Kabul edildi |
 | ADR-0040 | Uç nokta kataloğu yetki ve izolasyon testlerinin kaynağıdır | Kabul edildi |
 | ADR-0041 | Tarayıcı testleri gerçek uygulamayı kendi portlarında başlatır | Kabul edildi |
+| ADR-0042 | Gözlemlenebilirlik: JSON log, iz zinciri ve OTLP ile metrik | Kabul edildi |
 
 ---
 
@@ -1525,3 +1526,74 @@ doğrulanır.
 - Suite geliştirme veritabanını kullanır; her test benzersiz kişi ve alan
   açtığı için birbirini etkilemez. Aynı anda çalışan bir geliştirme Worker'ı
   aynı kuyrukları dinleyeceği için E2E sırasında kapatılmalıdır.
+
+---
+
+## ADR-0042 — Gözlemlenebilirlik: JSON log, iz zinciri ve OTLP ile metrik
+
+**Bağlam.** Faz 15 ile Faz 16 arasında Worker'ın her outbox turu hata verdi ve
+hiçbir davet e-postası, atama e-postası ya da bildirim üretilmedi. Kimse fark
+etmedi; hata yalnızca konsola akan bir yığının içindeydi ve o konsolu okuyan
+yoktu. Faz 18'in sorusu bu: bir daha olursa nasıl görünür olur.
+
+Üç karar gerekiyordu: log neye benzer, bir isteğin sonuçları arka planda nasıl
+izlenir, metrikler nasıl toplanır.
+
+**Karar.**
+
+1. **Serilog, iki hostta tek kurulum.** Geliştirmede okunabilir satır,
+   diğer ortamlarda satır başına bir JSON nesnesi. Her kayıt servis adını
+   (`flowdesk-api`, `flowdesk-worker`) ve varsa izleme kimliğini taşır. API
+   ayrıca istek başına tek bir satır yazar; sağlık yoklamaları Debug'dadır.
+2. **İzleme bağlamı outbox satırında saklanır.** İsteğin W3C `traceparent`
+   değeri satıra yazılır, işleyici onu sürdürerek yayınlar, broker mesajına
+   başlık olarak eklenir, tüketici oradan devam eder.
+3. **Metrikler OTLP ile gönderilir**, çekilmez. Prometheus kendi OTLP
+   alıcısıyla kabul eder.
+4. **Ölçülenler:** çerçeveden gelen istek süresi ve sayısı, çalışma zamanı
+   sayaçları; üstüne FlowDesk'in kendi arka plan görünürlüğü — outbox'ta
+   bekleyen, yayınlanan ve başarısız olan mesajlar, tüketici sonuçları ve
+   önbellek okumaları.
+5. **Gözlemlenebilirlik yığını Compose profilinde** (ADR-0008) ve metrik adresi
+   boş bırakılabilir: yığın kapalıyken uygulama aynı şekilde çalışır.
+6. **İz dışa aktarılmıyor.** Span'ler üretiliyor ve taşınıyor ama gönderilecek
+   bir iz deposu yok.
+
+**Gerekçe.**
+
+**Neden itme (OTLP), çekme değil.** İki sebep birden. OpenTelemetry'nin
+Prometheus exporter'ı hâlâ `beta`; sürüm politikası stable dışını kabul etmiyor
+(ADR-0016). Ve Worker'ın HTTP portu yok: çekme modeli onu görmek için Worker'a
+yalnızca metrik sunmak üzere bir web sunucusu eklemeyi gerektirirdi. Prometheus
+3'ün OTLP alıcısı ikisini de çözüyor; arada bir collector'a da gerek kalmıyor.
+
+**Neden iz deposu yok.** Span'lerin buradaki işi, arka planda yapılan işi onu
+isteyen isteğe bağlamak — ve bu, span'ler yalnızca log kayıtlarında görünse bile
+çalışıyor. Jaeger ya da Tempo eklemek bugün kimsenin bakmayacağı bir servisi
+ayağa kaldırmak olurdu; gerektiğinde kod değişmeden eklenebilir.
+
+**Neden bağlam satırda saklanıyor.** Mesaj dakikalar sonra, başka bir süreçte
+yayınlanıyor; o an isteğin bağlamı çoktan bitmiş oluyor. Bağlamı satırda
+taşımak, zinciri bir arada tutan tek yol.
+
+**Neden outbox gecikmesi metriklerde ayrı bir sayaç.** Bekleyen mesaj sayısını
+her ölçümde `COUNT` ile sormak, dışa aktarma aralığını veritabanı yüküne
+çevirirdi; sayıyı zaten her turda hesaplayan işleyici bildiriyor. API bu
+göstergeyi hiç bildirmiyor: outbox'ı işlemeyen bir hostun "0 bekliyor" demesi,
+panoda gerçek sayının yanında duran yanlış bir rakam olurdu.
+
+**Sonuçlar.**
+
+- **Serilog varsayılan olarak statik `Log.Logger`'ı değiştiriyor.** Aynı süreçte
+  iki host çalıştığında (uçtan uca testler) sonradan kurulan diğerinin
+  çıktısını ele geçiriyor. Statik logger artık korunuyor. Aynı kökten ikinci
+  sorun: istek logu ara katmanı da varsayılan olarak statik loggera yazıyor;
+  hostun kendi loggerına bağlandı, yoksa istek satırları hiçbir yere gitmiyordu.
+- **Npgsql her sorguyu SQL metniyle Information seviyesinde logluyordu.**
+  Warning'e indirildi.
+- **E-posta logu alıcı adresini ve talep konusunu taşıyordu** (SECURITY §12);
+  yalnızca mesaj kimliği kaldı.
+- Uygulama metrik adresi boş bırakıldığında ölçmeye devam eder, göndermez. E2E
+  bu şekilde koşar.
+- `OutboxMessage` bir sütun büyüdü. Eski satırlarda değer null; bağlamsız mesaj
+  kendi izini başlatır.
