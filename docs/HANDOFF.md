@@ -11,7 +11,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-21 (UTC, Faz 22 sonu)
+2026-09-21 (UTC, Faz 23 sonu — çekirdek kapsam tamamlandı)
 
 ## Repository Durumu
 
@@ -47,15 +47,22 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 20 — CI/CD
 - Faz 21 — Demo Verisi
 - Faz 22 — README ve Portfolyo Cilası
+- Faz 23 — Nihai Üretim Denetimi
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 23 — Nihai Üretim Denetimi** (henüz başlanmadı)
+**Çekirdek kapsam tamamlandı.** ROADMAP'teki 24 fazın (00–23) tamamı bitti ve
+`main`'e birleştirildi.
 
 ### Tamamlananlar
 
-Faz 23 kapsamında henüz iş yapılmadı. Faz 22 ürüne kod eklemedi: ekran
-görüntüsü betiği, Mermaid diyagramlar ve kurulum dokümanının düzeltilmesi.
+Faz 23 denetimi beş gerçek hata buldu ve düzeltti; ayrıntısı ve temiz çıkan
+denetim başlıkları `docs/PROGRESS.md` içinde. Kısaca: `.env` hiçbir .NET
+süreci tarafından okunmuyor (kurulum adımlarına yükleme satırı eklendi),
+CSP'nin `connect-src`'si ile HTTP istemcisinin adresi ayrı yerlerden
+okunuyordu (tek modüle indirildi, tarayıcı testine assertion eklendi), bir
+ADR'deki yol yanlıştı, Azurite portları üç dokümanda yanlıştı ve üretim
+Compose'u olduğundan fazlasını iddia ediyordu.
 
 ### Devam Eden İş
 
@@ -63,30 +70,25 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 23'ün tamamı (ROADMAP): baştan sona doğrulama.
+Planlanmış faz kalmadı.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/final-audit` dalını aç. Bu son faz; yeni özellik eklenmez.
+Yeni bir faz yok. Bundan sonrası bir seçim:
 
-Verilmiş sözler, denetimde tek tek doğrulanacak:
+- **Kapsam dışı bırakılanlardan biri** (`docs/ROADMAP.md` → "Kapsam dışı"):
+  koyu tema, Google OAuth, wildcard subdomain, Kanban, WebSocket, gerçek
+  zamanlı varlık, faturalandırma, mobil uygulama, özelleştirilebilir iş
+  akışları. Her biri için orada gerekçe ve olası yaklaşım yazılı.
+- **Gerçek bir ortama dağıtım.** `infra/docker-compose.prod.yml` bir provadır:
+  e-posta Mailpit'e, blob Azurite'e gidiyor ve ikisi de sabit yazılı. Gerçek
+  bir ortam bu iki bağlantı dizesini, Caddy'nin TLS yapılandırmasını ve bir
+  kayıt defteri (registry) kararını gerektirir (ADR-0044).
+- **Bakım.** `./scripts/security-scan.sh` düzenli koşulmalı; imaj etiketleri
+  ve paket sürümleri elle yükseltilir.
 
-- **"Uygulama boş bir PostgreSQL veritabanından bu komutlarla kurulabilmelidir"**
-  (DATABASE.md). Temiz bir veritabanı açıp README'nin kurulum adımlarını
-  harfiyen izle; çalışmayan bir adım bulunursa README düzeltilir.
-- **Kiracı izolasyonu, yetkilendirme ve token saklama** (SECURITY.md): iddia
-  edilen her savunma katmanının karşılığı testlerde var mı.
-- **Bağımlılık yönü** mimari testlerle korunuyor mu; `docs/` içindeki her
-  iddia depodaki gerçeklikle uyuşuyor mu (CLAUDE.md source of truth
-  hiyerarşisi).
-- **Sürüm politikası**: hiçbir yerde `preview`/`rc`/`beta` yok, imaj etiketleri
-  sabit.
-- **Depo public**: gerçek `.env`, parola, anahtar, token veya kişisel veri
-  commit edilmemiş. Ekran görüntülerinde görünen adresler dâhil.
-- Faz sonu komutlarının tamamı ve `./scripts/security-scan.sh` temiz.
-
-Not: ekran görüntüleri `npm --prefix e2e run screenshots` ile yeniden
-üretilebilir; arayüz değiştiyse güncellenmeli.
+Bir sonraki iş ne olursa olsun kural aynı: kendi dalında yapılır, faz sonu
+komutlarının tamamı gerçekten çalıştırılır, `main` çalışır durumda kalır.
 
 ## Son Doğrulama Durumu
 
@@ -352,6 +354,17 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 23'te eklenenler / değişenler:
+
+- `frontend/src/lib/api/api-origin.ts` — API adresi tek yerde; `http-client.ts`
+  ve `middleware.ts` oradan okuyor
+- `e2e/tests/security.spec.ts` — `connect-src` politikanın çağrılan origin'i
+  adlandırdığını doğruluyor
+- `README.md` — kurulum adımlarına `.env`'i kabuğa yükleyen adım, Azurite
+  port düzeltmesi
+- `.env.example`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` — yol ve port
+  düzeltmeleri; `infra/docker-compose.prod.yml` — kapsam notu
 
 Faz 22'de eklenenler / değişenler:
 
