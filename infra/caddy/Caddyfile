@@ -1,0 +1,36 @@
+# ============================================================================
+# FlowDesk — Caddy (Faz 20)
+# ----------------------------------------------------------------------------
+# Frontend ve API aynı origin altında sunulur (docs/ARCHITECTURE.md). İki
+# sonucu var: üretimde CORS'a gerek kalmıyor ve refresh token çerezi doğal
+# olarak same-origin oluyor.
+#
+# Güvenlik başlıklarını uygulamalar kendileri gönderiyor (ADR-0043); burada
+# tekrar edilmiyor. Caddy'nin işi yönlendirme ve TLS.
+# ============================================================================
+
+{
+	# Yerelde sertifika üretmeye çalışmasın; sertifika üretimi gerçek alan
+	# adıyla yapılan dağıtımın işi.
+	auto_https off
+	admin off
+}
+
+:{$FLOWDESK_SITE_PORT:8080} {
+	encode zstd gzip
+
+	# API: yol aynen iletilir, /api ön eki API'nin kendi rotalarının parçası.
+	handle /api/* {
+		reverse_proxy {$FLOWDESK_API_UPSTREAM:api:8080}
+	}
+
+	# Sağlık uç noktaları da API'nin.
+	handle /health/* {
+		reverse_proxy {$FLOWDESK_API_UPSTREAM:api:8080}
+	}
+
+	# Geri kalan her şey Next.js.
+	handle {
+		reverse_proxy {$FLOWDESK_WEB_UPSTREAM:web:3000}
+	}
+}

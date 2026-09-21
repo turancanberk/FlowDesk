@@ -1,0 +1,118 @@
+# ============================================================================
+# FlowDesk — üretim benzeri yığın (Faz 20)
+# ----------------------------------------------------------------------------
+# Üretimdeki şekliyle çalıştırır: imajlar depodan derlenir, Caddy frontend ile
+# API'yi aynı origin altında sunar, uygulamalar kök olmayan kullanıcıyla
+# çalışır.
+#
+# Altyapı (PostgreSQL, RabbitMQ, Mailpit, Azurite, Redis) geliştirme
+# Compose'undan gelir; bu dosya yalnızca uygulamaları ve Caddy'yi ekler:
+#
+#   docker compose --env-file .env \
+#     -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
+#
+# Sonra: http://localhost:8080
+# ============================================================================
+
+name: flowdesk
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: api
+      args:
+        PROJECT: backend/src/FlowDesk.Api/FlowDesk.Api.csproj
+    image: flowdesk-api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Postgres__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-flowdesk};Username=${POSTGRES_USER:-flowdesk};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}"
+      Messaging__Host: rabbitmq
+      Messaging__Port: "5672"
+      Messaging__UserName: ${RABBITMQ_USER:-flowdesk}
+      Messaging__Password: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD gerekli}
+      Email__Host: mailpit
+      Email__Port: "1025"
+      Email__UseStartTls: "false"
+      Email__FromAddress: ${Email__FromAddress:-bildirim@flowdesk.test}
+      Email__WebBaseUrl: http://localhost:${FLOWDESK_SITE_PORT:-8080}
+      Storage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      Cache__ConnectionString: redis:6379
+      Auth__SigningKey: ${Auth__SigningKey:?Auth__SigningKey gerekli}
+      # Aynı origin: tarayıcı isteği Caddy'den geliyor, CORS'a gerek yok.
+      Cors__AllowedOrigins__0: ""
+      # Caddy'nin adresi: rate limit kovaları istemciye göre ayrılsın
+      # (ADR-0043). Konteyner ağı sabit değil, bu yüzden ağın tamamı.
+      Network__TrustedProxies__0: ${FLOWDESK_TRUSTED_PROXIES:-172.16.0.0/12}
+      # TLS Caddy'de sonlanıyor; çerez Secure kalabilsin diye şema
+      # X-Forwarded-Proto ile taşınıyor.
+      Auth__Cookies__SecurePolicy: ${Auth__Cookies__SecurePolicy:-SameAsRequest}
+    expose:
+      - "8080"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: worker
+      args:
+        PROJECT: backend/src/FlowDesk.Worker/FlowDesk.Worker.csproj
+    image: flowdesk-worker:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Postgres__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-flowdesk};Username=${POSTGRES_USER:-flowdesk};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}"
+      Messaging__Host: rabbitmq
+      Messaging__Port: "5672"
+      Messaging__UserName: ${RABBITMQ_USER:-flowdesk}
+      Messaging__Password: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD gerekli}
+      Email__Host: mailpit
+      Email__Port: "1025"
+      Email__UseStartTls: "false"
+      Email__FromAddress: ${Email__FromAddress:-bildirim@flowdesk.test}
+      Email__WebBaseUrl: http://localhost:${FLOWDESK_SITE_PORT:-8080}
+      Storage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      Cache__ConnectionString: redis:6379
+      Auth__SigningKey: ${Auth__SigningKey:?Auth__SigningKey gerekli}
+
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        # Boş: tarayıcı API'ye aynı origin üzerinden, göreli yolla gider.
+        NEXT_PUBLIC_API_BASE_URL: ""
+    image: flowdesk-web:local
+    restart: unless-stopped
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    environment:
+      FLOWDESK_SITE_PORT: "8080"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    ports:
+      - "${FLOWDESK_SITE_PORT:-8080}:8080"
+
+volumes:
+  caddy-data:
+    name: flowdesk-caddy-data
