@@ -5,6 +5,7 @@ import {
   setAccessToken,
 } from "./access-token-store";
 import { ApiError, toApiError } from "./api-error";
+import { API_BASE_URL } from "./api-origin";
 
 /*
   The single HTTP client every authenticated request goes through.
@@ -14,8 +15,6 @@ import { ApiError, toApiError } from "./api-error";
     - keeping the refresh cookie flowing on auth calls
     - recovering from an expired access token exactly once per request
 */
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5080";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";

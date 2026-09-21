@@ -41,6 +41,14 @@ test.describe("Güvenlik başlıkları", () => {
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
 
+    /*
+      The policy has to name the origin the application actually calls. These
+      are decided in two different places — the client that sends the request
+      and the middleware that writes the policy — and when they disagreed the
+      sign-in form loaded and every request it made was refused (Faz 23).
+    */
+    expect(policy).toContain(`connect-src 'self' ${API_URL}`);
+
     // Two documents, two nonces: a fixed one would be no better than none.
     const second = await page.goto("/kayit");
     expect(second?.headers()["content-security-policy"]).not.toBe(policy);
