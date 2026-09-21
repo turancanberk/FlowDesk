@@ -22,4 +22,19 @@ public sealed class PostgresOptions
     /// </summary>
     [Range(1, 30)]
     public int HealthCheckTimeoutSeconds { get; init; } = 3;
+
+    /// <summary>
+    /// Applies pending migrations while the host starts, creating the database
+    /// if it is not there.
+    /// </summary>
+    /// <remarks>
+    /// False by default, and false in any deployment: a schema change belongs
+    /// to a deliberate step someone can watch and roll back, not to whichever
+    /// instance happened to boot first.
+    ///
+    /// True for environments that are created and thrown away — the browser
+    /// test suite brings up a database of its own, and CI starts from an empty
+    /// one (ADR-0044).
+    /// </remarks>
+    public bool ApplyMigrationsOnStart { get; init; }
 }

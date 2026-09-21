@@ -29,6 +29,12 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+/*
+  Only when configured, and never in a deployment: the browser tests and CI
+  each start from a database of their own (ADR-0044).
+*/
+await app.Services.ApplyFlowDeskMigrationsIfConfiguredAsync();
+
 app.EnsureSecureCookiePolicyInProduction();
 
 /*
