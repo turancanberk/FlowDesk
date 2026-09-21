@@ -1194,6 +1194,17 @@ ile değiştirilerek çözüldü. Ayrıntı: ADR-0010.
 
 ---
 
+## Faz sonrası düzeltmeler
+
+- **Geliştirmede CSP React'in eval kullanımını engelliyordu** (2026-09-21).
+  `next dev` altında her sayfa "eval() is not supported in this environment"
+  hatası veriyordu: React yalnızca geliştirmede sunucu hata yığınlarını eval
+  ile kuruyor, Faz 19'un CSP'si buna izin vermiyordu. Tarayıcı testleri üretim
+  derlemesine karşı koştuğu için görülmedi — kullanıcı bildirdi. `'unsafe-eval'`
+  yalnızca `NODE_ENV=development` iken ekleniyor (Next 16'nın CSP rehberindeki
+  biçim). Üretim politikasında olmadığı tarayıcı testinde doğrulanıyor;
+  mutasyonla sınandı.
+
 ## Bilinen sorunlar
 
 Yok.

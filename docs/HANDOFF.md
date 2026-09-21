@@ -18,7 +18,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 | Alan | Değer |
 |---|---|
 | Aktif dal | `main` (tüm fazlar bitti) |
-| Son commit | `7b3f328 — Merge branch 'docs/english-summary'` |
+| Son commit | `60095a7 — Merge branch 'fix/dev-csp-eval'` |
 | CI | Yeşil — beş işin beşi (ilk yeşil koşu: saat düzeltmesi, `cccee9f`) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
