@@ -20,7 +20,7 @@ namespace FlowDesk.IntegrationTests.Support;
 /// </remarks>
 public sealed class AzuriteContainerFixture : IAsyncLifetime
 {
-    private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:latest";
+    private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:3.37.0";
     private const int BlobPort = 10000;
 
     /// <summary>
