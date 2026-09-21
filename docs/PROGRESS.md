@@ -3,7 +3,7 @@
 Bu dosya faz seviyesindeki ilerlemeyi takip eder. Her faz sonunda güncellenir.
 Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 
-**Son güncelleme:** 2026-09-20
+**Son güncelleme:** 2026-09-21
 
 ---
 
@@ -29,20 +29,68 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 17 — Playwright E2E
 - [x] Faz 18 — Gözlemlenebilirlik
 - [x] Faz 19 — Güvenlik Sertleştirme
-- [ ] Faz 20 — CI/CD
+- [x] Faz 20 — CI/CD
 - [ ] Faz 21 — Demo Verisi
 - [ ] Faz 22 — README ve Portfolyo Cilası
 - [ ] Faz 23 — Nihai Üretim Denetimi
 
 ## Aktif faz
 
-**Faz 20 — CI/CD**
+**Faz 21 — Demo Verisi**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 20 — CI/CD · Tamamlandı
+
+İki iş: her değişikliği kendiliğinden doğrulayan bir boru hattı ve uygulamanın
+üretimde nasıl paketlendiğinin somut karşılığı. Kararlar ADR-0044'te.
+
+**Üretim imajları.** Backend tek bir çok aşamalı `Dockerfile` ile hem API hem
+Worker olarak derleniyor (`--target api` / `--target worker`); frontend Next'in
+`standalone` çıktısını taşıyor. Üçü de root olmayan kullanıcıyla çalışıyor,
+`.dockerignore` host'un `obj/`, `node_modules/` ve `.env` dosyalarını bağlamın
+dışında tutuyor. Derlenmiş boyutlar: api 406 MB, worker 366 MB, web 447 MB.
+
+**Tek köken (same-origin) üretim yığını.** `infra/docker-compose.prod.yml`
+API, Worker, web ve önlerinde Caddy'yi ayağa kaldırıyor; Caddy `/api/*` ve
+`/health/*` dışındaki her şeyi frontend'e veriyor. Tek köken olunca tarayıcıda
+CORS yok, çerez `SameSite=Strict` ile yetiyor ve `Network__TrustedProxies`
+rate limiting'in gerçek istemciyi görmesini sağlıyor (Faz 19).
+
+**Şema üretimde başlangıçta uygulanıyor.** `Postgres:ApplyMigrationsOnStart`
+açıkken API, EF migration'larını bir kez ve kilit altında uyguluyor;
+geliştirmede kapalı kalıyor ki elle `dotnet ef` akışı değişmesin.
+
+**CI beş ayrı işe bölündü** (backend, frontend, e2e, security, images).
+Ayrılması bilinçli: hangisinin düştüğü tek bakışta görünüyor ve birbirlerini
+beklemiyorlar. E2E işi Compose altyapısını gerçekten başlatıp suite'i koşuyor,
+başarısızlıkta Playwright izlerini artefakt olarak bırakıyor. Sırlar depoda
+değil: CI `.env.example`'ı kopyalıyor, değerler yalnızca o koşunun
+konteynerleri için yaşıyor.
+
+**Devredilen üç teknik borcun üçü de bu fazda kapandı.**
+
+1. **E2E artık kendi veritabanını kullanıyor.** Suite `flowdesk_e2e` veritabanını
+   kendi açıp migration'ları uyguluyor; geliştirme verisi karışmıyor.
+2. **Kuyruk öneki** (`Messaging:QueuePrefix`) eklendi; E2E `e2e.*` kuyruklarını
+   ve kendi exchange'ini kullanıyor, açık bir geliştirme Worker'ı artık
+   suite'in mesajlarını çalamıyor. Testle korunuyor.
+3. **İmaj etiketleri sabitlendi** (mailpit v1.31.2, azurite 3.37.0,
+   caddy 2.11.4-alpine) ve `format:check` CI'da zorunlu bir adım oldu.
+
+Doğrulama tahmin değil ölçüm: üretim yığını ayağa kaldırılıp Caddy üzerinden
+(`http://localhost:8080`) kayıt, refresh çerezi, çalışma alanı açma, Worker
+üzerinden Mailpit'e ulaşan davet e-postası, nonce'lu CSP belgesi ve proxy
+arkasında doğru bölümlenen 429 canlı olarak görüldü. İş akışı dosyası
+actionlint'ten bulgusuz geçti.
+
+Testler: backend 512/512 (230 birim + 282 entegrasyon), E2E 14/14.
+
+---
 
 ### Faz 19 — Güvenlik Sertleştirme · Tamamlandı
 
@@ -1007,16 +1055,14 @@ Yok.
 
 ## Teknik borç
 
-- **E2E geliştirme veritabanını kullanıyor.** Her test benzersiz kişi ve alan
-  açtığı için sorun çıkarmıyor, ama veri birikiyor ve açık bir geliştirme
-  Worker'ı aynı kuyrukları dinliyor. CI'da (Faz 20) E2E için ayrı, taze bir
-  veritabanı ve kuyruk öneki olmalı.
-- **İmaj etiketleri sabit değil.** Compose'da ve testlerde `axllent/mailpit` ile
-  Azurite `latest` kullanıyor. CI (Faz 20) öncesi sürüm sabitlenmeli. Faz 18'de
-  eklenen Prometheus ve Grafana sabit sürümle geldi.
-- **`format:check` CI'da zorunlu değil.** Faz 07'den beri biriken kayma, komut
-  faz sonu listesinde olmadığı için görülmedi. Faz 16 sonrası CLAUDE.md'deki
-  listeye eklendi; Faz 20'de CI'da da zorunlu olmalı.
+Yok. Devreden üç madde de Faz 20'de kapandı:
+
+- ~~E2E geliştirme veritabanını kullanıyor~~ → suite kendi `flowdesk_e2e`
+  veritabanını açıyor ve `e2e.*` kuyruk önekini kullanıyor (ADR-0044).
+- ~~İmaj etiketleri sabit değil~~ → mailpit v1.31.2, azurite 3.37.0,
+  caddy 2.11.4-alpine.
+- ~~`format:check` CI'da zorunlu değil~~ → CI'da frontend ve e2e için zorunlu
+  adım.
 
 ## Ertelenen özellikler
 
@@ -1227,4 +1273,19 @@ Faz 19 sonunda:
 | `./scripts/security-scan.sh` | Açık yok; ayrıştırıcı sahte bulguyla da sınandı (çıkış 1) |
 | Sunulan HTML ölçümü | Statik sayfada 18 betiğin 0'ı, istek anında render'da 18'i nonce taşıyor |
 | Mutasyon kontrolü | Nonce mekanizması bozulduğunda tarayıcı testi düşüyor |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 20 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 512/512 başarılı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
+| `./scripts/security-scan.sh` | Açık yok |
+| `actionlint .github/workflows/ci.yml` | Bulgu yok |
+| `docker build` (api / worker / web) | Başarılı — 406 MB / 366 MB / 447 MB |
+| Üretim yığını (Caddy, `localhost:8080`) | Kayıt, refresh çerezi, çalışma alanı, davet e-postası (Worker → Mailpit), nonce'lu CSP ve proxy arkasında 429 canlı doğrulandı |
+| Kuyruk öneki | `e2e.*` kuyrukları broker'da ayrı görüldü; testle korunuyor |
 | Migration | **Yok** — bu faz şema değiştirmiyor |

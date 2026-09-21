@@ -50,6 +50,7 @@ olarak işaretlenir ve yerine geçen ADR referans verilir.
 | ADR-0041 | Tarayıcı testleri gerçek uygulamayı kendi portlarında başlatır | Kabul edildi |
 | ADR-0042 | Gözlemlenebilirlik: JSON log, iz zinciri ve OTLP ile metrik | Kabul edildi |
 | ADR-0043 | Güvenlik başlıkları uygulamada; CSP nonce'lu; istemci adresi güvenilen proxy'den | Kabul edildi |
+| ADR-0044 | CI her şeyi koşar, imajlar derlenir; ortamlar kuyruk öneki ve kendi veritabanıyla ayrılır | Kabul edildi |
 
 ---
 
@@ -1660,3 +1661,64 @@ sisteme toplam on olur. Doğru olan, yalnızca önündeki proxy'ye inanmak; ve
 - Bağımlılık taraması tek betiğe toplandı ve bulgu varsa sıfırdan farklı kodla
   çıkıyor. İlk hâli sessizce hiçbir şey yapmıyordu: `dotnet list` bulgu
   bulduğunda da `0` ile çıkıyor ve metin çıktısı yerelleştirilmiş. JSON okunuyor.
+
+---
+
+## ADR-0044 — CI her şeyi koşar, imajlar derlenir; ortamlar kuyruk öneki ve kendi veritabanıyla ayrılır
+
+**Bağlam.** Faz 20 CI/CD. Üç karar gerekiyordu: CI ne koşar, üretim imajları
+nasıl derlenir ve dağıtım nasıl duracak, ve Faz 16–17'den kalan üç teknik borç
+nasıl kapanır (E2E'nin geliştirme veritabanını kullanması, `latest` imaj
+etiketleri, `format:check`'in CI'da olmaması).
+
+**Karar.**
+
+1. **CI, faz sonu komutlarının tamamını koşar** — backend derleme ve testler,
+   frontend biçim/lint/tip/derleme, tarayıcı testleri, bağımlılık taraması — ve
+   üç üretim imajını derler. İşler ayrı: hangisinin düştüğü tek bakışta görünür.
+2. **İmajlar derlenir, yayınlanmaz.** Kayıt defteri (registry) kararı
+   verilmedi; derlemenin kendisi Dockerfile'ların bozulmadığını söyler.
+3. **Tek Dockerfile, iki hedef** (API ve Worker). Frontend ayrı, Next'in
+   `standalone` çıktısıyla. Üçü de kök olmayan kullanıcıyla çalışır.
+4. **Caddy frontend ile API'yi aynı origin altında sunar**; güvenlik
+   başlıklarını uygulamalar gönderir (ADR-0043), Caddy'nin işi yönlendirme ve
+   TLS. Üretim benzeri yığın `infra/docker-compose.prod.yml` ile ayağa kalkar.
+5. **Kuyruk öneki** (`Messaging:QueuePrefix`): bir broker'ı paylaşan ortamlar
+   birbirinin mesajını almaz.
+6. **`Postgres:ApplyMigrationsOnStart`**: yalnızca yaratılıp atılan ortamlar
+   için, varsayılan kapalı. E2E kendi veritabanını böyle kuruyor.
+7. **Tüm imaj etiketleri sabit sürüm.**
+
+**Gerekçe.**
+
+**Neden kuyruk öneki.** Kuyruk adları sabit ve aynı adı dinleyen iki tüketici
+aynı kuyruktan okur: mesajı önce isteyen alır. Geliştiricinin Worker'ı
+açıkken tarayıcı testleri koştuğunda testin beklediği bildirim geliştirme
+veritabanına yazılıyordu. Önekle her ortam kendi kuyruğunu açıyor ve aynı
+yönlendirme anahtarına bağlı her kuyruk mesajın kendi kopyasını alıyor. Önek
+idempotency anahtarına da giriyor; iki ortam aynı veritabanını paylaşsa bile
+birbirinin işini "zaten yapılmış" sanmıyor.
+
+**Neden başlangıçta migration, ama varsayılan kapalı.** Şema değişikliği,
+birinin izleyip geri alabileceği bilinçli bir adım olmalı; hangi örneğin önce
+açıldığına bağlı olmamalı. Ama yaratılıp atılan bir ortamda — tarayıcı testleri
+ve CI — ayrı bir adım yalnızca gereksiz bir tören. Bayrak ikisini ayırıyor.
+
+**Neden imajlar yayınlanmıyor.** Yayınlamak bir kayıt defteri, bir etiketleme
+düzeni ve bir kimlik bilgisi demek; hiçbiri hakkında karar verilmedi. Derleme
+adımı yine de değerli: Dockerfile'ların bozulduğu, ancak denenince anlaşılır.
+
+**Sonuçlar.**
+
+- **`.dockerignore` derlemenin parçası.** Yokken host'un `obj/` klasörleri
+  imaja kopyalanıp konteynerin restore çıktısını eziyordu; belirtisi
+  "paket bulunamadı" hatasıydı ve nedenine hiç benzemiyordu.
+- **`.editorconfig` de imaja girer.** Kural şiddetleri orada ve uyarılar hata
+  sayılıyor; kopyalanmazsa imaj başka bir kural kümesiyle derlenir ve düşer.
+- Üretimde `Network__TrustedProxies` Caddy'nin ağını göstermeli (ADR-0043);
+  `docker-compose.prod.yml` bunu yapıyor.
+- Yerelde `flowdesk_e2e` veritabanı ilk koşuda oluşuyor. Geliştirme
+  veritabanına artık test verisi birikmiyor.
+- `postgres`, `rabbitmq` ve `redis` imajları ana sürüm etiketiyle
+  (`17-alpine` gibi) sabit; yama sürümleri akıyor. Geri kalan her şey tam
+  sürüm.
