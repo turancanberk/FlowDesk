@@ -13,24 +13,21 @@ gerçekten gerekirse ayrıştırma mümkün olur.
 
 ## Katmanlar ve bağımlılık yönü
 
-```
-            ┌──────────────┐        ┌─────────────────┐
-            │ FlowDesk.Api │        │ FlowDesk.Worker │
-            └──────┬───────┘        └────────┬────────┘
-                   │                         │
-                   └───────────┬─────────────┘
-                               ▼
-                     ┌──────────────────────┐
-                     │ FlowDesk.Application │◄──────┐
-                     └──────────┬───────────┘       │
-                                ▼                   │
-                       ┌─────────────────┐          │
-                       │ FlowDesk.Domain │◄─────────┤
-                       └─────────────────┘          │
-                                                    │
-                            ┌──────────────────────────────┐
-                            │   FlowDesk.Infrastructure    │
-                            └──────────────────────────────┘
+```mermaid
+flowchart TB
+    Api["FlowDesk.Api<br/>HTTP uç noktaları"]
+    Worker["FlowDesk.Worker<br/>outbox ve tüketiciler"]
+    App["FlowDesk.Application<br/>use case'ler, sözleşmeler"]
+    Domain["FlowDesk.Domain<br/>varlıklar, kurallar"]
+    Infra["FlowDesk.Infrastructure<br/>EF Core, RabbitMQ, Redis, SMTP, Blob"]
+
+    Api --> App
+    Worker --> App
+    App --> Domain
+    Infra --> App
+    Infra --> Domain
+
+    style Domain fill:#eef6ff,stroke:#2563eb
 ```
 
 Oklar bağımlılık yönünü gösterir.
@@ -250,13 +247,27 @@ RabbitMQ'ya yayınlar. Tüketiciler en az bir kez (at-least-once) teslimat
 varsayar; tekrar eden teslimatta yan etki üretmemek için `ProcessedMessage`
 tablosu üzerinden idempotency uygulanır.
 
-```
-İstek ──► Api ──► [transaction: iş verisi + OutboxMessage] ──► PostgreSQL
-                                                                   │
-                            Worker ◄── SKIP LOCKED ile okuma ──────┘
-                              │
-                              ├──► RabbitMQ ──► Tüketici ──► e-posta / bildirim
-                              └──► başarı: kayıt işlendi olarak işaretlenir
+```mermaid
+sequenceDiagram
+    autonumber
+    actor İstemci
+    participant Api
+    participant DB as PostgreSQL
+    participant Worker
+    participant Broker as RabbitMQ
+    participant Tüketici
+    participant SMTP
+
+    İstemci->>Api: talebi birine ata
+    Api->>DB: tek transaction: talep + OutboxMessage
+    Api-->>İstemci: 200
+    Worker->>DB: FOR UPDATE SKIP LOCKED ile bekleyenleri al
+    Worker->>Broker: yayınla
+    Worker->>DB: işlendi olarak işaretle
+    Broker->>Tüketici: teslim, en az bir kez
+    Tüketici->>DB: ProcessedMessage ile tekrarı ele
+    Tüketici->>DB: bildirimi yaz
+    Tüketici->>SMTP: e-postayı gönder
 ```
 
 Worker'ın bütün bileşimi tek bir çağrıdır: `AddFlowDeskWorker`. Worker'ın
@@ -270,11 +281,19 @@ doğrulanır.
 
 Kubernetes kullanılmaz.
 
-```
-İnternet ──► Caddy (TLS) ──┬──► Next.js
-                           └──► ASP.NET Core Api ──┬──► PostgreSQL
-                                                   ├──► Redis
-                                                   └──► RabbitMQ ──► Worker
+```mermaid
+flowchart LR
+    Net["İnternet"] --> Caddy["Caddy<br/>TLS, tek origin"]
+    Caddy -->|"/api, /health"| Api["ASP.NET Core Api"]
+    Caddy -->|"diğer her yol"| Web["Next.js"]
+
+    Api --> PG[("PostgreSQL")]
+    Api --> Redis[("Redis")]
+    Api --> MQ[("RabbitMQ")]
+    MQ --> Worker
+    Worker --> PG
+    Worker --> SMTP["SMTP"]
+    Worker --> Blob["Blob"]
 ```
 
 Caddy, frontend ve API'yi **aynı origin** altında sunar (`/api` alt yolu).

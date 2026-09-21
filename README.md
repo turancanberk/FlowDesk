@@ -9,8 +9,43 @@ destek taleplerini, görevlerini ve ekiplerini yönetir.
 Ürün arayüzü ve dokümantasyon Türkçe'dir; kaynak kod tanımlayıcıları
 İngilizce'dir.
 
-> **Durum:** Geliştirme aşamasında. Güncel ilerleme `docs/PROGRESS.md`
-> içindedir. Bu README, fazlar tamamlandıkça genişletilecektir.
+> **Durum:** Çekirdek kapsam tamamlandı; güncel ilerleme `docs/PROGRESS.md`
+> içindedir.
+
+---
+
+## Ekran görüntüleri
+
+Aşağıdakilerin tamamı çalışan uygulamadan, demo verisiyle alınmıştır
+(`npm --prefix e2e run screenshots`). Görünen bütün e-posta adresleri
+`.example` alan adındadır; RFC 2606 gereği hiçbiri kayıt edilemez.
+
+![Dashboard](docs/images/dashboard.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/talepler.png" alt="Talep listesi"></td>
+    <td width="50%"><img src="docs/images/talep-detayi.png" alt="Talep detayı"></td>
+  </tr>
+  <tr>
+    <td>Talep listesi — durum, öncelik ve atanan kişiye göre filtreleme</td>
+    <td>Talep detayı — durum geçişi, atama, yorumlar ve dosya ekleri</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/musteriler.png" alt="Müşteri listesi"></td>
+    <td><img src="docs/images/ekip.png" alt="Ekip ve roller"></td>
+  </tr>
+  <tr>
+    <td>Müşteriler — Türkçe arama, durum filtresi, arşivleme</td>
+    <td>Ekip — rol matrisi ve bekleyen davetler</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/etkinlik.png" alt="Etkinlik akışı"></td>
+  </tr>
+  <tr>
+    <td colspan="2">Etkinlik — çalışma alanında ne olduğunun, kim yaptığının kaydı</td>
+  </tr>
+</table>
 
 ---
 
@@ -53,6 +88,32 @@ Her bileşen somut bir problem çözdüğü için seçilmiştir. Gerekçeler
   Tüketiciler at-least-once teslimata karşı idempotent. (ADR-0014)
 - **Kademeli altyapı.** Bir servis, onu gerçekten kullanan faz gelmeden
   Compose'a eklenmiyor. (ADR-0008)
+
+---
+
+## Mimari
+
+```mermaid
+flowchart TB
+    Api["FlowDesk.Api<br/>HTTP uç noktaları"]
+    Worker["FlowDesk.Worker<br/>outbox ve tüketiciler"]
+    App["FlowDesk.Application<br/>use case'ler, sözleşmeler"]
+    Domain["FlowDesk.Domain<br/>varlıklar, kurallar"]
+    Infra["FlowDesk.Infrastructure<br/>EF Core, RabbitMQ, Redis, SMTP, Blob"]
+
+    Api --> App
+    Worker --> App
+    App --> Domain
+    Infra --> App
+    Infra --> Domain
+
+    style Domain fill:#eef6ff,stroke:#2563eb
+```
+
+Oklar bağımlılık yönünü gösterir. Domain'den çıkan ok yoktur: hiçbir altyapıyı
+tanımaz. Bu kural mimari testlerle doğrulanır — düşerse faz tamamlanmış
+sayılmaz. Katmanların ayrıntısı, asenkron akış ve dağıtım diyagramları
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) içindedir.
 
 ---
 
@@ -125,20 +186,27 @@ cp .env.example .env
 #    Gözlemlenebilirlik için: --profile observability ekleyin
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 
-# 3. Veritabanını oluştur
+# 3. Depoya sabitlenmiş .NET araçlarını kur (dotnet-ef)
+dotnet tool restore
+
+# 4. Veritabanını oluştur
 dotnet ef database update \
   -p backend/src/FlowDesk.Infrastructure \
   -s backend/src/FlowDesk.Api
 
-# 4. Backend
+# 5. API
 dotnet run --project backend/src/FlowDesk.Api
 
-# 5. Frontend
+# 6. Worker — e-posta ve bildirimleri o üretir; API tek başına
+#    outbox'ı boşaltmaz, davet e-postası gönderilmez
+dotnet run --project backend/src/FlowDesk.Worker
+
+# 7. Frontend
 npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-> Kurulum adımları Faz 01 tamamlandığında çalışır hale gelir.
+API, Worker ve frontend ayrı süreçlerdir; üçü de aynı anda çalışır.
 
 ### Portlar
 
@@ -150,16 +218,15 @@ değiştirilebilir.
 |---|---|---|
 | Frontend | 3000 | 01 |
 | API | 5080 | 01 |
-| E2E frontend / API (suite kendisi başlatır) | 3100 / 5180 | 17 |
-| Prometheus (observability profili) | 9090 | 18 |
-| Grafana (observability profili) | 3001 | 18 |
 | PostgreSQL | 5433 | 01 |
-| RabbitMQ / yönetim | 5672 / 15672 | 10 |
+| RabbitMQ / yönetim arayüzü | 5672 / 15672 | 10 |
 | Mailpit SMTP / arayüz | 1025 / 8025 | 12 |
 | Azurite | 10000-10002 | 13 |
 | Redis | 6380 | 15 |
-| Prometheus | 9090 | 18 |
-| Grafana | 3001 | 18 |
+| Prometheus — `observability` profili | 9090 | 18 |
+| Grafana — `observability` profili | 3001 | 18 |
+| E2E frontend / API — suite kendisi başlatır | 3100 / 5180 | 17 |
+| Caddy — üretim benzeri yığın | 8080 | 20 |
 
 ### Demo verisi
 
@@ -189,6 +256,12 @@ kayıt edilemez, hiçbiri gerçek bir kişiye ait değildir.
 Parola geliştirmede `DemoParola2026`. Geliştirme dışında `DemoData__Password`
 verilmelidir; verilmezse seed çalışmaz. Gerekçe: ADR-0045.
 
+Yukarıdaki ekran görüntüleri bu veriden üretilir. Uygulama ayaktayken:
+
+```bash
+npm --prefix e2e run screenshots
+```
+
 ---
 
 ## Doğrulama
@@ -208,6 +281,8 @@ npm --prefix frontend run build
 # kendisi, kendi portlarında başlatır
 npm --prefix e2e ci
 npx --prefix e2e playwright install chromium
+npm --prefix e2e run format:check
+npm --prefix e2e run typecheck
 npm --prefix e2e test
 
 # Bağımlılık taraması

@@ -295,6 +295,10 @@ Bu bir **güvenlik ağıdır, tek başına güvenlik sınırı değildir**:
 Migration'lar `FlowDesk.Infrastructure` içinde tutulur, başlangıç projesi
 `FlowDesk.Api`'dir.
 
+`dotnet-ef` aracının sürümü `.config/dotnet-tools.json` ile depoya sabitlenir;
+temiz bir klonda önce `dotnet tool restore` çalıştırılır. Araç sürümü EF Core
+paket sürümüyle birlikte yükseltilir.
+
 ```bash
 # Yeni migration
 dotnet ef migrations add <Ad> \
