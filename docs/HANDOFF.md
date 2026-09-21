@@ -17,8 +17,9 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 23 birleştirildi — tüm fazlar bitti) |
-| Son commit | `64a5636 — Merge branch 'feat/final-audit'` (Faz 23) |
+| Aktif dal | `main` (tüm fazlar bitti) |
+| Son commit | `7b3f328 — Merge branch 'docs/english-summary'` |
+| CI | Yeşil — beş işin beşi (ilk yeşil koşu: saat düzeltmesi, `cccee9f`) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
@@ -365,6 +366,9 @@ Faz 23'te eklenenler / değişenler:
   port düzeltmesi
 - `.env.example`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` — yol ve port
   düzeltmeleri; `infra/docker-compose.prod.yml` — kapsam notu
+- `backend/src/FlowDesk.Infrastructure/Time/SystemClock.cs` — zaman mikrosaniyeye
+  kırpılıyor (CI'ı kıran 700 ns farkı); `backend/tests/.../Time/SystemClockTests.cs`
+- `README.md` — İngilizce özet (Faz 23 sonrası, CV için)
 
 Faz 22'de eklenenler / değişenler:
 
