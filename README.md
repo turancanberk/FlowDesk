@@ -1,5 +1,7 @@
 # FlowDesk
 
+![CI](https://github.com/turancanberk/FlowDesk/actions/workflows/ci.yml/badge.svg)
+
 Küçük ve orta ölçekli ekipler için çok kiracılı (multi-tenant) B2B müşteri
 operasyonları platformu. Organizasyonlar kendi çalışma alanlarında müşterilerini,
 destek taleplerini, görevlerini ve ekiplerini yönetir.
@@ -179,6 +181,19 @@ npm --prefix frontend run build
 npm --prefix e2e ci
 npx --prefix e2e playwright install chromium
 npm --prefix e2e test
+
+# Bağımlılık taraması
+./scripts/security-scan.sh
+```
+
+Hepsi ayrıca her itmede CI'da koşar (`.github/workflows/ci.yml`).
+
+### Üretim benzeri çalıştırma
+
+```bash
+docker compose --env-file .env \
+  -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
+# http://localhost:8080 — frontend ve API aynı origin altında (Caddy)
 ```
 
 Entegrasyon testleri Testcontainers ile gerçek bir PostgreSQL örneği

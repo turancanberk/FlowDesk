@@ -20,7 +20,7 @@ namespace FlowDesk.IntegrationTests.Support;
 /// </remarks>
 public sealed class MailpitContainerFixture : IAsyncLifetime
 {
-    private const string MailpitImage = "axllent/mailpit:latest";
+    private const string MailpitImage = "axllent/mailpit:v1.31.2";
     private const int SmtpPort = 1025;
     private const int HttpPort = 8025;
 

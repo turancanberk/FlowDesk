@@ -77,7 +77,7 @@ services:
     # Yerel geliştirme için SMTP sunucusu ve posta kutusu. Gerçek bir sağlayıcıya
     # bağlanmadan, gönderilen postanın biçimini ve içeriğini tarayıcıdan görmeyi
     # sağlıyor; test ortamında kimseye posta gitmemesi de bunun bir sonucu.
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.2
     container_name: flowdesk-mailpit
     restart: unless-stopped
     environment:
@@ -101,7 +101,7 @@ services:
   azurite:
     # Azure Blob Storage'ın yerel öykünücüsü. Üretimde gerçek bir depolama
     # hesabı kullanılacak; bağlantı dizesi dışında hiçbir şey değişmiyor.
-    image: mcr.microsoft.com/azure-storage/azurite:latest
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
     container_name: flowdesk-azurite
     restart: unless-stopped
     # Yalnızca blob servisi. Queue ve table bu üründe kullanılmıyor ve

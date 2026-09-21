@@ -1,0 +1,29 @@
+# Derleme bağlamına girmeyecekler (Faz 20).
+#
+# bin/ ve obj/ özellikle önemli: host'ta üretilmiş restore çıktısı imaja
+# kopyalanırsa konteynerin kendi restore'unu ezer ve derleme "paket bulunamadı"
+# ile düşer.
+
+**/bin/
+**/obj/
+**/node_modules/
+**/.next/
+**/.next.nosync/
+**/.turbo/
+
+.git/
+.github/
+.vscode/
+.idea/
+
+# Testler ve test çıktıları imajda işe yaramaz; onları CI çalıştırır.
+backend/tests/
+e2e/test-results/
+e2e/playwright-report/
+TestResults/
+
+# Yerel yapılandırma ve sırlar asla imaja girmez.
+.env
+*.env.local
+
+docs/

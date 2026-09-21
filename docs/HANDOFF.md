@@ -11,7 +11,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-20 (UTC)
+2026-09-21 (UTC)
 
 ## Repository Durumu
 
@@ -44,15 +44,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 17 — Playwright E2E
 - Faz 18 — Gözlemlenebilirlik
 - Faz 19 — Güvenlik Sertleştirme
+- Faz 20 — CI/CD
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 20 — CI/CD** (henüz başlanmadı)
+**Faz 21 — Demo Verisi** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 20 kapsamında henüz iş yapılmadı. Faz 19'un özeti `docs/PROGRESS.md`
-içinde; kararlar ADR-0043'te.
+Faz 21 kapsamında henüz iş yapılmadı. Faz 20'nin özeti `docs/PROGRESS.md`
+içinde; kararlar ADR-0044'te.
 
 ### Devam Eden İş
 
@@ -60,32 +61,32 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 20'nin tamamı (ROADMAP): GitHub Actions, üretim Dockerfile'ları, Caddy.
+Faz 21'in tamamı (ROADMAP): gerçekçi demo verisi üreten seed ve onu
+çalıştırma yolu.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/ci-cd` dalını aç.
+`feat/demo-data` dalını aç.
 
 Başlanacak yerler:
 
-- **GitHub Actions.** Faz sonu komutlarının tamamı (CLAUDE.md) ve
-  `./scripts/security-scan.sh` adım olsun. E2E için Compose servisleri
-  gerekiyor.
-- **Üretim Dockerfile'ları** (Api, Worker, frontend) ve **Caddy**: frontend ile
-  API aynı origin altında (ARCHITECTURE).
-- **Caddy eklenirken `Network__TrustedProxies` doldurulmalı.** Boş kalırsa
-  bütün istekler proxy'nin adresinden gelmiş görünür ve herkes aynı rate limit
-  kovasını paylaşır (ADR-0043). Frontend tarafında `FLOWDESK_ENABLE_HSTS=true`
-  ile HSTS açılır.
+- **Seed nerede çalışır?** Bugün üretimde şemayı API başlatırken uyguluyoruz
+  (`Postgres:ApplyMigrationsOnStart`, ADR-0044). Demo verisi bunun bir parçası
+  **değil**: ayrı ve açıkça tetiklenen bir yol olmalı, yoksa her üretim
+  başlangıcı sahte müşteri yazar.
+- **Veri gerçekçi ve Türkçe olmalı** (CLAUDE.md dil kuralları): isimler,
+  şirketler, talep konuları. Enum'lar ve kod tanımlayıcıları İngilizce kalır.
+- **Tarihler bugüne göre üretilmeli.** Dashboard "geciken" ve "bu hafta"
+  ayrımı yapıyor (Faz 09); sabit tarihli seed bir hafta sonra anlamsız bir
+  pano üretir.
+- **Deponun public olduğunu unutma.** Seed'de gerçek kişi verisi, gerçek
+  e-posta adresi veya çalışan parola olmaz; demo parolası yalnızca yerel
+  kullanım içindir ve dokümanda öyle anlatılmalıdır.
+- **Çok kiracılılık gösterilebilmeli:** en az iki çalışma alanı ve farklı
+  rollerde üyeler, ki izolasyon ve rol matrisi ekranda görülebilsin.
 
-**Bu fazda kapatılacak üç teknik borç** (PROGRESS "Teknik borç"):
-
-1. E2E kendi veritabanını ve kuyruk önekini kullanmalı; şu an geliştirme
-   veritabanını kullanıyor ve açık bir geliştirme Worker'ı aynı kuyrukları
-   dinliyor.
-2. `axllent/mailpit` ve Azurite imaj etiketleri `latest`; sabitlenmeli.
-   (Prometheus ve Grafana Faz 18'de sabit sürümle geldi.)
-3. `format:check` CI'da zorunlu adım olmalı.
+Dikkat: E2E suite'i kendi veritabanını (`flowdesk_e2e`) kullanıyor; seed
+oraya karışmamalı, yoksa sayıma dayanan testler kayar.
 
 ## Son Doğrulama Durumu
 
@@ -143,6 +144,12 @@ Fazların sonunda gerçekten çalıştırılanlar (en günceli en altta):
 | Prometheus / Grafana (Faz 18) | Metrikler OTLP ile ulaştı; panodaki sekiz sorgu da veri döndürdü |
 | `./scripts/security-scan.sh` (Faz 19) | Açık yok; ayrıştırıcı sahte bulguyla da sınandı |
 | Sunulan HTML ölçümü (Faz 19) | İstek anında render'da 18 betiğin 18'i CSP nonce'u taşıyor |
+| `dotnet test backend/FlowDesk.slnx` (Faz 20) | 512/512 başarılı (230 birim + 282 entegrasyon) |
+| `npm --prefix e2e test` (Faz 20) | 14/14 başarılı; kendi veritabanı ve `e2e.*` kuyruklarıyla |
+| `npm --prefix frontend run format:check / lint / typecheck / build` (Faz 20) | Başarılı |
+| `docker build` api / worker / web (Faz 20) | Başarılı — 406 MB / 366 MB / 447 MB |
+| Üretim yığını, Caddy üzerinden (Faz 20) | `localhost:8080`: kayıt, refresh çerezi, çalışma alanı, Worker → Mailpit davet e-postası, nonce'lu CSP, proxy arkasında 429 |
+| `actionlint .github/workflows/ci.yml` (Faz 20) | Bulgu yok |
 
 ## Mevcut Hatalar / Blokerler
 
@@ -345,6 +352,21 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 20'de eklenenler / değişenler:
+
+- `.github/workflows/ci.yml` — beş iş: backend, frontend, e2e, security, images
+- `backend/Dockerfile` (çok aşamalı; `--target api` / `--target worker`),
+  `frontend/Dockerfile` (standalone), `.dockerignore`
+- `infra/docker-compose.prod.yml`, `infra/caddy/Caddyfile` — tek köken yığın
+- `backend/src/FlowDesk.Infrastructure/Persistence/MigrationStartupExtensions.cs`,
+  `PostgresOptions.cs` (`ApplyMigrationsOnStart`)
+- `backend/src/FlowDesk.Infrastructure/Messaging/MessagingOptions.cs`
+  (`QueuePrefix`), `RabbitMqConnection.cs`, `MessageConsumerService.cs`
+- `e2e/support/environment.ts` — kendi veritabanı (`flowdesk_e2e`), kendi
+  exchange'i ve `e2e` kuyruk öneki
+- `infra/docker-compose.yml` — mailpit ve azurite etiketleri sabitlendi
+- `docs/ARCHITECTURE.md` ("Sürekli entegrasyon"), `README.md`, ADR-0044
 
 Faz 19'da eklenenler / değişenler:
 
@@ -645,7 +667,7 @@ Faz 01'de eklenenler:
 | Son migration | `AddOutboxTraceParent` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
 | Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments`, `ActivityEvents` |
-| Seed | Yok (Faz 21) |
+| Seed | Yok (Faz 21 — sıradaki faz) |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
 
@@ -663,6 +685,7 @@ fixture içinde uygular; yerel veritabanına dokunmaz.
 | Redis | **Aktif** — `flowdesk-redis`, host portu 6380, kalıcılık kapalı |
 | Prometheus | **Profilde** — `flowdesk-prometheus`, host portu 9090, OTLP alıcısı açık |
 | Grafana | **Profilde** — `flowdesk-grafana`, host portu 3001, veri kaynağı ve pano sağlanıyor |
+| Caddy | **Yalnızca üretim yığınında** — `infra/docker-compose.prod.yml`, host portu 8080; `/api/*` ve `/health/*` API'ye, kalanı web'e |
 
 Bu makinede host portları `5432`, `6379` ve `5000` başka süreçlerce kullanılıyor.
 Tam port haritası `docs/ARCHITECTURE.md` içindedir.

@@ -200,6 +200,47 @@ public sealed class MessageConsumerTests
         Assert.Equal(0u, await host.CountAsync(Cancellation));
     }
 
+    /// <summary>
+    /// Two environments on one broker do not take each other's messages.
+    /// </summary>
+    /// <remarks>
+    /// Queue names are fixed, so a developer's worker and the browser test
+    /// suite would otherwise consume from the same queue and each message
+    /// would go to whichever asked first. With a prefix each declares its own
+    /// queue, and a message bound to the same routing key reaches both
+    /// (ADR-0044).
+    /// </remarks>
+    [Fact]
+    public async Task Kuyruk_oneki_ortamlari_birbirinden_ayirir()
+    {
+        var shared = Guid.CreateVersion7().ToString("N");
+        var exchange = $"flowdesk.tests.{shared}";
+        var queue = $"flowdesk.tests.{shared}.probe";
+
+        var first = new ConcurrentQueue<ProbeMessage>();
+        var second = new ConcurrentQueue<ProbeMessage>();
+
+        await using var bir = await ConsumerHost.StartAsync(
+            _broker, _postgres, services => services.AddSingleton(new ProbeRecorder(first)),
+            Cancellation, exchange, queue, queuePrefix: "bir");
+
+        await using var iki = await ConsumerHost.StartAsync(
+            _broker, _postgres, services => services.AddSingleton(new ProbeRecorder(second)),
+            Cancellation, exchange, queue, queuePrefix: "iki");
+
+        var sent = new ProbeMessage(
+            Guid.CreateVersion7(), Guid.CreateVersion7(), DateTimeOffset.UtcNow, "iki ortam");
+
+        await bir.PublishAsync(sent, Cancellation);
+
+        // Each has its own queue, so each gets its own copy.
+        var birinci = await WaitForAsync(first, Cancellation);
+        var ikinci = await WaitForAsync(second, Cancellation);
+
+        Assert.Equal(sent.MessageId, birinci.MessageId);
+        Assert.Equal(sent.MessageId, ikinci.MessageId);
+    }
+
     private static async Task<ProbeMessage> WaitForAsync(
         ConcurrentQueue<ProbeMessage> received,
         CancellationToken cancellationToken)
@@ -375,17 +416,26 @@ public sealed class MessageConsumerTests
                 traceParent: null,
                 cancellationToken);
 
+        /// <param name="exchange">
+        /// Shared by two hosts in the queue-prefix test; per test otherwise.
+        /// </param>
+        /// <param name="queuePrefix">
+        /// What the host puts in front of the queue name it declares.
+        /// </param>
         public static async Task<ConsumerHost> StartAsync(
             RabbitMqContainerFixture broker,
             PostgresContainerFixture postgres,
             Action<IServiceCollection> configure,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? exchange = null,
+            string? queueName = null,
+            string queuePrefix = "")
         {
             // Per-test exchange and queue, so one test's consumer cannot eat
             // another's messages while they share a broker.
             var suffix = Guid.CreateVersion7().ToString("N");
-            var exchange = $"flowdesk.tests.{suffix}";
-            var queue = $"flowdesk.tests.{suffix}.probe";
+            exchange ??= $"flowdesk.tests.{suffix}";
+            var queue = queueName ?? $"flowdesk.tests.{suffix}.probe";
 
             var builder = Host.CreateApplicationBuilder();
 
@@ -397,6 +447,7 @@ public sealed class MessageConsumerTests
                 ["Messaging:UserName"] = RabbitMqContainerFixture.UserName,
                 ["Messaging:Password"] = RabbitMqContainerFixture.Password,
                 ["Messaging:ExchangeName"] = exchange,
+                ["Messaging:QueuePrefix"] = queuePrefix,
                 ["Messaging:PublishTimeoutSeconds"] = "10",
             });
 

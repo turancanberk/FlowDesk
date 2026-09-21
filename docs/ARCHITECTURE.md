@@ -282,3 +282,26 @@ Bunun iki sonucu vardır: üretimde CORS'a ihtiyaç kalmaz ve refresh token çer
 doğal olarak same-origin olur.
 
 Gizli bilgi imaja gömülmez; ortam değişkeni ve GitHub Secrets ile sağlanır.
+
+Üretim imajları: backend için tek Dockerfile ve iki hedef (`api`, `worker`),
+frontend için Next'in `standalone` çıktısı. Üçü de kök olmayan kullanıcıyla
+çalışır. Üretim benzeri yığın yerelde ayağa kalkar:
+
+```bash
+docker compose --env-file .env \
+  -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
+# http://localhost:8080
+```
+
+Caddy'nin arkasında istemci adresi `X-Forwarded-For`'dan okunur; bu yüzden
+`Network__TrustedProxies` doldurulmalıdır (ADR-0043).
+
+## Sürekli entegrasyon
+
+`.github/workflows/ci.yml` faz sonu komutlarının tamamını koşar — backend
+derleme ve testler, frontend biçim/lint/tip/derleme, tarayıcı testleri,
+bağımlılık taraması — ve üç üretim imajını derler. İmajlar yayınlanmaz: kayıt
+defteri kararı verilmedi (ADR-0044).
+
+Ortamlar birbirine karışmaz: tarayıcı testleri kendi veritabanını
+(`flowdesk_e2e`), kendi exchange'ini ve kendi kuyruk önekini kullanır.

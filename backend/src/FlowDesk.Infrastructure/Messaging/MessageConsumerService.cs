@@ -116,8 +116,10 @@ public sealed partial class MessageConsumerService : BackgroundService
         var channel = await _connection.OpenChannelAsync(cancellationToken);
         _channels.Add(channel);
 
+        var queueName = _connection.QueueNameFor(subscription.QueueName);
+
         await channel.QueueDeclareAsync(
-            queue: subscription.QueueName,
+            queue: queueName,
             // Survives a broker restart, as do the messages in it. A transient
             // queue would silently drop work that was already accepted.
             durable: true,
@@ -126,7 +128,7 @@ public sealed partial class MessageConsumerService : BackgroundService
             cancellationToken: cancellationToken);
 
         await channel.QueueBindAsync(
-            queue: subscription.QueueName,
+            queue: queueName,
             exchange: _connection.ExchangeName,
             routingKey: subscription.RoutingPattern,
             cancellationToken: cancellationToken);
@@ -143,7 +145,7 @@ public sealed partial class MessageConsumerService : BackgroundService
             HandleAsync(channel, subscription, delivery, cancellationToken);
 
         await channel.BasicConsumeAsync(
-            queue: subscription.QueueName,
+            queue: queueName,
             // Acknowledged by hand once the work has actually been done.
             // Auto-acknowledging would drop a message the moment it is
             // delivered, whether or not it was handled.
@@ -151,7 +153,7 @@ public sealed partial class MessageConsumerService : BackgroundService
             consumer: consumer,
             cancellationToken: cancellationToken);
 
-        LogSubscribed(_logger, subscription.QueueName, subscription.RoutingPattern);
+        LogSubscribed(_logger, queueName, subscription.RoutingPattern);
     }
 
     private async Task HandleAsync(
@@ -193,8 +195,17 @@ public sealed partial class MessageConsumerService : BackgroundService
             var handled = await dbContext.ExecuteInTransactionAsync(
                 async token =>
                 {
+                    /*
+                      Claimed under the prefixed name, so two environments
+                      sharing a database would not mistake each other's work
+                      for a duplicate.
+                    */
                     var claimed = await MessageIdempotency.TryClaimAsync(
-                        dbContext, messageId, subscription.ConsumerName, clock.UtcNow, token);
+                        dbContext,
+                        messageId,
+                        _connection.QueueNameFor(subscription.ConsumerName),
+                        clock.UtcNow,
+                        token);
 
                     if (!claimed)
                     {

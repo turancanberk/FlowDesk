@@ -96,7 +96,28 @@ export function backendEnvironment(): Record<string, string> {
       developer's own (ADR-0042). The instruments still record; nothing ships.
     */
     Observability__MetricsOtlpEndpoint: "",
+    /*
+      A database, an exchange and a queue prefix of its own. Queue names are
+      fixed, so a developer's worker listening to the same broker would take
+      the suite's messages — and the suite's rows would pile up in the
+      database people develop against (ADR-0044).
+    */
+    Postgres__ConnectionString: suiteConnectionString(),
+    Postgres__ApplyMigrationsOnStart: "true",
+    Messaging__ExchangeName: "flowdesk.e2e",
+    Messaging__QueuePrefix: "e2e",
   };
+}
+
+/**
+ * The suite's own database on the developer's PostgreSQL, created on first
+ * use by the API's start-up migration.
+ */
+function suiteConnectionString(): string {
+  const configured = readDotEnv()["Postgres__ConnectionString"] ?? "";
+
+  // Npgsql keys are case-insensitive and may be written either way.
+  return configured.replace(/(^|;)\s*database\s*=\s*[^;]*/i, "$1Database=flowdesk_e2e");
 }
 
 export function webEnvironment(): Record<string, string> {

@@ -29,6 +29,12 @@ const productionHeaders =
     : [];
 
 const nextConfig: NextConfig = {
+  /*
+    Üretim imajı yalnızca sunucunun gerçekten kullandığı dosyaları taşısın
+    (frontend/Dockerfile). Geliştirmede etkisi yok.
+  */
+  output: "standalone",
+
   async headers() {
     return [{ source: "/:path*", headers: [...securityHeaders, ...productionHeaders] }];
   },
