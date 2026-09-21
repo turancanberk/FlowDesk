@@ -198,10 +198,11 @@ yapılandırılabilir.
 | RabbitMQ yönetim | 15672 | 15672 | 10 |
 | Mailpit SMTP | 1025 | 1025 | 12 |
 | Mailpit arayüz | 8025 | 8025 | 12 |
-| Azurite blob/queue/table | 10000-10002 | 10000-10002 | 13 |
+| Azurite blob (yalnızca blob servisi) | 10000 | 10000 | 13 |
 | Redis | 6380 | 6379 | 15 |
 | Prometheus | 9090 | 9090 | 18 |
 | Grafana | 3001 | 3000 | 18 |
+| Caddy (üretim benzeri yığın) | 8080 | 8080 | 20 |
 
 ## Tarayıcı testleri (E2E)
 

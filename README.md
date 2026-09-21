@@ -186,27 +186,36 @@ cp .env.example .env
 #    Gözlemlenebilirlik için: --profile observability ekleyin
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 
-# 3. Depoya sabitlenmiş .NET araçlarını kur (dotnet-ef)
+# 3. .env'i kabuğa yükle
+#    Compose dosyayı --env-file ile okur, ama .NET süreçleri okumaz:
+#    yapılandırmayı ortam değişkenlerinden alırlar. Bu satır olmadan API
+#    "PostgreSQL connection string is not configured" ile durur.
+#    Her yeni terminalde tekrarlanır (bash/zsh).
+set -a && . ./.env && set +a
+
+# 4. Depoya sabitlenmiş .NET araçlarını kur (dotnet-ef)
 dotnet tool restore
 
-# 4. Veritabanını oluştur
+# 5. Veritabanını oluştur
 dotnet ef database update \
   -p backend/src/FlowDesk.Infrastructure \
   -s backend/src/FlowDesk.Api
 
-# 5. API
+# 6. API
 dotnet run --project backend/src/FlowDesk.Api
 
-# 6. Worker — e-posta ve bildirimleri o üretir; API tek başına
+# 7. Worker — e-posta ve bildirimleri o üretir; API tek başına
 #    outbox'ı boşaltmaz, davet e-postası gönderilmez
 dotnet run --project backend/src/FlowDesk.Worker
 
-# 7. Frontend
+# 8. Frontend
 npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-API, Worker ve frontend ayrı süreçlerdir; üçü de aynı anda çalışır.
+API, Worker ve frontend ayrı süreçlerdir; üçü de aynı anda, kendi
+terminallerinde çalışır. Her terminalde önce 3. adımdaki `set -a` satırı
+çalıştırılır.
 
 ### Portlar
 
@@ -221,7 +230,7 @@ değiştirilebilir.
 | PostgreSQL | 5433 | 01 |
 | RabbitMQ / yönetim arayüzü | 5672 / 15672 | 10 |
 | Mailpit SMTP / arayüz | 1025 / 8025 | 12 |
-| Azurite | 10000-10002 | 13 |
+| Azurite — yalnızca blob servisi | 10000 | 13 |
 | Redis | 6380 | 15 |
 | Prometheus — `observability` profili | 9090 | 18 |
 | Grafana — `observability` profili | 3001 | 18 |
