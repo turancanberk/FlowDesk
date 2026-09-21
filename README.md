@@ -12,6 +12,53 @@ destek taleplerini, görevlerini ve ekiplerini yönetir.
 > **Durum:** Çekirdek kapsam tamamlandı; güncel ilerleme `docs/PROGRESS.md`
 > içindedir.
 
+<details open>
+<summary><b>In English</b></summary>
+
+FlowDesk is a multi-tenant B2B customer operations platform for small and
+mid-sized teams: each organization gets a workspace holding its customers,
+support tickets, tasks, invitations and role-based team. The interface and the
+documentation are in Turkish; source identifiers, database columns, API routes
+and JSON fields are in English, so the code reads normally to any reviewer.
+Screenshots are below.
+
+What the project is built to demonstrate:
+
+- **Tenant isolation as a security boundary, not a convenience.** A resource
+  belonging to another workspace answers `404`, never `403`. Every workspace-
+  scoped endpoint is listed in one catalog and checked against the running
+  application, then exercised for every role and every foreign caller.
+- **Reliable messaging.** Integration events are written in the same
+  transaction as the business change (outbox pattern) and published by a
+  separate worker; consumers assume at-least-once delivery and are idempotent.
+- **Sessions that survive scrutiny.** Rotating refresh tokens stored hashed,
+  with replay detection; the access token lives only in browser memory, never
+  in `localStorage`.
+- **Tests against the real thing.** 546 automated tests: unit tests, plus
+  integration tests that run against real PostgreSQL, RabbitMQ, Redis, blob and
+  SMTP containers through Testcontainers, plus Playwright journeys driving the
+  production build of the frontend. There is no mocking library. A handful of
+  hand-written doubles exist where a test has to move time, force a failure or
+  watch one component on its own — a clock that can be advanced, a broker that
+  refuses to publish, a mail sender that records instead of sending — and the
+  full request → outbox → broker → consumer → SMTP chain is verified in one
+  test against the real services.
+- **Deliberate restraint.** No microservices, no Kubernetes, no MediatR, no
+  generic repository or unit-of-work wrapper over `DbContext`. Every
+  abstraction has a stated reason; the architectural decisions are recorded as
+  ADRs in `docs/DECISIONS.md`.
+
+Build, tests, formatting, linting, types, browser tests, dependency audit and
+the three production images all run on every push to `main` and on every pull
+request (`.github/workflows/ci.yml`).
+
+Where to look first: `backend/src/FlowDesk.Domain` for the rules,
+`backend/tests/FlowDesk.IntegrationTests/Hardening` for the isolation and
+role-matrix suite, and `docs/ARCHITECTURE.md` for the layer and deployment
+diagrams.
+
+</details>
+
 ---
 
 ## Ekran görüntüleri
@@ -298,7 +345,8 @@ npm --prefix e2e test
 ./scripts/security-scan.sh
 ```
 
-Hepsi ayrıca her itmede CI'da koşar (`.github/workflows/ci.yml`).
+Hepsi ayrıca `main`'e her itmede ve her pull request'te CI'da koşar
+(`.github/workflows/ci.yml`).
 
 ### Üretim benzeri çalıştırma
 
