@@ -17,8 +17,8 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 21 birleştirildi) |
-| Son commit | `05abafb — Merge branch 'feat/demo-data'` (Faz 21) |
+| Aktif dal | `main` (Faz 22 birleştirildi) |
+| Son commit | `ba645d6 — Merge branch 'feat/readme-polish'` (Faz 22) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
