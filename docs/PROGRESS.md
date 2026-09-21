@@ -82,6 +82,19 @@ ama e-posta Mailpit'e ve blob Azurite'e gidiyor ve ikisi de sabit yazılı.
 Başlığa bunun bir prova olduğu ve gerçek bir ortama çıkarken nelerin
 değişeceği yazıldı.
 
+**6. CI, ilk 23 fazın hiçbirinde yeşil olmamıştı.** Faz sonu komutları yerelde
+hep geçti ve GitHub'daki koşular hiç açılmadı; rozet kırmızıydı. Tek bir
+entegrasyon testi düşüyordu: `Resolving_records_the_moment_the_work_was_done`,
+700 nanosaniyelik farkla. Sebebi test değil, ürünün kendisiydi — PostgreSQL
+`timestamptz` mikrosaniye saklıyor, .NET 100-nanosaniyelik tick tutuyor.
+Yazmadan hemen sonraki yanıt tick hassasiyetli değeri, sonraki her okuma
+kırpılmış değeri taşıyordu: aynı alan, mikrosaniyenin altında farklı iki cevap.
+Saat artık saklanabilir çözünürlükte üretiyor. Test yazarken bir tuzak daha
+çıktı: ilk hâli makine saatini örnekliyordu ve bu makinenin saati zaten
+mikrosaniye çözünürlüklü olduğu için düzeltme kaldırıldığında bile geçiyordu.
+Kırpma ayrı ve seçilmiş değerlerle sınanan bir fonksiyona çıkarıldı; mutasyon
+artık iki testi düşürüyor.
+
 **Temiz denetim sonuçları.** Git geçmişinin tamamında özel anahtar, bulut
 kimlik bilgisi veya commit edilmiş `.env` yok; depodaki kimlik bilgisi benzeri
 her değer ya örnek, ya Azurite'in belgelenmiş genel emülatör anahtarı, ya da
@@ -92,7 +105,7 @@ UnitOfWork ve Kubernetes hiçbir yerde geçmiyor; `localStorage` yalnızca
 "kullanılmıyor" diyen bir yorumda geçiyor. CI, CLAUDE.md'deki faz sonu
 komutlarının tamamını koşuyor.
 
-Testler: backend 528/528, E2E 14/14.
+Testler: backend 532/532, E2E 14/14.
 
 ---
 
@@ -1460,10 +1473,11 @@ Faz 23 sonunda:
 | Komut / kontrol | Sonuç |
 |---|---|
 | `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
-| `dotnet test backend/FlowDesk.slnx` | 528/528 başarılı |
+| `dotnet test backend/FlowDesk.slnx` | 532/532 başarılı |
 | `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
 | `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
 | `./scripts/security-scan.sh` | Açık yok |
+| **GitHub Actions** | Denetimde kırmızı bulundu: 527/528, tek test mikrosaniye farkından düşüyordu. Saat düzeltildi, test mutasyonla doğrulandı |
 | **Temiz veritabanından kurulum** | README adımları harfiyen izlendi: `dotnet tool restore` → `dotnet ef database update` → API → Worker. Kayıt, çalışma alanı, müşteri, talep (TLP-1001) ve Worker üzerinden Mailpit'e ulaşan davet e-postası gerçek isteklerle doğrulandı |
 | Kiracı izolasyonu (canlı) | Yabancı çalışma alanı `404` (403 değil) |
 | `.env` okunuyor mu? | Ölçüldü: `dotnet ef` `.env`'deki veritabanını değil sabit yedeği bildirdi → kurulum adımı eklendi |
