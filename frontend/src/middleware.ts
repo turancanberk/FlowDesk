@@ -22,9 +22,22 @@ export function middleware(): NextResponse {
   */
   const apiOrigin = API_BASE_URL;
 
+  /*
+    React uses eval in development — and only there — to rebuild server-side
+    error stacks in the browser. Without it every page logs "eval() is not
+    supported in this environment" and those stacks are lost. Neither React nor
+    Next uses eval in a production build, so the production policy stays
+    without it; the browser tests run against that build and assert as much.
+
+    Keyed on NODE_ENV, which `next build` and `next start` always set to
+    "production": there is no configuration by which a deployed bundle takes
+    this branch.
+  */
+  const evalInDevelopment = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
   const policy = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${evalInDevelopment}`,
     /*
       Style stays inline-friendly. Base UI positions menus, dialogs and
       popovers with style attributes, and a policy that forbids them would
