@@ -38,6 +38,14 @@ test.describe("Güvenlik başlıkları", () => {
     // A nonce per document, and no blanket permission for inline script.
     expect(policy).toMatch(/script-src [^;]*'nonce-[a-f0-9]+'/);
     expect(policy).not.toContain("'unsafe-inline' 'nonce");
+
+    /*
+      Development needs eval — React rebuilds server error stacks with it — so
+      the development policy allows it. This suite runs against the production
+      build, which must not: eval is a script-injection sink, and allowing it
+      would undo most of what the nonce is for.
+    */
+    expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
 
