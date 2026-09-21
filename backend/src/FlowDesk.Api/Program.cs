@@ -1,6 +1,7 @@
 using FlowDesk.Api.Common;
 using FlowDesk.Api.Endpoints;
 using FlowDesk.Infrastructure;
+using FlowDesk.Infrastructure.DemoData;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,15 @@ var app = builder.Build();
   each start from a database of their own (ADR-0044).
 */
 await app.Services.ApplyFlowDeskMigrationsIfConfiguredAsync();
+
+/*
+  Started to seed and for nothing else. The process writes the demo workspaces
+  and exits without binding a port or serving a request (ADR-0045).
+*/
+if (args.WantsDemoDataSeed())
+{
+    return await app.Services.RunFlowDeskDemoDataSeedAsync();
+}
 
 app.EnsureSecureCookiePolicyInProduction();
 
@@ -90,6 +100,8 @@ app.MapNotificationEndpoints();
 app.MapActivityEndpoints();
 
 await app.RunAsync();
+
+return 0;
 
 /// <summary>
 /// Exposed so that <c>WebApplicationFactory</c> can boot the real application in

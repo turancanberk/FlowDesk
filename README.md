@@ -161,6 +161,34 @@ değiştirilebilir.
 | Prometheus | 9090 | 18 |
 | Grafana | 3001 | 18 |
 
+### Demo verisi
+
+Boş bir veritabanı ürünü anlatmıyor. Seed, bir süredir kullanılan iki çalışma
+alanı yazar: müşteriler, geçmişi olan talepler, yorumlar, görevler, etkinlik
+akışı ve okunmamış bildirimler.
+
+```bash
+dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data
+```
+
+Süreç yazar ve çıkar; hiçbir portu dinlemez. İkinci kez çalıştırılırsa durumu
+bildirir ve hiçbir şey yazmaz.
+
+| Hesap | Aydın Yazılım | Marmara Lojistik |
+|---|---|---|
+| `elif.demir@flowdesk.example` | Sahip | Yönetici |
+| `burak.sahin@flowdesk.example` | Yönetici | — |
+| `ceren.yilmaz@flowdesk.example` | Temsilci | — |
+| `deniz.kara@flowdesk.example` | Temsilci | Sahip |
+| `merve.aksoy@flowdesk.example` | İzleyici | — |
+
+Elif iki çalışma alanında farklı rollerde: kiracı izolasyonu ve rol matrisi
+ekranda görülebiliyor. Adresler `.example` alan adındadır (RFC 2606); hiçbiri
+kayıt edilemez, hiçbiri gerçek bir kişiye ait değildir.
+
+Parola geliştirmede `DemoParola2026`. Geliştirme dışında `DemoData__Password`
+verilmelidir; verilmezse seed çalışmaz. Gerekçe: ADR-0045.
+
 ---
 
 ## Doğrulama

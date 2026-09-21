@@ -30,19 +30,63 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 18 — Gözlemlenebilirlik
 - [x] Faz 19 — Güvenlik Sertleştirme
 - [x] Faz 20 — CI/CD
-- [ ] Faz 21 — Demo Verisi
+- [x] Faz 21 — Demo Verisi
 - [ ] Faz 22 — README ve Portfolyo Cilası
 - [ ] Faz 23 — Nihai Üretim Denetimi
 
 ## Aktif faz
 
-**Faz 21 — Demo Verisi**
+**Faz 22 — README ve Portfolyo Cilası**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 21 — Demo Verisi · Tamamlandı
+
+Boş bir veritabanı ürünü anlatmıyor. Seed, bir süredir kullanılıyormuş gibi
+görünen iki çalışma alanı yazıyor: 5 hesap, 10 müşteri, 16 talep, 11 görev,
+yorumlar, etkinlik akışı ve okunmamış bildirimler. Kararlar ADR-0045'te.
+
+**Ayrı bir komut, ayar ya da uç nokta değil.**
+`dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data` yazar ve
+çıkar; hiçbir portu dinlemez. Bir ayar yanlışlıkla açılır ve açık kalır; bir uç
+nokta, çalışan bir sisteme dışarıdan on bin satır yazmanın yoludur.
+
+**Domain üzerinden yazılıyor.** Talep numarası çalışma alanının sayacından
+geliyor (iki alan da TLP-1001'den başlıyor), durum geçişleri varlığın izin
+verdiği yollardan geçiyor. Ham SQL daha kısa olurdu ve ürünün asla
+üretemeyeceği kayıtlar yazardı.
+
+**Outbox'a hiçbir şey yazılmıyor.** Anlatılan işler günler önce bitmiş.
+Yayınlansaydı Worker kapanmış talepler hakkında bir yığın e-posta gönderirdi.
+Bildirimler doğrudan yazılıyor, zil ilk girişte boş değil.
+
+**Parola depoda değil.** Depo public; kaynağa yazılmış bir varsayılan, seed'i
+çalıştırmış her kurulum için çalışan bir kimlik bilgisi olurdu. Geliştirme
+dışında `DemoData:Password` zorunlu, verilmezse seed çalışmıyor ve nedenini
+söylüyor. Adresler `.example` alan adında (RFC 2606): hiçbiri kayıt edilemez.
+
+**Çok kiracılılık gösterilebiliyor.** Elif Aydın Yazılım'da Sahip, Marmara
+Lojistik'te Yönetici; Deniz tersi. Aynı hesap, iki çalışma alanı, iki farklı
+izin kümesi.
+
+**Bu fazda çıkan iki şey.** Sayaç satırı ham SQL ile kilitlendiği için
+çalışma alanı ve müşterileri talepler yazılmadan önce kaydedilmeliydi; ilk hâli
+yabancı anahtar ihlaliyle düştü. İkincisi bir test hatasıydı: numaralandırmanın
+1'den başladığı varsayılmıştı, ürün 1001'den başlıyor.
+
+Doğrulama çalışan sistemde yapıldı: seed gerçek bir veritabanına yazıldı, API
+o veritabanına karşı başlatıldı ve giriş, iki çalışma alanının panosu, talep
+listesi, yorumlarıyla bir talep, etkinlik akışı ve okunmamış bildirimler
+gerçek isteklerle görüldü. İzleyici rolündeki hesap yabancı çalışma alanı için
+`404` aldı. Kiracı izolasyonu testi mutasyonla doğrulandı.
+
+Testler: backend 528/528 (230 birim + 298 entegrasyon), E2E 14/14.
+
+---
 
 ### Faz 20 — CI/CD · Tamamlandı
 
@@ -1288,4 +1332,21 @@ Faz 20 sonunda:
 | `docker build` (api / worker / web) | Başarılı — 406 MB / 366 MB / 447 MB |
 | Üretim yığını (Caddy, `localhost:8080`) | Kayıt, refresh çerezi, çalışma alanı, davet e-postası (Worker → Mailpit), nonce'lu CSP ve proxy arkasında 429 canlı doğrulandı |
 | Kuyruk öneki | `e2e.*` kuyrukları broker'da ayrı görüldü; testle korunuyor |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 21 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 528/528 başarılı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
+| `./scripts/security-scan.sh` | Açık yok |
+| Gerçek veritabanına seed | 5 hesap, 10 müşteri, 16 talep, 11 görev yazıldı |
+| Çalışan API'ye karşı doğrulama | Giriş, iki çalışma alanının panosu, talep listesi, yorumlu talep detayı, etkinlik akışı ve okunmamış bildirimler gerçek isteklerle görüldü |
+| Kiracı izolasyonu | İzleyici rolündeki hesap yabancı çalışma alanı için `404`, kendi alanı için `200` aldı |
+| İkinci çalıştırma | "Demo verisi zaten var" — hiçbir şey yazılmadı, çıkış kodu 0 |
+| Geliştirme dışında parolasız çalıştırma | Reddedildi, nedeni yazıldı, çıkış kodu 1 |
+| Mutasyon kontrolü | Bir çalışma alanının talepleri yabancı kiracıya bağlandığında izolasyon testi düşüyor |
 | Migration | **Yok** — bu faz şema değiştirmiyor |

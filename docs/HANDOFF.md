@@ -11,7 +11,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-21 (UTC)
+2026-09-21 (UTC, Faz 21 sonu)
 
 ## Repository Durumu
 
@@ -45,15 +45,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 18 — Gözlemlenebilirlik
 - Faz 19 — Güvenlik Sertleştirme
 - Faz 20 — CI/CD
+- Faz 21 — Demo Verisi
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 21 — Demo Verisi** (henüz başlanmadı)
+**Faz 22 — README ve Portfolyo Cilası** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 21 kapsamında henüz iş yapılmadı. Faz 20'nin özeti `docs/PROGRESS.md`
-içinde; kararlar ADR-0044'te.
+Faz 22 kapsamında henüz iş yapılmadı. Faz 21'in özeti `docs/PROGRESS.md`
+içinde; kararlar ADR-0045'te.
 
 ### Devam Eden İş
 
@@ -61,32 +62,28 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 21'in tamamı (ROADMAP): gerçekçi demo verisi üreten seed ve onu
-çalıştırma yolu.
+Faz 22'nin tamamı (ROADMAP): diyagram, ekran görüntüleri, kurulum dokümanının
+son hâli.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/demo-data` dalını aç.
+`feat/readme-polish` dalını aç.
 
 Başlanacak yerler:
 
-- **Seed nerede çalışır?** Bugün üretimde şemayı API başlatırken uyguluyoruz
-  (`Postgres:ApplyMigrationsOnStart`, ADR-0044). Demo verisi bunun bir parçası
-  **değil**: ayrı ve açıkça tetiklenen bir yol olmalı, yoksa her üretim
-  başlangıcı sahte müşteri yazar.
-- **Veri gerçekçi ve Türkçe olmalı** (CLAUDE.md dil kuralları): isimler,
-  şirketler, talep konuları. Enum'lar ve kod tanımlayıcıları İngilizce kalır.
-- **Tarihler bugüne göre üretilmeli.** Dashboard "geciken" ve "bu hafta"
-  ayrımı yapıyor (Faz 09); sabit tarihli seed bir hafta sonra anlamsız bir
-  pano üretir.
-- **Deponun public olduğunu unutma.** Seed'de gerçek kişi verisi, gerçek
-  e-posta adresi veya çalışan parola olmaz; demo parolası yalnızca yerel
-  kullanım içindir ve dokümanda öyle anlatılmalıdır.
-- **Çok kiracılılık gösterilebilmeli:** en az iki çalışma alanı ve farklı
-  rollerde üyeler, ki izolasyon ve rol matrisi ekranda görülebilsin.
-
-Dikkat: E2E suite'i kendi veritabanını (`flowdesk_e2e`) kullanıyor; seed
-oraya karışmamalı, yoksa sayıma dayanan testler kayar.
+- **Ekran görüntüleri artık üretilebilir.** Demo verisi var (Faz 21):
+  `dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data`
+  sonrası pano, talep listesi, talep detayı, etkinlik akışı ve ekip ekranı
+  dolu görünür. Görüntülerde görünen adresler `.example` alan adındadır;
+  gerçek bir adres ya da kişi verisi görüntüye girmemeli (depo public).
+- **Diyagram**: katmanlar ve bağımlılık yönü, outbox akışı, tek köken üretim
+  yığını (ARCHITECTURE'daki metin anlatımın karşılığı).
+- **README şu an ne anlatıyor, ne anlatmıyor** kontrol edilmeli: kurulum,
+  doğrulama, demo verisi ve üretim benzeri çalıştırma bölümleri var;
+  ekran görüntüsü ve diyagram yok.
+- Faz 23 (nihai denetim) için bırakılan söz: "Uygulama boş bir PostgreSQL
+  veritabanından kurulabilmelidir" (DATABASE.md) — Faz 22'de değil, 23'te
+  doğrulanacak.
 
 ## Son Doğrulama Durumu
 
@@ -352,6 +349,18 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 21'de eklenenler / değişenler:
+
+- `backend/src/FlowDesk.Infrastructure/DemoData/` — `DemoDataSeeder`,
+  `DemoDataOptions`, `DemoDataPassword`, `DemoDataSeedResult`,
+  `DemoDataStartupExtensions`
+- `backend/src/FlowDesk.Api/Program.cs` — `--seed-demo-data` yolu ve çıkış kodu
+- `backend/src/FlowDesk.Infrastructure/InfrastructureServiceCollectionExtensions.cs`
+  — `DemoDataOptions` bağlanıyor (seeder DI'a kaydedilmiyor)
+- `backend/tests/.../DemoData/DemoDataSeederTests.cs`, `DemoDataPasswordTests.cs`
+- `README.md` (demo verisi bölümü ve hesap tablosu), `docs/DATABASE.md`,
+  `.env.example` (`DemoData__Password`), ADR-0045
 
 Faz 20'de eklenenler / değişenler:
 
@@ -667,7 +676,7 @@ Faz 01'de eklenenler:
 | Son migration | `AddOutboxTraceParent` |
 | Migration uygulandı mı | Evet — yerel `flowdesk` veritabanına uygulandı |
 | Tablolar | Identity kullanıcı tabloları, `RefreshTokens`, `Tenants`, `Memberships`, `Invitations`, `Customers`, `Tickets`, `TicketComments`, `TenantCounters`, `Tasks`, `OutboxMessages`, `ProcessedMessages`, `Notifications`, `Attachments`, `ActivityEvents` |
-| Seed | Yok (Faz 21 — sıradaki faz) |
+| Seed | Var (Faz 21) — şemadan ayrı komut: `--seed-demo-data`, ADR-0045 |
 
 Identity rol tabloları bilinçli olarak oluşturulmadı (ADR-0022).
 

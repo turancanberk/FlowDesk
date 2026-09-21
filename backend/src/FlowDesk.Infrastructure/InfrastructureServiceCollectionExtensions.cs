@@ -6,6 +6,7 @@ using FlowDesk.Application.Tickets.UploadAttachment;
 using FlowDesk.Infrastructure.Activity;
 using FlowDesk.Infrastructure.Authentication;
 using FlowDesk.Infrastructure.Caching;
+using FlowDesk.Infrastructure.DemoData;
 using FlowDesk.Infrastructure.Email;
 using FlowDesk.Infrastructure.HealthChecks;
 using FlowDesk.Infrastructure.Messaging;
@@ -58,6 +59,18 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddFlowDeskStorage(configuration);
         services.AddFlowDeskCaching(configuration);
         services.AddFlowDeskInfrastructureHealthChecks();
+
+        /*
+          Bound, but nothing else: the seeder itself is built only by the
+          command that runs it (DemoDataStartupExtensions). Validated on start
+          so that a password too short for the account policy is a startup
+          error rather than a failure five hundred rows into the seed.
+        */
+        services
+            .AddOptions<DemoDataOptions>()
+            .Bind(configuration.GetSection(DemoDataOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         return services;
     }

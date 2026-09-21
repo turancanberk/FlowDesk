@@ -315,6 +315,24 @@ dotnet ef migrations script \
 Uygulama boş bir PostgreSQL veritabanından bu komutlarla kurulabilmelidir. Bu
 Faz 23'te açıkça doğrulanır.
 
+## Demo verisi (Faz 21)
+
+Şemadan ayrı bir adımdır ve migration'ın parçası değildir: her üretim
+başlangıcının sahte müşteri yazması istenmez.
+
+```bash
+dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data
+```
+
+Seed, ham SQL yerine domain varlıkları üzerinden yazar. Talep numarası
+`TenantCounters` satırından alınır, durum geçişleri varlığın izin verdiği
+yollardan geçer. Bunun bir sırası var: çalışma alanı ve müşterileri talepler
+yazılmadan önce kaydedilir, çünkü sayaç satırı ham SQL ile kilitlenir ve ham
+SQL değişiklik izleyicisinde bekleyeni göremez. Tamamı tek transaction'dır.
+
+Seed hiçbir outbox satırı yazmaz; anlattığı işler geçmişte kalmıştır.
+Bildirimler doğrudan yazılır. Ayrıntı ve gerekçe: ADR-0045.
+
 ## Sorgu kalitesi
 
 ADR-0004 gereği EF Core doğrudan kullanılır; bu, sorgu kalitesini doğrudan

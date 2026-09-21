@@ -1722,3 +1722,62 @@ adımı yine de değerli: Dockerfile'ların bozulduğu, ancak denenince anlaşı
 - `postgres`, `rabbitmq` ve `redis` imajları ana sürüm etiketiyle
   (`17-alpine` gibi) sabit; yama sürümleri akıyor. Geri kalan her şey tam
   sürüm.
+
+---
+
+## ADR-0045 — Demo verisi komut satırından yazılır, domain üzerinden ve parolası yapılandırmadan gelir
+
+**Bağlam.** Faz 21 demo verisi. Depoyu açan birinin ürünü boş ekranlarla değil,
+bir süredir kullanılıyormuş gibi görünen bir destek masasıyla karşılaması
+isteniyor. Üç soru vardı: veri nasıl yazılır, ne zaman yazılır ve demo
+hesaplarının parolası nereden gelir.
+
+**Karar.**
+
+1. **Ayrı bir komut**: `dotnet run --project backend/src/FlowDesk.Api --
+   --seed-demo-data`. Süreç yazar ve çıkar; hiçbir portu dinlemez, hiçbir
+   isteğe yanıt vermez. Üretim imajında da aynı şekilde çalışır
+   (`docker compose ... run --rm api --seed-demo-data`).
+2. **Yazma domain varlıkları üzerinden**, ham SQL ile değil. Talep numarası
+   çalışma alanının sayacından alınır, durum geçişleri izin verilen yollardan
+   geçer, her kayıt ait olduğu çalışma alanını taşır.
+3. **Hiçbir şey outbox'a yazılmaz.** Anlatılan işler günler önce olmuş bitmiş
+   şeylerdir. Bildirimler doğrudan yazılır; zil ilk girişte boş değildir.
+4. **Zaman damgaları çalıştırma anına görelidir.** Sabit tarih, yazıldığı gün
+   doğru olan ve bir hafta sonra yanlış olan bir pano üretir.
+5. **Parola yapılandırmadan gelir.** Geliştirme dışında `DemoData:Password`
+   verilmezse seed çalışmaz ve nedenini söyler. Geliştirmede belgelenmiş bir
+   varsayılan vardır.
+6. **İkinci çalıştırma hiçbir şey yazmaz.** Çalışma alanları varsa süreç
+   durumu bildirip sıfır kodla çıkar.
+
+**Gerekçe.**
+
+**Neden komut, ayar ya da uç nokta değil.** Bir ayar yanlışlıkla açılır ve açık
+kalır; bir uç nokta, çalışan bir sisteme dışarıdan on bin satır yazmanın
+yoludur. Bağımsız değişken yalnızca biri onu yazdığında, bir kez olur.
+
+**Neden domain üzerinden.** Ham SQL daha kısa olurdu ve ürünün asla
+üretemeyeceği kayıtlar yazardı: sıfırdan başlayan talep numaraları, geçersiz
+durum geçişleri, sayaçla tutarsız bir tablo. Demo verisi ürünü anlatıyorsa,
+ürünün kurallarına uymalıdır.
+
+**Neden parola depoda değil.** Depo public. Kaynağa yazılmış bir varsayılan,
+seed'i bir kez çalıştırmış her kurulum için çalışan bir kimlik bilgisi olurdu —
+"ne yaptığına bakayım" diye çalıştıran biri dâhil (CLAUDE.md). Geliştirme
+istisnası bilinçli: kendi makinesindeki bir demoya giremiyorsa demo bir işe
+yaramaz, ve o veritabanına yalnızca o makineden erişilir.
+
+**Neden adresler `.example` alan adında.** RFC 2606 bu alan adını ayırır; hiçbir
+zaman kayıt edilemez. Demo'dan çıkan bir e-posta gerçek bir kişinin gelen
+kutusuna ulaşamaz ve buradaki hiçbir adres birinin gerçek adresi sanılamaz.
+
+**Sonuçlar.**
+
+- Seed, çalışma alanını ve müşterilerini talepleri yazmadan önce kaydeder:
+  talep numarası satır kilidiyle ham SQL'den alınır ve ham SQL, değişiklik
+  izleyicisinde bekleyeni göremez. Hepsi tek bir transaction içindedir.
+- Demo dosya eki yüklemez. Blob depolamasına bağımlı olmak, ekin asıl
+  ilginç olduğu yeri — talebi — zaten anlatan bir veri kümesi için pahalıdır.
+- İki çalışma alanı var ve bir hesap ikisinde farklı rollerde: çok
+  kiracılılık ve rol matrisi ekranda görülebiliyor (ADR-0003).
