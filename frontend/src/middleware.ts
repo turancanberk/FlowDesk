@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { API_BASE_URL } from "@/lib/api/api-origin";
+
 /*
   Content-Security-Policy for the documents the app serves.
 
@@ -11,10 +13,14 @@ import { NextResponse } from "next/server";
 export function middleware(): NextResponse {
   const nonce = crypto.randomUUID().replaceAll("-", "");
 
-  // The API lives on another origin in development; behind Caddy in
-  // production it is the same one. Both are allowed to be connected to,
-  // nothing else is.
-  const apiOrigin = process.env["NEXT_PUBLIC_API_BASE_URL"] ?? "";
+  /*
+    The API lives on another origin in development; behind Caddy in production
+    it is the same one. Both are allowed to be connected to, nothing else is.
+
+    The same value the HTTP client sends to (api-origin.ts). Reading the
+    variable separately here is what once let the two disagree.
+  */
+  const apiOrigin = API_BASE_URL;
 
   const policy = [
     "default-src 'self'",

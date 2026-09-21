@@ -32,17 +32,69 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 20 — CI/CD
 - [x] Faz 21 — Demo Verisi
 - [x] Faz 22 — README ve Portfolyo Cilası
-- [ ] Faz 23 — Nihai Üretim Denetimi
+- [x] Faz 23 — Nihai Üretim Denetimi
 
 ## Aktif faz
 
-**Faz 23 — Nihai Üretim Denetimi**
+**Yok — çekirdek kapsam tamamlandı.**
 
-Durum: Başlanmadı
+Sıradaki iş `docs/ROADMAP.md` içindeki "Kapsam dışı" başlığından seçilir.
 
 ---
 
 ## Faz geçmişi
+
+### Faz 23 — Nihai Üretim Denetimi · Tamamlandı
+
+Verilmiş sözlerin tek tek denetlendiği son faz. Yeni özellik eklenmedi;
+denetim beş gerçek hata buldu ve hepsi düzeltildi.
+
+**1. README'yi izleyen biri uygulamayı çalıştıramıyordu.** Hiçbir .NET süreci
+`.env` dosyasını okumuyor — onu yalnızca Compose `--env-file` ile okuyor.
+Talimatları harfiyen izleyip API'yi başlatmak
+`OptionsValidationException: 'ConnectionString' ... is not configured` ile
+düşüyordu. Ölçülerek bulundu, tahmin edilerek değil: temiz bir kabukta
+başlatıldı ve çöktü. Kurulum adımlarına `.env`'i kabuğa yükleyen satır eklendi
+ve adımlar temiz bir veritabanıyla baştan sona yeniden koşuldu.
+
+**2. Tarayıcı API'ye hiç bağlanamıyordu — değişken verilmediğinde.** İstemci
+`NEXT_PUBLIC_API_BASE_URL` yokken `http://localhost:5080`'e düşüyordu, ama
+CSP'yi yazan ara katman aynı durumda boş dize kullanıyordu: `connect-src
+'self'`. Giriş formu kusursuz açılıp her isteği reddedilirdi ve sebep yalnızca
+tarayıcı konsolunda görünürdü. İki yer artık tek bir modülden okuyor
+(`lib/api/api-origin.ts`); ölçüm hem hatayı hem düzelmeyi gösterdi
+(`connect-src 'self'` → `connect-src 'self' http://localhost:5080`). Üretimde
+değişken açıkça boş dize olduğu için politika değişmiyor. Değişmez, tarayıcı
+testine bir assertion olarak eklendi.
+
+**3. Bir ADR kendi dosyasıyla çelişiyordu.** ADR-0010 `backend/global.json`
+diyordu; dosya depo kökünde ve aynı dosyadaki ADR-0018 bunu zaten açıkça
+"depo kökündedir, `backend/` altında değil" diye yazıyordu.
+
+**4. Azurite portları üç yerde yanlıştı.** README, ARCHITECTURE ve
+`.env.example` 10000-10002 diyordu; yalnızca blob servisi çalışıyor ve yalnızca
+10000 yayınlanıyor. Kullanılmayan iki değişken kaldırıldı, port haritasına
+üretim yığınının Caddy portu eklendi.
+
+**5. Üretim Compose'u olduğundan fazlasını iddia ediyordu.** "Üretimdeki
+şekliyle çalıştırır" diyordu; paketleme, tek origin ve güvenilen proxy gerçek,
+ama e-posta Mailpit'e ve blob Azurite'e gidiyor ve ikisi de sabit yazılı.
+Başlığa bunun bir prova olduğu ve gerçek bir ortama çıkarken nelerin
+değişeceği yazıldı.
+
+**Temiz denetim sonuçları.** Git geçmişinin tamamında özel anahtar, bulut
+kimlik bilgisi veya commit edilmiş `.env` yok; depodaki kimlik bilgisi benzeri
+her değer ya örnek, ya Azurite'in belgelenmiş genel emülatör anahtarı, ya da
+zorunlu ortam değişkeni. Hiçbir pakette `preview`/`rc`/`beta` yok, imaj
+etiketleri sabit. Hiçbir test `Skip` edilmemiş, üç uyarı bastırmasının üçü de
+dar kapsamlı ve gerekçeli. `MediatR`, generic `IRepository<T>`, generic
+UnitOfWork ve Kubernetes hiçbir yerde geçmiyor; `localStorage` yalnızca
+"kullanılmıyor" diyen bir yorumda geçiyor. CI, CLAUDE.md'deki faz sonu
+komutlarının tamamını koşuyor.
+
+Testler: backend 528/528, E2E 14/14.
+
+---
 
 ### Faz 22 — README ve Portfolyo Cilası · Tamamlandı
 
@@ -1401,4 +1453,25 @@ Faz 22 sonunda:
 | Mermaid diyagramlar | Dördü de gerçek Mermaid ayrıştırıcısına verildi, hepsi geçerli |
 | Ekran görüntüsü / README eşleşmesi | Üretilen altı görüntünün altısı da README'de kullanılıyor |
 | `dotnet tool restore` + `dotnet ef --version` | Başarılı, 10.0.12 — araç sürümü depoya sabit |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 23 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 528/528 başarılı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check / typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
+| `./scripts/security-scan.sh` | Açık yok |
+| **Temiz veritabanından kurulum** | README adımları harfiyen izlendi: `dotnet tool restore` → `dotnet ef database update` → API → Worker. Kayıt, çalışma alanı, müşteri, talep (TLP-1001) ve Worker üzerinden Mailpit'e ulaşan davet e-postası gerçek isteklerle doğrulandı |
+| Kiracı izolasyonu (canlı) | Yabancı çalışma alanı `404` (403 değil) |
+| `.env` okunuyor mu? | Ölçüldü: `dotnet ef` `.env`'deki veritabanını değil sabit yedeği bildirdi → kurulum adımı eklendi |
+| CSP `connect-src` (değişken yokken) | Önce `'self'` (API engellenirdi) → düzeltme sonrası `'self' http://localhost:5080` |
+| Üretim yığını (Caddy, `localhost:8080`) | `connect-src 'self'`, belgede 20 nonce, kayıt + çalışma alanı 201, yabancı alan 404 |
+| Git geçmişi sır taraması | Özel anahtar, bulut kimlik bilgisi ya da commit edilmiş `.env` yok |
+| Sürüm politikası | Hiçbir pakette `preview`/`rc`/`beta`; imaj etiketleri sabit |
+| Test bütünlüğü | Hiçbir test `Skip` edilmemiş; üç uyarı bastırmasının üçü de dar kapsamlı ve gerekçeli |
+| Yasaklı bağımlılıklar | `MediatR`, generic `IRepository<T>`, generic UnitOfWork, Kubernetes: hiçbiri yok |
+| `docker compose config` (üretim) | Geçerli |
 | Migration | **Yok** — bu faz şema değiştirmiyor |

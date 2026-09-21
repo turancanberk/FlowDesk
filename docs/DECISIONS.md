@@ -256,7 +256,7 @@ değildi. .NET 9 bakım aşamasında ve desteği 10 Kasım 2026'da bitiyor.
 
 **Karar.** .NET 10 LTS hedeflenecek. SDK resmî `dotnet-install.sh` ile
 `~/.dotnet` altına yan yana kuruldu; mevcut 8 ve 9 SDK'larına dokunulmadı.
-Sürüm `backend/global.json` ile sabitlendi.
+Sürüm depo kökündeki `global.json` ile sabitlendi.
 
 **Gerekçe.** .NET 10 desteği 2028-11-14'e kadar sürüyor. Ekosistem paketleri
 (EF Core, Npgsql, Serilog, ASP.NET Core Identity) 10.x hattında güncel. Bir
