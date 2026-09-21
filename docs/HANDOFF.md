@@ -17,8 +17,8 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 19 birleştirildi) |
-| Son commit | `dbc04ad — Merge branch 'feat/security-hardening'` (Faz 19) |
+| Aktif dal | `main` (Faz 20 birleştirildi) |
+| Son commit | `242a013 — Merge branch 'feat/ci-cd'` (Faz 20) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
