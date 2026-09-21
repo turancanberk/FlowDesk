@@ -42,6 +42,18 @@ public sealed class MessagingOptions
     public string ExchangeName { get; set; } = "flowdesk.events";
 
     /// <summary>
+    /// Prefix for every queue this host declares and consumes, and for the
+    /// consumer name idempotency is claimed under.
+    /// </summary>
+    /// <remarks>
+    /// Empty in a deployment, where the broker belongs to one environment. Set
+    /// when several environments share a broker — a developer's worker and the
+    /// browser test suite on one machine, for instance — because queue names
+    /// are fixed and whoever consumes first takes the message (ADR-0032).
+    /// </remarks>
+    public string QueuePrefix { get; set; } = string.Empty;
+
+    /// <summary>
     /// How long a lost connection keeps being retried before giving up.
     /// </summary>
     /// <remarks>

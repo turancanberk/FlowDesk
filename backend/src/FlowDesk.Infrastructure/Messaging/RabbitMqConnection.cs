@@ -43,6 +43,10 @@ public sealed partial class RabbitMqConnection : IAsyncDisposable
 
     public string ExchangeName => _options.ExchangeName;
 
+    /// <summary>The queue name this environment uses for a subscription.</summary>
+    public string QueueNameFor(string queueName) =>
+        _options.QueuePrefix.Length == 0 ? queueName : $"{_options.QueuePrefix}.{queueName}";
+
     /// <summary>
     /// Opens a channel, connecting and declaring the exchange if needed.
     /// </summary>
