@@ -17,8 +17,8 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 | Alan | Değer |
 |---|---|
-| Aktif dal | `main` (Faz 20 birleştirildi) |
-| Son commit | `242a013 — Merge branch 'feat/ci-cd'` (Faz 20) |
+| Aktif dal | `main` (Faz 21 birleştirildi) |
+| Son commit | `05abafb — Merge branch 'feat/demo-data'` (Faz 21) |
 | Working tree | Temiz |
 | Remote | `origin` → https://github.com/turancanberk/FlowDesk (public) |
 
