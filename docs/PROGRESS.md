@@ -31,18 +31,54 @@ Operasyonel devir ayrıntısı için `docs/HANDOFF.md`.
 - [x] Faz 19 — Güvenlik Sertleştirme
 - [x] Faz 20 — CI/CD
 - [x] Faz 21 — Demo Verisi
-- [ ] Faz 22 — README ve Portfolyo Cilası
+- [x] Faz 22 — README ve Portfolyo Cilası
 - [ ] Faz 23 — Nihai Üretim Denetimi
 
 ## Aktif faz
 
-**Faz 22 — README ve Portfolyo Cilası**
+**Faz 23 — Nihai Üretim Denetimi**
 
 Durum: Başlanmadı
 
 ---
 
 ## Faz geçmişi
+
+### Faz 22 — README ve Portfolyo Cilası · Tamamlandı
+
+Bu faz ürüne kod eklemedi; projenin kendisini okunur yaptı.
+
+**Ekran görüntüleri bir betikle üretiliyor** (`npm --prefix e2e run
+screenshots`), elle alınıp klasöre atılmıyor. Gerekçesi basit: üretilme yolu
+olmayan bir görüntü kimsenin doğrulayamayacağı bir iddiadır ve ilk arayüz
+değişikliğinde dokümantasyon gibi görünen bir yanlışa dönüşür. Betik demo
+verisine (Faz 21) karşı koşuyor, üretim derlemesini kullanıyor — `next dev`
+her sayfanın köşesine geliştirme göstergesi çiziyor — ve altı ekranı
+yakalıyor.
+
+**Diyagramlar Mermaid'e çevrildi**: katmanlar ve bağımlılık yönü, outbox
+zincirinin sıra diyagramı, tek köken üretim yığını. ASCII kutular depoda
+okunuyordu ama GitHub'da hizasız görünüyordu; Mermaid metin olarak
+sürümleniyor ve GitHub doğrudan render ediyor. Dördü de gerçek Mermaid
+ayrıştırıcısıyla denendi, göze bakılarak değil.
+
+**Kurulumda üç gerçek hata bulundu.**
+
+1. **Adımlar `dotnet-ef`'i hiç kurmuyordu.** Temiz bir klonda üçüncü adım
+   "command not found" ile düşerdi. Araç sürümü artık
+   `.config/dotnet-tools.json` ile depoya sabit; adımlara `dotnet tool restore`
+   eklendi.
+2. **Worker hiç başlatılmıyordu.** Talimatı izleyen biri davet e-postasının
+   neden gelmediğini anlayamazdı: outbox'ı boşaltan süreç yoktu.
+3. **Port tablosunda Prometheus ve Grafana iki kez listeleniyordu.** Tekrar
+   giderildi, üretim yığınının Caddy portu eklendi.
+
+**Talep detayı görüntüsü ilk denemede en yeni talebi seçti** — yorumsuz,
+atanmamış, boş bir ekran. Betik artık üzerinde çalışılmış bir talep buluyor.
+
+Testler: backend 528/528, E2E 14/14 (bu faz test eklemedi).
+
+---
 
 ### Faz 21 — Demo Verisi · Tamamlandı
 
@@ -1349,4 +1385,20 @@ Faz 21 sonunda:
 | İkinci çalıştırma | "Demo verisi zaten var" — hiçbir şey yazılmadı, çıkış kodu 0 |
 | Geliştirme dışında parolasız çalıştırma | Reddedildi, nedeni yazıldı, çıkış kodu 1 |
 | Mutasyon kontrolü | Bir çalışma alanının talepleri yabancı kiracıya bağlandığında izolasyon testi düşüyor |
+| Migration | **Yok** — bu faz şema değiştirmiyor |
+
+Faz 22 sonunda:
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `dotnet build backend/FlowDesk.slnx` | Başarılı — 0 uyarı, 0 hata |
+| `dotnet test backend/FlowDesk.slnx` | 528/528 başarılı |
+| `npm --prefix frontend run format:check / lint / typecheck / build` | Başarılı |
+| `npm --prefix e2e run format:check` | Önce düştü (yeni betik biçimsizdi), düzeltildi, yeniden geçti |
+| `npm --prefix e2e run typecheck`, `npm --prefix e2e test` | Başarılı, 14/14 |
+| `./scripts/security-scan.sh` | Açık yok |
+| `npm --prefix e2e run screenshots` | Altı görüntü çalışan uygulamadan üretildi |
+| Mermaid diyagramlar | Dördü de gerçek Mermaid ayrıştırıcısına verildi, hepsi geçerli |
+| Ekran görüntüsü / README eşleşmesi | Üretilen altı görüntünün altısı da README'de kullanılıyor |
+| `dotnet tool restore` + `dotnet ef --version` | Başarılı, 10.0.12 — araç sürümü depoya sabit |
 | Migration | **Yok** — bu faz şema değiştirmiyor |

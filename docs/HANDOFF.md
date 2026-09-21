@@ -11,7 +11,7 @@ Kısa, güncel ve operasyonel olmalıdır.
 
 ## Son Güncelleme
 
-2026-09-21 (UTC, Faz 21 sonu)
+2026-09-21 (UTC, Faz 22 sonu)
 
 ## Repository Durumu
 
@@ -46,15 +46,16 @@ Kısa, güncel ve operasyonel olmalıdır.
 - Faz 19 — Güvenlik Sertleştirme
 - Faz 20 — CI/CD
 - Faz 21 — Demo Verisi
+- Faz 22 — README ve Portfolyo Cilası
 
 ## Şu Anda Nerede Kaldık?
 
-**Faz 22 — README ve Portfolyo Cilası** (henüz başlanmadı)
+**Faz 23 — Nihai Üretim Denetimi** (henüz başlanmadı)
 
 ### Tamamlananlar
 
-Faz 22 kapsamında henüz iş yapılmadı. Faz 21'in özeti `docs/PROGRESS.md`
-içinde; kararlar ADR-0045'te.
+Faz 23 kapsamında henüz iş yapılmadı. Faz 22 ürüne kod eklemedi: ekran
+görüntüsü betiği, Mermaid diyagramlar ve kurulum dokümanının düzeltilmesi.
 
 ### Devam Eden İş
 
@@ -62,28 +63,30 @@ Yok.
 
 ### Henüz Yapılmayanlar
 
-Faz 22'nin tamamı (ROADMAP): diyagram, ekran görüntüleri, kurulum dokümanının
-son hâli.
+Faz 23'ün tamamı (ROADMAP): baştan sona doğrulama.
 
 ## Bir Sonraki Yapılacak İş
 
-`feat/readme-polish` dalını aç.
+`feat/final-audit` dalını aç. Bu son faz; yeni özellik eklenmez.
 
-Başlanacak yerler:
+Verilmiş sözler, denetimde tek tek doğrulanacak:
 
-- **Ekran görüntüleri artık üretilebilir.** Demo verisi var (Faz 21):
-  `dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data`
-  sonrası pano, talep listesi, talep detayı, etkinlik akışı ve ekip ekranı
-  dolu görünür. Görüntülerde görünen adresler `.example` alan adındadır;
-  gerçek bir adres ya da kişi verisi görüntüye girmemeli (depo public).
-- **Diyagram**: katmanlar ve bağımlılık yönü, outbox akışı, tek köken üretim
-  yığını (ARCHITECTURE'daki metin anlatımın karşılığı).
-- **README şu an ne anlatıyor, ne anlatmıyor** kontrol edilmeli: kurulum,
-  doğrulama, demo verisi ve üretim benzeri çalıştırma bölümleri var;
-  ekran görüntüsü ve diyagram yok.
-- Faz 23 (nihai denetim) için bırakılan söz: "Uygulama boş bir PostgreSQL
-  veritabanından kurulabilmelidir" (DATABASE.md) — Faz 22'de değil, 23'te
-  doğrulanacak.
+- **"Uygulama boş bir PostgreSQL veritabanından bu komutlarla kurulabilmelidir"**
+  (DATABASE.md). Temiz bir veritabanı açıp README'nin kurulum adımlarını
+  harfiyen izle; çalışmayan bir adım bulunursa README düzeltilir.
+- **Kiracı izolasyonu, yetkilendirme ve token saklama** (SECURITY.md): iddia
+  edilen her savunma katmanının karşılığı testlerde var mı.
+- **Bağımlılık yönü** mimari testlerle korunuyor mu; `docs/` içindeki her
+  iddia depodaki gerçeklikle uyuşuyor mu (CLAUDE.md source of truth
+  hiyerarşisi).
+- **Sürüm politikası**: hiçbir yerde `preview`/`rc`/`beta` yok, imaj etiketleri
+  sabit.
+- **Depo public**: gerçek `.env`, parola, anahtar, token veya kişisel veri
+  commit edilmemiş. Ekran görüntülerinde görünen adresler dâhil.
+- Faz sonu komutlarının tamamı ve `./scripts/security-scan.sh` temiz.
+
+Not: ekran görüntüleri `npm --prefix e2e run screenshots` ile yeniden
+üretilebilir; arayüz değiştiyse güncellenmeli.
 
 ## Son Doğrulama Durumu
 
@@ -349,6 +352,14 @@ Kiracı izolasyonu bir **güvenlik sınırıdır**. Kullanıcı arayüzü Türk�
 kod tanımlayıcıları İngilizce, commit mesajları Türkçe.
 
 ## Değiştirilen Önemli Dosyalar
+
+Faz 22'de eklenenler / değişenler:
+
+- `e2e/scripts/capture-screenshots.ts` ve `e2e` içinde `screenshots` betiği
+- `docs/images/` — altı ekran görüntüsü (demo verisinden üretilmiş)
+- `README.md` — ekran görüntüleri, mimari diyagram, kurulumda Worker adımı,
+  port tablosundaki tekrarın giderilmesi
+- `docs/ARCHITECTURE.md` — üç ASCII diyagram Mermaid'e çevrildi
 
 Faz 21'de eklenenler / değişenler:
 
