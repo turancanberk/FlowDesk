@@ -29,7 +29,8 @@ konuşma geçmişi. Konuşma geçmişi hiçbir zaman deponun önüne geçmez.
 | Alan | Dil |
 |---|---|
 | Kullanıcı arayüzü, tüm görünen metinler | Türkçe |
-| Proje dokümantasyonu | Türkçe |
+| Proje dokümantasyonu (`docs/`) | Türkçe |
+| `README.md` | İngilizce (depo vitrini; CV ve işe alım için) |
 | Git commit açıklamaları | Türkçe (Conventional Commit ön ekleri İngilizce) |
 | Kaynak kod tanımlayıcıları | İngilizce |
 | Veritabanı tablo/sütun adları, API rotaları, JSON alanları | İngilizce |
