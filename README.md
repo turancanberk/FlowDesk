@@ -2,27 +2,18 @@
 
 ![CI](https://github.com/turancanberk/FlowDesk/actions/workflows/ci.yml/badge.svg)
 
-Küçük ve orta ölçekli ekipler için çok kiracılı (multi-tenant) B2B müşteri
-operasyonları platformu. Organizasyonlar kendi çalışma alanlarında müşterilerini,
-destek taleplerini, görevlerini ve ekiplerini yönetir.
+A multi-tenant B2B customer operations platform for small and mid-sized teams.
+Each organization gets its own workspace holding its customers, support
+tickets, tasks, invitations and role-based team.
 
-Ürün arayüzü ve dokümantasyon Türkçe'dir; kaynak kod tanımlayıcıları
-İngilizce'dir.
+The product interface and the in-depth documentation under `docs/` are in
+Turkish; source identifiers, database columns, API routes and JSON fields are
+in English, so the code reads normally to any reviewer.
 
-> **Durum:** Çekirdek kapsam tamamlandı; güncel ilerleme `docs/PROGRESS.md`
-> içindedir.
+> **Status:** Core scope complete. Phase-by-phase progress is tracked in
+> `docs/PROGRESS.md`.
 
-<details open>
-<summary><b>In English</b></summary>
-
-FlowDesk is a multi-tenant B2B customer operations platform for small and
-mid-sized teams: each organization gets a workspace holding its customers,
-support tickets, tasks, invitations and role-based team. The interface and the
-documentation are in Turkish; source identifiers, database columns, API routes
-and JSON fields are in English, so the code reads normally to any reviewer.
-Screenshots are below.
-
-What the project is built to demonstrate:
+## What the project is built to demonstrate
 
 - **Tenant isolation as a security boundary, not a convenience.** A resource
   belonging to another workspace answers `404`, never `403`. Every workspace-
@@ -39,8 +30,8 @@ What the project is built to demonstrate:
   SMTP containers through Testcontainers, plus Playwright journeys driving the
   production build of the frontend. There is no mocking library. A handful of
   hand-written doubles exist where a test has to move time, force a failure or
-  watch one component on its own — a clock that can be advanced, a broker that
-  refuses to publish, a mail sender that records instead of sending — and the
+  watch one component on its own (a clock that can be advanced, a broker that
+  refuses to publish, a mail sender that records instead of sending), and the
   full request → outbox → broker → consumer → SMTP chain is verified in one
   test against the real services.
 - **Deliberate restraint.** No microservices, no Kubernetes, no MediatR, no
@@ -57,95 +48,94 @@ Where to look first: `backend/src/FlowDesk.Domain` for the rules,
 role-matrix suite, and `docs/ARCHITECTURE.md` for the layer and deployment
 diagrams.
 
-</details>
-
 ---
 
-## Ekran görüntüleri
+## Screenshots
 
-Aşağıdakilerin tamamı çalışan uygulamadan, demo verisiyle alınmıştır
-(`npm --prefix e2e run screenshots`). Görünen bütün e-posta adresleri
-`.example` alan adındadır; RFC 2606 gereği hiçbiri kayıt edilemez.
+All screenshots are taken from the running application with demo data
+(`npm --prefix e2e run screenshots`). The interface is in Turkish. Every email
+address shown uses the `.example` domain; under RFC 2606 none of them can be
+registered.
 
 ![Dashboard](docs/images/dashboard.png)
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/talepler.png" alt="Talep listesi"></td>
-    <td width="50%"><img src="docs/images/talep-detayi.png" alt="Talep detayı"></td>
+    <td width="50%"><img src="docs/images/talepler.png" alt="Ticket list"></td>
+    <td width="50%"><img src="docs/images/talep-detayi.png" alt="Ticket detail"></td>
   </tr>
   <tr>
-    <td>Talep listesi — durum, öncelik ve atanan kişiye göre filtreleme</td>
-    <td>Talep detayı — durum geçişi, atama, yorumlar ve dosya ekleri</td>
+    <td>Tickets: filtering by status, priority and assignee</td>
+    <td>Ticket detail: status transitions, assignment, comments and attachments</td>
   </tr>
   <tr>
-    <td><img src="docs/images/musteriler.png" alt="Müşteri listesi"></td>
-    <td><img src="docs/images/ekip.png" alt="Ekip ve roller"></td>
+    <td><img src="docs/images/musteriler.png" alt="Customer list"></td>
+    <td><img src="docs/images/ekip.png" alt="Team and roles"></td>
   </tr>
   <tr>
-    <td>Müşteriler — Türkçe arama, durum filtresi, arşivleme</td>
-    <td>Ekip — rol matrisi ve bekleyen davetler</td>
+    <td>Customers: Turkish-aware search, status filter, archiving</td>
+    <td>Team: role matrix and pending invitations</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="docs/images/etkinlik.png" alt="Etkinlik akışı"></td>
+    <td colspan="2"><img src="docs/images/etkinlik.png" alt="Activity feed"></td>
   </tr>
   <tr>
-    <td colspan="2">Etkinlik — çalışma alanında ne olduğunun, kim yaptığının kaydı</td>
+    <td colspan="2">Activity: a record of what happened in the workspace and who did it</td>
   </tr>
 </table>
 
 ---
 
-## Teknoloji
+## Tech stack
 
-**Backend** — .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL
+**Backend:** .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL
 
-**Frontend** — Next.js, TypeScript, Tailwind CSS, TanStack Query,
+**Frontend:** Next.js, TypeScript, Tailwind CSS, TanStack Query,
 TanStack Table, React Hook Form, Zod
 
-**Altyapı** — Docker Compose, RabbitMQ, Redis, Mailpit, Azurite
+**Infrastructure:** Docker Compose, RabbitMQ, Redis, Mailpit, Azurite
 
-**Test** — xUnit, WebApplicationFactory, Testcontainers, Playwright
+**Testing:** xUnit, WebApplicationFactory, Testcontainers, Playwright
 
-**Gözlemlenebilirlik** — Serilog, OpenTelemetry, Prometheus, Grafana
+**Observability:** Serilog, OpenTelemetry, Prometheus, Grafana
 
-Her bileşen somut bir problem çözdüğü için seçilmiştir. Gerekçeler
-`docs/DECISIONS.md` içindedir.
-
----
-
-## Öne çıkan mühendislik kararları
-
-- **Modüler monolit.** Mikroservis değil. Tek ekip, yüksek tutarlılık ihtiyacı
-  ve süreç içi çağrılar bu ölçekte doğru tercih. Modül sınırları mimari
-  testlerle korunuyor. (ADR-0001)
-- **Kiracı izolasyonu bir güvenlik sınırı.** Üyelik doğrulaması, EF Core global
-  query filter ve yazma tarafı sahiplik kontrolü olmak üzere üç savunma
-  katmanı. Yabancı kaynak için `403` değil `404` dönülüyor, böylece kayıt
-  varlığı sızmıyor. (ADR-0002, ADR-0007)
-- **Token saklama.** Access token yalnızca tarayıcı belleğinde ve
-  `Authorization: Bearer` ile taşınıyor; `localStorage` kullanılmıyor. Refresh
-  token `HttpOnly` çerezde, döner, veritabanında hash'li saklanıyor ve replay
-  tespit edildiğinde tüm oturum ailesi iptal ediliyor. (ADR-0006)
-- **Soyutlama disiplini.** MediatR yok, generic `IRepository<T>` yok, generic
-  UnitOfWork yok. `DbContext` zaten Unit of Work; EF Core doğrudan ve bilinçli
-  kullanılıyor. (ADR-0004)
-- **Outbox Pattern.** Entegrasyon olayları iş verisiyle aynı transaction'da
-  kaydediliyor; Worker bunları `FOR UPDATE SKIP LOCKED` ile yayınlıyor.
-  Tüketiciler at-least-once teslimata karşı idempotent. (ADR-0014)
-- **Kademeli altyapı.** Bir servis, onu gerçekten kullanan faz gelmeden
-  Compose'a eklenmiyor. (ADR-0008)
+Every component was chosen because it solves a concrete problem. The
+reasoning is in `docs/DECISIONS.md`.
 
 ---
 
-## Mimari
+## Key engineering decisions
+
+- **Modular monolith.** Not microservices. A single team, strong consistency
+  requirements and in-process calls make it the right choice at this scale.
+  Module boundaries are enforced by architecture tests. (ADR-0001)
+- **Tenant isolation as a security boundary.** Three layers of defense:
+  membership verification, EF Core global query filters and write-side
+  ownership checks. A foreign resource returns `404` rather than `403`, so the
+  existence of a record never leaks. (ADR-0002, ADR-0007)
+- **Token storage.** The access token is kept only in browser memory and sent
+  as `Authorization: Bearer`; `localStorage` is not used. The refresh token
+  lives in an `HttpOnly` cookie, rotates, is stored hashed in the database,
+  and when replay is detected the whole session family is revoked. (ADR-0006)
+- **Abstraction discipline.** No MediatR, no generic `IRepository<T>`, no
+  generic UnitOfWork. `DbContext` already is a Unit of Work; EF Core is used
+  directly and deliberately. (ADR-0004)
+- **Outbox pattern.** Integration events are saved in the same transaction as
+  the business data; the Worker publishes them using `FOR UPDATE SKIP LOCKED`.
+  Consumers are idempotent against at-least-once delivery. (ADR-0014)
+- **Incremental infrastructure.** A service is not added to Compose until the
+  phase that actually uses it arrives. (ADR-0008)
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart TB
-    Api["FlowDesk.Api<br/>HTTP uç noktaları"]
-    Worker["FlowDesk.Worker<br/>outbox ve tüketiciler"]
-    App["FlowDesk.Application<br/>use case'ler, sözleşmeler"]
-    Domain["FlowDesk.Domain<br/>varlıklar, kurallar"]
+    Api["FlowDesk.Api<br/>HTTP endpoints"]
+    Worker["FlowDesk.Worker<br/>outbox and consumers"]
+    App["FlowDesk.Application<br/>use cases, contracts"]
+    Domain["FlowDesk.Domain<br/>entities, rules"]
     Infra["FlowDesk.Infrastructure<br/>EF Core, RabbitMQ, Redis, SMTP, Blob"]
 
     Api --> App
@@ -157,47 +147,49 @@ flowchart TB
     style Domain fill:#eef6ff,stroke:#2563eb
 ```
 
-Oklar bağımlılık yönünü gösterir. Domain'den çıkan ok yoktur: hiçbir altyapıyı
-tanımaz. Bu kural mimari testlerle doğrulanır — düşerse faz tamamlanmış
-sayılmaz. Katmanların ayrıntısı, asenkron akış ve dağıtım diyagramları
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) içindedir.
+Arrows show the direction of dependency. No arrow leaves Domain: it knows
+nothing about infrastructure. This rule is verified by architecture tests, and
+a phase does not count as complete if they fail. Layer details, the
+asynchronous flow and the deployment diagrams are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
-## Depo yapısı
+## Repository layout
 
 ```
 backend/
   src/
-    FlowDesk.Domain/          # varlıklar, değer nesneleri, domain kuralları
-    FlowDesk.Application/     # use case'ler, sözleşmeler, izinler
+    FlowDesk.Domain/          # entities, value objects, domain rules
+    FlowDesk.Application/     # use cases, contracts, permissions
     FlowDesk.Infrastructure/  # EF Core, PostgreSQL, Redis, RabbitMQ, Blob, SMTP
-    FlowDesk.Api/             # HTTP uç noktaları, auth, ProblemDetails
-    FlowDesk.Worker/          # outbox yayıncısı, mesaj tüketicileri
+    FlowDesk.Api/             # HTTP endpoints, auth, ProblemDetails
+    FlowDesk.Worker/          # outbox publisher, message consumers
   tests/
     FlowDesk.UnitTests/
     FlowDesk.IntegrationTests/
-frontend/                     # Next.js App Router uygulaması
-e2e/                          # Playwright senaryoları
-infra/                        # docker compose ve servis yapılandırmaları
-docs/                         # proje dokümantasyonu
+frontend/                     # Next.js App Router application
+e2e/                          # Playwright scenarios
+infra/                        # Docker Compose and service configuration
+docs/                         # project documentation (Turkish)
 ```
 
-Bağımlılık yönü tek yönlüdür: `Api`/`Worker` → `Application` → `Domain`, ve
-`Infrastructure` → `Application`/`Domain`. Domain hiçbir altyapıya bağımlı
-değildir.
+Dependencies point one way: `Api`/`Worker` → `Application` → `Domain`, and
+`Infrastructure` → `Application`/`Domain`. Domain depends on no
+infrastructure.
 
 ---
 
-## Gereksinimler
+## Requirements
 
-| Araç | Sürüm |
+| Tool | Version |
 |---|---|
 | .NET SDK | 10.0.x |
 | Node.js | 22.x (LTS) |
-| Docker + Compose | Güncel sürüm |
+| Docker + Compose | Current release |
 
-.NET 10 SDK kurulu değilse resmî betikle yan yana kurulabilir:
+If the .NET 10 SDK is not installed, the official script can install it side
+by side:
 
 ```bash
 curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
@@ -206,12 +198,12 @@ chmod +x dotnet-install.sh
 ```
 
 <details>
-<summary>macOS 26 / Apple Silicon: kurulum sonrası <code>SIGKILL</code> alıyorsanız</summary>
+<summary>macOS 26 / Apple Silicon: if you get <code>SIGKILL</code> after installing</summary>
 
-Betik mevcut bir `~/.dotnet` kurulumunun üzerine yazdığında host ikilisi
-`SIGKILL (Code Signature Invalid)` ile öldürülebilir. İmza aslında geçerlidir;
-sorun çekirdeğin o inode için tuttuğu bayat değerlendirmedir. Host ikilisini
-yeni bir inode ile değiştirmek sorunu çözer:
+When the script overwrites an existing `~/.dotnet` installation, the host
+binary can be killed with `SIGKILL (Code Signature Invalid)`. The signature is
+actually valid; the problem is a stale assessment the kernel keeps for that
+inode. Replacing the host binary with a new inode fixes it:
 
 ```bash
 cd ~/.dotnet && cp dotnet dotnet.new && mv -f dotnet.new dotnet && chmod +x dotnet
@@ -222,28 +214,28 @@ dotnet --version
 
 ---
 
-## Kurulum
+## Getting started
 
 ```bash
-# 1. Ortam değişkenlerini hazırla
+# 1. Prepare environment variables
 cp .env.example .env
-# .env içindeki örnek parolaları kendi yerel değerlerinizle değiştirin
+# Replace the sample passwords in .env with your own local values
 
-# 2. Altyapıyı başlat
-#    Gözlemlenebilirlik için: --profile observability ekleyin
+# 2. Start the infrastructure
+#    For observability, add: --profile observability
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 
-# 3. .env'i kabuğa yükle
-#    Compose dosyayı --env-file ile okur, ama .NET süreçleri okumaz:
-#    yapılandırmayı ortam değişkenlerinden alırlar. Bu satır olmadan API
-#    "PostgreSQL connection string is not configured" ile durur.
-#    Her yeni terminalde tekrarlanır (bash/zsh).
+# 3. Load .env into the shell
+#    Compose reads the file through --env-file, but the .NET processes do not:
+#    they take their configuration from environment variables. Without this
+#    line the API stops with "PostgreSQL connection string is not configured".
+#    Repeat in every new terminal (bash/zsh).
 set -a && . ./.env && set +a
 
-# 4. Depoya sabitlenmiş .NET araçlarını kur (dotnet-ef)
+# 4. Install the .NET tools pinned in the repository (dotnet-ef)
 dotnet tool restore
 
-# 5. Veritabanını oluştur
+# 5. Create the database
 dotnet ef database update \
   -p backend/src/FlowDesk.Infrastructure \
   -s backend/src/FlowDesk.Api
@@ -251,8 +243,8 @@ dotnet ef database update \
 # 6. API
 dotnet run --project backend/src/FlowDesk.Api
 
-# 7. Worker — e-posta ve bildirimleri o üretir; API tek başına
-#    outbox'ı boşaltmaz, davet e-postası gönderilmez
+# 7. Worker: it produces emails and notifications; the API alone does not
+#    drain the outbox, so no invitation email is sent without it
 dotnet run --project backend/src/FlowDesk.Worker
 
 # 8. Frontend
@@ -260,59 +252,62 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-API, Worker ve frontend ayrı süreçlerdir; üçü de aynı anda, kendi
-terminallerinde çalışır. Her terminalde önce 3. adımdaki `set -a` satırı
-çalıştırılır.
+The API, the Worker and the frontend are separate processes; all three run at
+the same time, each in its own terminal. Run the `set -a` line from step 3
+first in every terminal.
 
-### Portlar
+### Ports
 
-Bu proje varsayılan portları bilinçli olarak kaydırır; geliştirme makinesinde
-`5432`, `6379` ve `5000` sık kullanılan portlardır. Tümü `.env` ile
-değiştirilebilir.
+The project deliberately shifts the default ports, since `5432`, `6379` and
+`5000` are commonly taken on development machines. All of them can be changed
+through `.env`.
 
-| Servis | Port | Devreye girdiği faz |
+| Service | Port | Introduced in phase |
 |---|---|---|
 | Frontend | 3000 | 01 |
 | API | 5080 | 01 |
 | PostgreSQL | 5433 | 01 |
-| RabbitMQ / yönetim arayüzü | 5672 / 15672 | 10 |
-| Mailpit SMTP / arayüz | 1025 / 8025 | 12 |
-| Azurite — yalnızca blob servisi | 10000 | 13 |
+| RabbitMQ / management UI | 5672 / 15672 | 10 |
+| Mailpit SMTP / UI | 1025 / 8025 | 12 |
+| Azurite (blob service only) | 10000 | 13 |
 | Redis | 6380 | 15 |
-| Prometheus — `observability` profili | 9090 | 18 |
-| Grafana — `observability` profili | 3001 | 18 |
-| E2E frontend / API — suite kendisi başlatır | 3100 / 5180 | 17 |
-| Caddy — üretim benzeri yığın | 8080 | 20 |
+| Prometheus (`observability` profile) | 9090 | 18 |
+| Grafana (`observability` profile) | 3001 | 18 |
+| E2E frontend / API (started by the suite) | 3100 / 5180 | 17 |
+| Caddy (production-like stack) | 8080 | 20 |
 
-### Demo verisi
+### Demo data
 
-Boş bir veritabanı ürünü anlatmıyor. Seed, bir süredir kullanılan iki çalışma
-alanı yazar: müşteriler, geçmişi olan talepler, yorumlar, görevler, etkinlik
-akışı ve okunmamış bildirimler.
+An empty database does not explain the product. The seed writes two
+workspaces that look like they have been in use for a while: customers,
+tickets with history, comments, tasks, an activity feed and unread
+notifications.
 
 ```bash
 dotnet run --project backend/src/FlowDesk.Api -- --seed-demo-data
 ```
 
-Süreç yazar ve çıkar; hiçbir portu dinlemez. İkinci kez çalıştırılırsa durumu
-bildirir ve hiçbir şey yazmaz.
+The process writes and exits; it listens on no port. Run a second time, it
+reports the current state and writes nothing.
 
-| Hesap | Aydın Yazılım | Marmara Lojistik |
+| Account | Aydın Yazılım | Marmara Lojistik |
 |---|---|---|
-| `elif.demir@flowdesk.example` | Sahip | Yönetici |
-| `burak.sahin@flowdesk.example` | Yönetici | — |
-| `ceren.yilmaz@flowdesk.example` | Temsilci | — |
-| `deniz.kara@flowdesk.example` | Temsilci | Sahip |
-| `merve.aksoy@flowdesk.example` | İzleyici | — |
+| `elif.demir@flowdesk.example` | Owner | Admin |
+| `burak.sahin@flowdesk.example` | Admin | — |
+| `ceren.yilmaz@flowdesk.example` | Agent | — |
+| `deniz.kara@flowdesk.example` | Agent | Owner |
+| `merve.aksoy@flowdesk.example` | Viewer | — |
 
-Elif iki çalışma alanında farklı rollerde: kiracı izolasyonu ve rol matrisi
-ekranda görülebiliyor. Adresler `.example` alan adındadır (RFC 2606); hiçbiri
-kayıt edilemez, hiçbiri gerçek bir kişiye ait değildir.
+Elif has different roles in the two workspaces, so tenant isolation and the
+role matrix are visible on screen. The addresses use the `.example` domain
+(RFC 2606); none can be registered and none belongs to a real person.
 
-Parola geliştirmede `DemoParola2026`. Geliştirme dışında `DemoData__Password`
-verilmelidir; verilmezse seed çalışmaz. Gerekçe: ADR-0045.
+The development password is `DemoParola2026`. Outside development,
+`DemoData__Password` must be provided, otherwise the seed does not run.
+Reasoning: ADR-0045.
 
-Yukarıdaki ekran görüntüleri bu veriden üretilir. Uygulama ayaktayken:
+The screenshots above are generated from this data. With the application
+running:
 
 ```bash
 npm --prefix e2e run screenshots
@@ -320,7 +315,7 @@ npm --prefix e2e run screenshots
 
 ---
 
-## Doğrulama
+## Verification
 
 ```bash
 # Backend
@@ -333,56 +328,59 @@ npm --prefix frontend run lint
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
 
-# E2E — Compose servisleri ayakta olmalı; API, Worker ve frontend'i suite
-# kendisi, kendi portlarında başlatır
+# E2E: the Compose services must be up; the suite starts the API, the Worker
+# and the frontend itself, on its own ports
 npm --prefix e2e ci
 npx --prefix e2e playwright install chromium
 npm --prefix e2e run format:check
 npm --prefix e2e run typecheck
 npm --prefix e2e test
 
-# Bağımlılık taraması
+# Dependency scan
 ./scripts/security-scan.sh
 ```
 
-Hepsi ayrıca `main`'e her itmede ve her pull request'te CI'da koşar
+All of these also run in CI on every push to `main` and on every pull request
 (`.github/workflows/ci.yml`).
 
-### Üretim benzeri çalıştırma
+### Production-like run
 
 ```bash
 docker compose --env-file .env \
   -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
-# http://localhost:8080 — frontend ve API aynı origin altında (Caddy)
+# http://localhost:8080 serves the frontend and the API under one origin (Caddy)
 ```
 
-Entegrasyon testleri Testcontainers ile gerçek bir PostgreSQL örneği
-kullanır; SQLite ile değiştirilmez. Docker'ın çalışıyor olması gerekir.
+Integration tests use a real PostgreSQL instance through Testcontainers; it is
+never swapped for SQLite. Docker must be running.
 
 ---
 
-## Güvenlik
+## Security
 
-Bu depo public'tir ve gerçek gizli bilgi içermez. `.env.example` yalnızca örnek
-değerler taşır; gerçek değerler ortam değişkeni, .NET user-secrets veya GitHub
-Secrets ile sağlanır.
+This repository is public and contains no real secrets. `.env.example` holds
+sample values only; real values are supplied through environment variables,
+.NET user-secrets or GitHub Secrets.
 
-Kimlik doğrulama modeli, yetkilendirme izin matrisi, kiracı izolasyonu savunma
-katmanları ve zorunlu güvenlik testleri `docs/SECURITY.md` içindedir.
+The authentication model, the authorization permission matrix, the tenant
+isolation defense layers and the mandatory security tests are described in
+`docs/SECURITY.md`.
 
 ---
 
-## Dokümantasyon
+## Documentation
 
-| Doküman | İçerik |
+The documents below are written in Turkish.
+
+| Document | Contents |
 |---|---|
-| [docs/PRODUCT.md](docs/PRODUCT.md) | Ürün tanımı, roller, kullanıcı akışları |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Katmanlar, bağımlılık yönü, altyapı, portlar |
-| [docs/SECURITY.md](docs/SECURITY.md) | Kimlik doğrulama, yetkilendirme, kiracı izolasyonu |
-| [docs/DATABASE.md](docs/DATABASE.md) | Veri modeli, indeksler, kısıtlar, migration |
-| [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) | REST kuralları, hata biçimi, sayfalama |
-| [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | Tasarım yönü, token'lar, bileşen kuralları |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Mimari kararlar (ADR) |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Faz planı ve kapsam dışı özellikler |
-| [docs/PROGRESS.md](docs/PROGRESS.md) | Faz ilerlemesi ve doğrulama durumu |
-| [docs/HANDOFF.md](docs/HANDOFF.md) | Geliştirme devir dosyası |
+| [docs/PRODUCT.md](docs/PRODUCT.md) | Product definition, roles, user flows |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, dependency direction, infrastructure, ports |
+| [docs/SECURITY.md](docs/SECURITY.md) | Authentication, authorization, tenant isolation |
+| [docs/DATABASE.md](docs/DATABASE.md) | Data model, indexes, constraints, migrations |
+| [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) | REST conventions, error format, pagination |
+| [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | Design direction, tokens, component rules |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Architecture decision records (ADRs) |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Phase plan and out-of-scope features |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | Phase progress and verification status |
+| [docs/HANDOFF.md](docs/HANDOFF.md) | Development handoff notes |

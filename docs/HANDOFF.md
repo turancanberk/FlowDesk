@@ -369,6 +369,8 @@ Faz 23'te eklenenler / değişenler:
 - `backend/src/FlowDesk.Infrastructure/Time/SystemClock.cs` — zaman mikrosaniyeye
   kırpılıyor (CI'ı kıran 700 ns farkı); `backend/tests/.../Time/SystemClockTests.cs`
 - `README.md` — İngilizce özet (Faz 23 sonrası, CV için)
+- `README.md` — tamamen İngilizceye çevrildi; `CLAUDE.md` dil kurallarına
+  README satırı eklendi (Faz 23 sonrası, CV için)
 
 Faz 22'de eklenenler / değişenler:
 
